@@ -1,0 +1,52 @@
+course_code,course_title,lecturer_name,source_type,course_level,credit_hours,Semester
+COSC 370,Operations Research,Dr. A. Adu-Sackey,Departmental,3,3.0,2
+INFT 370,Management Science,Dr. A. Adu-Sackey,Departmental,3,3.0,2
+MATH 112,Calculus I,Dr. G. Biney,General,1,3.0,1
+MATH 214,Multivariable Calculus,Dr. G. Biney,General,2,3.0,2
+COSC 272,Data Communication & Computer Network II,E. Okoe,Departmental,2,3.0,2
+INFT 372,Network Project Management,E. Okoe,Departmental,2,3.0,2
+COSC 130,Digital Electronics,E. Okoe,Departmental,1,3.0,2
+COSC 124,Procedural Programming,E. Okoe,Departmental,1,3.0,2
+COSC 117,Fundamentals of Computing Skills,G. Preprah Tanoah,Departmental,1,3.0,1
+BBIS 213,IT for Business (MOS),G. Preprah Tanoah,Departmental,2,3.0,2
+BBIS 260,Web and Social Management Tools,G. Preprah Tanoah,Departmental,2,3.0,2
+PHYS 103,Physics,J. Okyere Asirifi,Departmental,1,3.0,1
+COSC 470,Computer & Cyber Forensics,M. Asare,Departmental,4,3.0,1
+INFT 470,Computer & Cyber Forensics,M. Asare,Departmental,4,3.0,1
+INFT 446,Systems and Network Administration,M. Asare,Departmental,4,3.0,2
+INFT 459,Enterprise Information Security,M. Doe,Departmental,4,3.0,2
+COSC 352,Computer Security,M. Doe,Departmental,4,3.0,2
+INFT 420,Computer-Human Interaction,M. Doe,Departmental,4,3.0,2
+STAT 202,Statistical Methods for Health Sciences,O. Osei-Tutu,Departmental,2,3.0,2
+MATH 121,College Algebra,O. Osei-Tutu,General,1,3.0,1
+MATH 172,Discrete & Continuous Mathematics,Prof. L. Asiedu,Departmental,1,3.0,2
+CSCD 119,Introduction to Computer Science,Prof. P. Yaw Owusu Amoako,Departmental,1,3.0,1
+COSC 224,Object-Oriented Programming,Prof. P. Yaw Owusu Amoako,Departmental,2,3.0,2
+COSC 364,Research Methods,Prof. P. Yaw Owusu Amoako,Departmental,3,3.0,2
+INFT 364,Research Methods,Prof. P. Yaw Owusu Amoako,Departmental,3,3.0,2
+COSC 480,Compiler Design,Prof. P. Yaw Owusu Amoako,Departmental,4,3.0,1
+MATH 101,Algebra,Prof. W. Oblitey,General,1,3.0,1
+MATH 171,Introductory Mathematics for Computer Science,Prof. W. Oblitey,Departmental,1,3.0,1
+BBIS 226,Business Process Modeling and Workflow,Prof. W. Ofoe Larkotey,Departmental,2,3.0,2
+BBIS 432,IS Consultancy Practices Solution Develop,Prof. W. Ofoe Larkotey,Departmental,4,3.0,2
+RNSG 101,Nursing and Midwifery Informatics,R. Amponsah,Departmental,1,3.0,1
+COSC 346,Software Engineering,R. Amponsah,Departmental,3,3.0,1
+INFT 346,Software Development Life Cycle,R. Amponsah,Departmental,3,3.0,2
+COSC 113,Elements of Programming,R. Amponsah,Departmental,1,3.0,1
+INFT 281,Management Information Systems,R. W. Ambeh-Doh,Departmental,2,3.0,1
+COSC 280,Information Systems,R. W. Ambeh-Doh,Departmental,2,3.0,2
+BBIS 110,Introduction to Business Information Systems,R. W. Ambeh-Doh,Departmental,2,3.0,2
+BBIS 338,Enterprise Systems,R. W. Ambeh-Doh,Departmental,3,3.0,2
+INFT 115,Information Technology Foundation,R. W. Ambeh-Doh,Departmental,1,3.0,1
+INFT 480,Data Warehousing,S. Ganu,Departmental,4,3.0,1
+BBIS 304,Business Intelligence and Data Warehousing,S. Ganu,Departmental,4,3.0,2
+BBIS 488,Decision Support Systems,S. Ganu,Departmental,4,3.0,2
+COSC 240,Systems Programming,S. Ganu,Departmental,2,3.0,1
+INFT 240,DotNet Programming,S. Ganu,Departmental,2,3.0,2
+INFT 410,Internet-Enabled Applications Systems Development,S. Sebuabe,Departmental,4,3.0,1
+INFT 340,Computer Vision: Concepts and Application,S. Sebuabe,Departmental,3,3.0,1
+COSC 250,Computer Ethics,S. Sebuabe,Departmental,2,3.0,1
+BBIS 203,IT Professional Ethics and Practice,S. Sebuabe,Departmental,2,3.0,1
+STAT 384,Probability and Statistics,TBA,Departmental,3,3.0,2
+ACCT 211,Financial Accounting I,TBA,Departmental,2,3.0,1
+ACCT 210,Financial Accounting I,TBA,Departmental,2,3.0,1

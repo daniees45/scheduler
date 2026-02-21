@@ -1,0 +1,164 @@
+[
+  {
+    "timestamp": "2026-02-13T20:27:31.438232",
+    "event_type": "task_scheduled",
+    "task": "Study for exam",
+    "day": "Monday",
+    "time": "10:00-11:00",
+    "category": "study",
+    "reason": ""
+  },
+  {
+    "timestamp": "2026-02-13T20:27:31.438847",
+    "event_type": "task_scheduled",
+    "task": "Lunch",
+    "day": "Tuesday",
+    "time": "12:00-13:00",
+    "category": "personal",
+    "reason": ""
+  },
+  {
+    "timestamp": "2026-02-13T20:27:31.439266",
+    "event_type": "task_scheduled",
+    "task": "Lab work",
+    "day": "Wednesday",
+    "time": "14:00-15:30",
+    "category": "work",
+    "reason": ""
+  },
+  {
+    "timestamp": "2026-02-13T20:27:52.617413",
+    "event_type": "task_scheduled",
+    "task": "Study for exam",
+    "day": "Monday",
+    "time": "10:00-11:00",
+    "category": "study",
+    "reason": ""
+  },
+  {
+    "timestamp": "2026-02-13T20:27:52.618016",
+    "event_type": "task_scheduled",
+    "task": "Lunch",
+    "day": "Tuesday",
+    "time": "12:00-13:00",
+    "category": "personal",
+    "reason": ""
+  },
+  {
+    "timestamp": "2026-02-13T20:27:52.618345",
+    "event_type": "task_scheduled",
+    "task": "Lab work",
+    "day": "Wednesday",
+    "time": "14:00-15:30",
+    "category": "work",
+    "reason": ""
+  },
+  {
+    "timestamp": "2026-02-13T20:27:52.618747",
+    "event_type": "task_rescheduled",
+    "task": "Study for exam",
+    "original": "Monday 10:00",
+    "new": "Wednesday 14:00",
+    "category": "study",
+    "reason": "Conflict with class"
+  },
+  {
+    "timestamp": "2026-02-13T20:28:21.635745",
+    "event_type": "task_scheduled",
+    "task": "Study for exam",
+    "day": "Monday",
+    "time": "10:00-11:00",
+    "category": "study",
+    "reason": ""
+  },
+  {
+    "timestamp": "2026-02-13T20:28:21.636830",
+    "event_type": "task_scheduled",
+    "task": "Lunch",
+    "day": "Tuesday",
+    "time": "12:00-13:00",
+    "category": "personal",
+    "reason": ""
+  },
+  {
+    "timestamp": "2026-02-13T20:28:21.637600",
+    "event_type": "task_scheduled",
+    "task": "Lab work",
+    "day": "Wednesday",
+    "time": "14:00-15:30",
+    "category": "work",
+    "reason": ""
+  },
+  {
+    "timestamp": "2026-02-13T20:28:21.638570",
+    "event_type": "task_rescheduled",
+    "task": "Study for exam",
+    "original": "Monday 10:00",
+    "new": "Wednesday 14:00",
+    "category": "study",
+    "reason": "Conflict with class"
+  },
+  {
+    "timestamp": "2026-02-13T20:28:21.639133",
+    "event_type": "suggestion_accepted",
+    "suggestion": "Suggested slot",
+    "day": "Thursday",
+    "time": "15:00-16:00",
+    "score": 0.85,
+    "reason": "Available slot"
+  },
+  {
+    "timestamp": "2026-02-13T20:59:43.691392",
+    "event_type": "suggestion_accepted",
+    "suggestion": "Study Session",
+    "day": "Monday",
+    "time": "10:00-11:00",
+    "score": 8.5,
+    "reason": "Morning productivity peak"
+  },
+  {
+    "timestamp": "2026-02-13T20:59:43.692273",
+    "event_type": "suggestion_rejected",
+    "suggestion": "Lunch Break Study",
+    "day": "Tuesday",
+    "time": "14:00-15:00",
+    "score": 6.5,
+    "rejection_reason": ""
+  },
+  {
+    "timestamp": "2026-02-13T21:01:59.451815",
+    "event_type": "suggestion_accepted",
+    "suggestion": "Morning Study",
+    "day": "Monday",
+    "time": "09:00-10:00",
+    "score": 8.5,
+    "reason": "Good morning productivity"
+  },
+  {
+    "timestamp": "2026-02-13T21:01:59.453434",
+    "event_type": "suggestion_rejected",
+    "suggestion": "Afternoon Study",
+    "day": "Tuesday",
+    "time": "14:00-15:00",
+    "score": 5.0,
+    "rejection_reason": ""
+  },
+  {
+    "timestamp": "2026-02-13T21:02:23.785398",
+    "event_type": "suggestion_accepted",
+    "suggestion": "Morning Study",
+    "day": "Monday",
+    "time": "09:00-10:00",
+    "score": 8.5,
+    "reason": "Good morning productivity"
+  },
+  {
+    "timestamp": "2026-02-13T21:02:23.786092",
+    "event_type": "suggestion_rejected",
+    "suggestion": "Afternoon Study",
+    "day": "Tuesday",
+    "time": "14:00-15:00",
+    "score": 5.0,
+    "rejection_reason": ""
+  }
+]

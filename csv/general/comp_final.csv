@@ -1,0 +1,42 @@
+Course Code,Course Title,Credit Hrs,Lecturer Name,Room Name,Day,Time
+COSC 370 / INFT 370,Operations Research [Sec A] / Management Science [Sec A],3.0,Dr. A. Adu-Sackey,CS3,Tuesday,7:00 AM - 9:30 AM
+MATH 112,Calculus I [Sec A],3.0,Dr. G. Biney,GEN. LAB,Monday,10:00 AM - 12:30 PM
+MATH 214,Multivariable Calculus [Sec A],3.0,Dr. G. Biney,CS LAB,Friday,10:00 AM - 12:30 PM
+MATH 121,College Algebra [Sec A],3.0,O. Osei-Tutu,Baobab RM5,Wednesday,2:00 PM - 4:30 PM
+MATH 101,Algebra [Sec A],3.0,Prof. W. Oblitey,CS2,Tuesday,2:00 PM - 4:30 PM
+STAT 202,Statistical Methods for Health Sciences [Sec A],3.0,O. Osei-Tutu,Baobab RM3,Thursday,7:00 AM - 9:30 AM
+STAT 202,Statistical Methods for Health Sciences [HAC Sec A],3.0,O. Osei-Tutu,CS1,Thursday,2:00 PM - 4:30 PM
+STAT 202,Statistical Methods for Health Sciences [Sec B],3.0,O. Osei-Tutu,Baobab RM3,Tuesday,2:00 PM - 4:30 PM
+MATH 171,Introductory Mathematics for Computer Science,3.0,Prof. W. Oblitey,Baobab RM5,Monday,2:00 PM - 4:30 PM
+COSC 272 / INFT 372,Data Communication & Computer Network II [Sec A] / Network Project Management,3.0,E. Okoe,Baobab RM3,Wednesday,2:00 PM - 4:30 PM
+COSC 130,Digital Electronics [Sec A],3.0,E. Okoe,Baobab RM5,Wednesday,7:00 AM - 9:30 AM
+COSC 124,Procedural Programming [Sec A],3.0,E. Okoe,GEN. LAB,Thursday,10:00 AM - 12:30 PM
+COSC 117,Fundamentals of Computing Skills [Sec B],3.0,G. Preprah Tanoah,American High,Thursday,10:00 AM - 12:30 PM
+BBIS 213,IT for Business (MOS) [Sec A],3.0,G. Preprah Tanoah,GEN. LAB,Wednesday,7:00 AM - 9:30 AM
+COSC 117,Fundamentals of Computing Skills [Sec A],3.0,G. Preprah Tanoah,CS2,Tuesday,7:00 AM - 9:30 AM
+BBIS 260,Web and Social Management Tools [Sec A],3.0,G. Preprah Tanoah,CS3,Friday,10:00 AM - 12:30 PM
+PHYS 103,Physics [Sec A],3.0,J. Okyere Asirifi,CS LAB,Thursday,7:00 AM - 9:30 AM
+COSC 470,/ INFT 470 Computer & Cyber Forensics,3.0,M. Asare,Baobab RM5,Thursday,7:00 AM - 9:30 AM
+INFT 446,Systems and Network Administration [Sec A],3.0,M. Asare,CS2,Thursday,10:00 AM - 12:30 PM
+INFT 459 / COSC 352,Enterprise Information Security [Sec A] / Computer Security [Sec A],3.0,M. Doe,CS1,Friday,10:00 AM - 12:30 PM
+INFT 420,Computer-Human Interaction [Sec A],3.0,M. Doe,Baobab RM3,Tuesday,7:00 AM - 9:30 AM
+MATH 172,Discrete & Continuous Mathematics [Sec A],3.0,Prof. L. Asiedu,CS3,Friday,7:00 AM - 9:30 AM
+CSCD 119,Introduction to Computer Science [Sec A],3.0,Prof. P. Yaw Owusu Amoako,CS LAB,Wednesday,7:00 AM - 9:30 AM
+COSC 224,Object-Oriented Programming [Sec A],3.0,Prof. P. Yaw Owusu Amoako,GEN. LAB,Tuesday,10:00 AM - 12:30 PM
+COCS 364 / INFT 364,Research Methods [Sec A],3.0,Prof. P. Yaw Owusu Amoako,CS2,Wednesday,10:00 AM - 12:30 PM
+COSC 480,Compiler Design [Sec A],3.0,Prof. P. Yaw Owusu Amoako,CS LAB,Friday,7:00 AM - 9:30 AM
+BBIS 226,Business Process Modeling and Workflow [Sec A],3.0,Prof. W. Ofoe Larkotey,Baobab RM5,Friday,10:00 AM - 12:30 PM
+BBIS 432,IS Consultancy Practices Solution Develop [Sec A],3.0,Prof. W. Ofoe Larkotey,CS3,Thursday,7:00 AM - 9:30 AM
+RNSG 101,Nursing and Midwifery Informatics [Sec A] [Jan. Batch],3.0,R. Amponsah,CS LAB,Thursday,10:00 AM - 12:30 PM
+COSC 346 / INFT 346,Software Engineering [Sec A] / Software Development Life Cycle [Sec A],3.0,R. Amponsah,Baobab RM3,Tuesday,10:00 AM - 12:30 PM
+COSC 113,Elements of Programming [Sec A],3.0,R. Amponsah,American High,Thursday,7:00 AM - 9:30 AM
+INFT 281 / COSC 280 / BBIS 110,Management Information Systems [Sec A] / Information Systems [Sec A] / Introduction to Business Information Systems [Sec A],3.0,R. W. Ambeh-Doh,GEN. LAB,Wednesday,10:00 AM - 12:30 PM
+BBIS 338,Enterprise Systems [Sec A],3.0,R. W. Ambeh-Doh,Baobab RM5,Thursday,10:00 AM - 12:30 PM
+INFT 115,Information Technology Foundation [Sec A],3.0,R. W. Ambeh-Doh,CS1,Thursday,7:00 AM - 9:30 AM
+INFT 480 / BBIS 304,Data Warehousing [Sec A] / Business Intelligence and Dataware Housing [Sec A],3.0,S. Ganu,CS1,Thursday,10:00 AM - 12:30 PM
+BBIS 488,Decision Support Systems [Sec A],3.0,S. Ganu,GEN. LAB,Friday,10:00 AM - 12:30 PM
+COSC 240 / INFT 346,Systems Programming {Sec A] / DotNet Programming [Sec A],3.0,S. Ganu,Baobab RM5,Tuesday,7:00 AM - 9:30 AM
+INFT 410,Internet-Enabled Applications Systems Development,3.0,S. Sebuabe,CS3,Tuesday,2:00 PM - 4:30 PM
+INFT 340,Computer Vision: Concepts and Application [Sec A],3.0,S. Sebuabe,CS LAB,Monday,10:00 AM - 12:30 PM
+COSC 250 / BBIS 203,Computer Ethics [Sec A] / IT Professional Ethics and Practice [Sec A],3.0,S. Sebuabe,Baobab RM3,Thursday,2:00 PM - 4:30 PM
+STAT 384,Probability and Statistics [Sec A],3.0,TBA,Baobab RM3,Wednesday,10:00 AM - 12:30 PM

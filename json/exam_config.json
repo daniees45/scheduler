@@ -1,0 +1,16 @@
+{
+  "days": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+  "slots_per_day": 2,
+  "strict_capacity": true,
+  "slot_times": {
+    "0": ["9:00 AM", "12:00 PM"],
+    "1": ["2:00 PM", "5:00 PM"]
+  },
+  "max_exams_per_day_per_cohort": 2,
+  "cohort_mode": "level_semester",
+  "single_room": false,
+  "default_room_name": null,
+  "max_students_per_hall": 300,
+  "friday_only_first_slot": true,
+  "group_sections_by_course": true
+}

@@ -1,0 +1,9 @@
+{
+  "role": "student",
+  "department": "Computer Science",
+  "level": "100",
+  "semester": "1",
+  "timetable_paths": {
+    "Computer Science": "/Applications/XAMPP/xamppfiles/htdocs/ProjectFinal/tkinter_app/output/final_computer_schedule.csv"
+  }
+}

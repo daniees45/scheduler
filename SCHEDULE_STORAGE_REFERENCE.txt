@@ -1,0 +1,156 @@
+┌──────────────────────────────────────────────────────────────────┐
+│            SCHEDULE STORAGE - HYBRID SYSTEM REFERENCE            │
+└──────────────────────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════
+  WHAT HAPPENS AFTER EACH SCHEDULE GENERATION?
+═══════════════════════════════════════════════════════════════════
+
+1. SAVE LOCALLY  
+   ├─ Final: generated_schedule_YYYYMMDD_HHMMSS.csv
+   └─ Outputs ready for use
+
+2. CREATE TWO HISTORICAL FILES (Hybrid Approach)
+   ├─ Timestamped: historical_schedule_YYYYMMDD_HHMMSS.csv
+   │  └─ Purpose: Version control, rollback, tracking
+   └─ Master: historical_schedule.csv (APPENDED)
+      └─ Purpose: Training data (all generations combined)
+
+3. UPLOAD TO B2 CLOUD (3 files per generation)
+   ├─ Final: csv/final/schedule_YYYYMMDD_HHMMSS.csv
+   ├─ Timestamped: csv/history/historical_schedule_YYYYMMDD_HHMMSS.csv
+   └─ Master: csv/general/historical_schedule.csv (updated)
+
+4. RETRAIN AI MODELS (using master file)
+   ├─ Q-Learning Model (q_model.pkl)
+   ├─ Feasibility Classifier (feasibility_classifier.pkl)
+   └─ Scheduling Model (scheduling_model.pkl)
+
+5. UPLOAD MODELS TO B2
+   └─ All models uploaded to root of bucket
+
+═══════════════════════════════════════════════════════════════════
+  HYBRID SYSTEM BENEFITS
+═══════════════════════════════════════════════════════════════════
+
+✅ VERSION CONTROL: Timestamped files track each generation
+✅ EASY TRAINING: Master file has all data in one place
+✅ CLEAN DATA: No timestamp columns cluttering CSVs
+✅ FLEXIBLE CLEANUP: Delete old timestamped files safely
+✅ ROLLBACK: Load any specific generation
+✅ DUAL BACKUP: Both files uploaded to B2
+
+═══════════════════════════════════════════════════════════════════
+  FILE MANAGEMENT
+═══════════════════════════════════════════════════════════════════
+
+📊 VIEW MASTER FILE (all training data):
+   wc -l historical_schedule.csv
+   ls -lh historical_schedule.csv
+
+📋 LIST TIMESTAMPED VERSIONS (version control):
+   ls -lh historical_schedule_*.csv
+   ls historical_schedule_*.csv | wc -l
+
+🗑️ CLEAN OLD TIMESTAMPED FILES (keep last 20):
+   ls -t historical_schedule_*.csv | tail -n +21 | xargs rm
+   # Master file unchanged - keeps all training data
+
+📄 VIEW SPECIFIC GENERATION:
+   head -n 20 historical_schedule_20260221_143022.csv
+
+═══════════════════════════════════════════════════════════════════
+  B2 STORAGE STRUCTURE
+═══════════════════════════════════════════════════════════════════
+
+vvu-scheduler/
+├── csv/
+│   ├── final/                       (Generated schedules)
+│   │   ├── schedule_20260219_143022.csv
+│   │   ├── schedule_20260220_101530.csv
+│   │   └── ...
+│   ├── history/                     (Timestamped versions)
+│   │   ├── historical_schedule_20260219_143022.csv
+│   │   ├── historical_schedule_20260220_101530.csv
+│   │   └── ...
+│   └── general/                     (Master cumulative files)
+│       ├── historical_schedule.csv         ← ALL course data
+│       └── historical_exam_schedule.csv    ← ALL exam data
+├── scheduling_model.pkl
+├── q_model.pkl
+└── feasibility_classifier.pkl
+
+═══════════════════════════════════════════════════════════════════
+  DATA STRUCTURE
+═══════════════════════════════════════════════════════════════════
+
+NO TIMESTAMP METADATA COLUMNS - Just clean schedule data:
+
+Course Code, Course Title, Lecturer, Room, Day, Time, ...
+CS 101, Intro to CS, Dr. Smith, Room 101, Monday, 8:00am, ...
+CS 102, Data Structures, Dr. Jones, Room 102, Tuesday, 10:00am, ...
+
+Timestamp information is in the FILENAME:
+   historical_schedule_20260221_143022.csv
+                       └─ Generated: Feb 21, 2026 at 14:30:22
+
+═══════════════════════════════════════════════════════════════════
+  USE CASES
+═══════════════════════════════════════════════════════════════════
+
+FOR VERSION CONTROL / ROLLBACK:
+   # Load specific generation
+   df = pd.read_csv('historical_schedule_20260221_143022.csv')
+
+FOR TRAINING AI MODELS:
+   # Load master file (all data combined)
+   df = pd.read_csv('historical_schedule.csv')
+
+FOR CLEANUP:
+   # Delete old timestamped files (training data stays in master)
+   ls -t historical_schedule_*.csv | tail -n +21 | xargs rm
+
+═══════════════════════════════════════════════════════════════════
+  API ENDPOINTS
+═══════════════════════════════════════════════════════════════════
+
+GET SCHEDULE HISTORY:
+   GET /web/api/get_schedule_history.php
+   → Returns all schedules (final, timestamped, master)
+
+DOWNLOAD MASTER CUMULATIVE FILE:
+   GET /web/api/download_historical_archive.php?type=course
+   → Downloads complete training data (all generations)
+
+DOWNLOAD SPECIFIC GENERATION:
+   GET /web/api/download_historical_archive.php?timestamp=20260221_143022
+   → Downloads timestamped version
+
+═══════════════════════════════════════════════════════════════════
+  MAINTENANCE RECOMMENDATIONS
+═══════════════════════════════════════════════════════════════════
+
+📅 REGULAR TASKS:
+   Monthly:    Check master file size
+   Quarterly:  Clean old timestamped files (keep last 50)
+   
+🗑️ CLEANUP TIMESTAMPED FILES:
+   # Keep last 20 course schedules
+   ls -t historical_schedule_*.csv | tail -n +21 | xargs rm
+   
+   # Keep last 10 exam schedules
+   ls -t historical_exam_schedule_*.csv | tail -n +11 | xargs rm
+
+⚠️ MASTER FILE MANAGEMENT:
+   • Master file grows with each generation (APPEND mode)
+   • Contains all training data - handle carefully
+   • Can trim using: manage_historical_archive.py trim 50000
+
+═══════════════════════════════════════════════════════════════════
+
+✅ HYBRID SYSTEM: Timestamped files + Master cumulative file
+✅ NO metadata columns - clean data only
+✅ Version control + Easy training
+✅ All uploaded to B2 automatically
+
+═══════════════════════════════════════════════════════════════════

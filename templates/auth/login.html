@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card" style="max-width: 400px; margin: 4rem auto; text-align: center;">
+    <h2>Welcome Back</h2>
+    <p style="color: var(--text-secondary); margin-bottom: 2rem;">Sign in to access the AI Scheduler.</p>
+
+    <form action="{{ url_for('login') }}" method="post">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div style="text-align: left;">
+            <label style="display: block; margin-bottom: 0.5rem; color: var(--text-secondary);">Username</label>
+            <input type="text" name="username" required placeholder="Enter username">
+        </div>
+
+        <div style="text-align: left;">
+            <label style="display: block; margin-bottom: 0.5rem; color: var(--text-secondary);">Password</label>
+            <input type="password" name="password" required placeholder="Enter password">
+        </div>
+
+        <button type="submit" class="btn" style="width: 100%; margin-top: 1rem;">Sign In</button>
+    </form>
+
+    <p style="margin-top: 1.5rem; color: var(--text-secondary); font-size: 0.9rem;">
+        Default Admins: <strong>admin</strong> / <strong>faculty</strong> <br>
+        Password: <strong>...123</strong>
+    </p>
+</div>
+{% endblock %}

@@ -1,0 +1,13 @@
+type,title,day,start_time,end_time,score,reason
+suggestion,Study Session,Saturday,07:00,21:00,894.0,"Score 894.0: duration 840 mins, time bonus 20."
+suggestion,Study Session,Sunday,07:00,21:00,894.0,"Score 894.0: duration 840 mins, time bonus 20."
+suggestion,Study Session,Friday,12:30,21:00,564.0,"Score 564.0: duration 510 mins, time bonus 20."
+suggestion,Study Session,Tuesday,16:30,21:00,320.2,"Score 320.2: duration 270 mins, time bonus 16."
+suggestion,Study Session,Tuesday,07:00,10:00,225.5,"Score 225.5: duration 180 mins, time bonus 18."
+suggestion,Study Session,Monday,18:00,21:00,220.5,"Score 220.5: duration 180 mins, time bonus 12."
+suggestion,Study Session,Wednesday,18:00,21:00,220.5,"Score 220.5: duration 180 mins, time bonus 12."
+suggestion,Study Session,Thursday,18:00,21:00,220.5,"Score 220.5: duration 180 mins, time bonus 12."
+suggestion,Study Session,Monday,12:30,14:00,129.0,"Score 129.0: duration 90 mins, time bonus 20."
+suggestion,Study Session,Tuesday,12:30,14:00,129.0,"Score 129.0: duration 90 mins, time bonus 20."
+suggestion,Study Session,Wednesday,12:30,14:00,129.0,"Score 129.0: duration 90 mins, time bonus 20."
+suggestion,Study Session,Thursday,12:30,14:00,129.0,"Score 129.0: duration 90 mins, time bonus 20."

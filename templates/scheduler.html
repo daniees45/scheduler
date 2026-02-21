@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card">
+    <h1>Execute Tasks</h1>
+    <p>Run your AI pipeline in sequence.</p>
+</div>
+
+<div class="grid">
+    <!-- Step 1: Extract -->
+    <div class="card">
+        <h2>1. PDF Extraction</h2>
+        <p style="margin-bottom: 1rem;">Convert Raw PDF to CSV Tables.</p>
+        <form id="extractForm">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <label>Select PDF</label>
+            <select name="pdf_file" required>
+                {% for f in files if f.endswith('.pdf') %}
+                <option value="{{ f }}">{{ f }}</option>
+                {% endfor %}
+            </select>
+            <label>Output Filename</label>
+            <input type="text" name="output_csv" value="raw_extracted.csv">
+            <button type="submit" class="btn" style="width: 100%">Extract Data</button>
+        </form>
+        <div id="extractResult" style="margin-top: 1rem;"></div>
+    </div>
+
+    <!-- Step 2: Clean -->
+    <div class="card">
+        <h2>2. Data Cleanup</h2>
+        <p style="margin-bottom: 1rem;">Normalize and fix CSV errors.</p>
+        <form id="cleanForm">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <label>Raw Input CSV</label>
+            <select name="input_csv" required>
+                {% for f in files if f.endswith('.csv') %}
+                <option value="{{ f }}">{{ f }}</option>
+                {% endfor %}
+            </select>
+            <label>Clean Output Filename</label>
+            <input type="text" name="output_csv" value="vvu_clean.csv">
+            <button type="submit" class="btn" style="width: 100%">Clean Data</button>
+        </form>
+        <div id="cleanResult" style="margin-top: 1rem;"></div>
+    </div>
+
+    <!-- Step 3: Solve -->
+    <div class="card">
+        <h2>3. AI Scheduler</h2>
+        <p style="margin-bottom: 1rem;">Run CSP Solver to generate schedule.</p>
+        <form id="scheduleForm">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <label>Input Data (Clean CSV)</label>
+            <select name="input_csv" required>
+                {% for f in files if f.endswith('.csv') %}
+                <option value="{{ f }}" {% if 'clean' in f %}selected{% endif %}>{{ f }}</option>
+                {% endfor %}
+            </select>
+            <label>Check for General Schedule?</label>
+            <select disabled>
+                <option>Auto-detected (vvu_general_schedule.csv)</option>
+            </select>
+            <button type="submit" class="btn btn-primary"
+                style="width: 100%; background: linear-gradient(45deg, var(--accent-color), #818cf8);">Run AI
+                Solver</button>
+        </form>
+        <div id="scheduleResult" style="margin-top: 1rem;"></div>
+        <button id="diagnoseBtn" class="btn btn-secondary" style="display: none; width: 100%; margin-top: 1rem;">View
+            Conflict Report</button>
+    </div>
+</div>
+
+<!-- Loading Overlay -->
+<div id="loadingOverlay"
+    style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:9999; flex-direction:column; justify-content:center; align-items:center;">
+    <div class="spinner"></div>
+    <h2 id="loadingText" style="color:white; margin-top: 1rem;">Processing...</h2>
+
+    <!-- Progress Bar -->
+    <div
+        style="width: 300px; height: 10px; background: rgba(255,255,255,0.1); border-radius: 5px; margin-top: 2rem; overflow: hidden;">
+        <div id="progressBar" style="width: 0%; height: 100%; background: var(--accent-color); transition: width 0.3s;">
+        </div>
+    </div>
+    <p id="progressMessage" style="color: var(--text-secondary); margin-top: 0.5rem;"></p>
+</div>
+
+<!-- Conflict Report Modal -->
+<div id="conflictModal"
+    style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:10000; padding: 2rem; overflow-y: auto;">
+    <div class="card"
+        style="max-width: 800px; margin: 0 auto; background: var(--card-bg); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 2rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+            <h2>AI Conflict Report</h2>
+            <button class="btn btn-secondary"
+                onclick="document.getElementById('conflictModal').style.display='none'">Close</button>
+        </div>
+        <pre id="conflictContent"
+            style="white-space: pre-wrap; color: var(--text-primary); background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 8px; font-family: monospace; font-size: 0.9rem; line-height: 1.5; border: 1px solid rgba(255,255,255,0.05);"></pre>
+    </div>
+</div>
+
+<script>
+    const overlay = document.getElementById('loadingOverlay');
+    const loadingText = document.getElementById('loadingText');
+    const progressBar = document.getElementById('progressBar');
+    const progressMessage = document.getElementById('progressMessage');
+
+    let pollInterval;
+
+    function startPolling() {
+        progressBar.style.width = '0%';
+        progressMessage.innerText = 'Starting...';
+
+        pollInterval = setInterval(async () => {
+            try {
+                const response = await fetch("{{ url_for('get_progress') }}");
+                const data = await response.json();
+
+                progressBar.style.width = data.progress + '%';
+                progressMessage.innerText = data.message;
+
+                if (data.status === 'completed' || data.status === 'failed' || data.status === 'error') {
+                    stopPolling();
+                }
+            } catch (e) {
+                console.error("Polling error", e);
+            }
+        }, 1000);
+    }
+
+    function stopPolling() {
+        clearInterval(pollInterval);
+    }
+
+    async function runTask(url, formData, resultDivId, isScheduler = false) {
+        overlay.style.display = 'flex';
+        const resDiv = document.getElementById(resultDivId);
+        resDiv.innerHTML = '';
+
+        if (isScheduler) {
+            startPolling();
+        }
+
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                body: new FormData(formData)
+            });
+            const data = await response.json();
+
+            if (data.status === 'success') {
+                resDiv.innerHTML = `<div class="alert" style="background: rgba(34, 197, 94, 0.2); color: #86efac;">✅ ${data.message}</div>`;
+            } else {
+                resDiv.innerHTML = `<div class="alert" style="background: rgba(239, 68, 68, 0.2); color: #fca5a5;">❌ ${data.message}</div>`;
+                if (isScheduler) {
+                    document.getElementById('diagnoseBtn').style.display = 'block';
+                }
+            }
+        } catch (error) {
+            resDiv.innerHTML = `<div class="alert">❌ System Error: ${error}</div>`;
+        } finally {
+            if (!isScheduler) {
+                overlay.style.display = 'none';
+            } else {
+                // Keep overlay for a second to show 100% progress
+                setTimeout(() => {
+                    overlay.style.display = 'none';
+                    stopPolling();
+                }, 1500);
+            }
+        }
+    }
+
+    document.getElementById('extractForm').onsubmit = function (e) {
+        e.preventDefault();
+        runTask("{{ url_for('run_extraction') }}", this, 'extractResult');
+    };
+
+    document.getElementById('cleanForm').onsubmit = function (e) {
+        e.preventDefault();
+        runTask("{{ url_for('run_clean') }}", this, 'cleanResult');
+    };
+
+    document.getElementById('scheduleForm').onsubmit = function (e) {
+        e.preventDefault();
+        runTask("{{ url_for('run_scheduler') }}", this, 'scheduleResult', true);
+    };
+
+    document.getElementById('diagnoseBtn').onclick = async function () {
+        const formData = new FormData(document.getElementById('scheduleForm'));
+        const modal = document.getElementById('conflictModal');
+        const content = document.getElementById('conflictContent');
+
+        content.innerText = "Analyzing conflicts...";
+        modal.style.display = 'block';
+
+        try {
+            const response = await fetch("{{ url_for('diagnose') }}", {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
+            if (data.status === 'success') {
+                content.innerText = data.report;
+            } else {
+                content.innerText = "Error generating report: " + data.message;
+            }
+        } catch (e) {
+            content.innerText = "Connection error: " + e;
+        }
+    };
+</script>
+{% endblock %}

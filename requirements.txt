@@ -1,0 +1,17 @@
+flask
+pandas
+requests
+tabula-py
+flask-sqlalchemy
+flask-login
+flask-bcrypt
+flask-wtf
+email_validator
+fpdf
+ics
+scikit-learn
+
+# Optional packages (install separately if needed)
+# shap - For model explainability (may have build issues on some systems)
+# Try: pip install shap or use conda: conda install -c conda-forge shap
+boto3

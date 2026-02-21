@@ -1,0 +1,42 @@
+course_code,course_title,lecturer_name,Semester,source_type,course_level,day,room_name,start_time,credit_hours,timings,end_time
+COSC 370 / INFT 370,Operations Research [Sec A] / Management Science [Sec A],Dr. A. Adu-Sackey,1,Departmental,3,M,CS2,7:00am,3.0,7:00am - 9:30am,9:30am
+MATH 112,Calculus I [Sec A],Dr. G. Biney,2,General,1,T,MET 103,10:00am,3.0,10:00am - 12:30pm,12:30pm
+MATH 214,Multivariable Calculus [Sec A],Dr. G. Biney,2,General,2,W,MET 101,3:00pm,3.0,3:00pm - 5:30pm,5:30pm
+COSC 272 / INFT 372,Data Communication & Computer Network II [Sec A] / Network Project Management,E. Okoe,2,Departmental,2,F,GEN. LAB,7:00am,3,7:00am - 9:30am,9:30am
+COSC 130,Digital Electronics [Sec A],E. Okoe,1,Departmental,1,M,CS1,2:00pm,3,2:00pm - 4:30pm,4:30pm
+COSC 124,Procedural Programming [Sec A],E. Okoe,2,Departmental,1,TH,GEN. LAB,2:00pm,3,2:00pm - 4:30pm,4:30pm
+COSC 117,Fundamentals of Computing Skills [Sec B],G. Preprah Tanoah,1,Departmental,1,F,Baobab RM1,10:00am,3.0,10:00am - 12:30pm,12:30pm
+BBIS 213,IT for Business (MOS) [Sec A],G. Preprah Tanoah,1,Departmental,2,M,GEN. LAB,7:00am,3.0,7:00am - 9:30am,9:30am
+COSC 117,Fundamentals of Computing Skills [Sec A],G. Preprah Tanoah,2,Departmental,1,W,Baobab RM5,10:00am,3.0,10:00am - 12:00pm,12:00pm
+BBIS 260,Web and Social Management Tools [Sec A],G. Preprah Tanoah,2,Departmental,2,W,CS2,7:00am,3.0,7:00am - 9:30am,9:30am
+PHYS 103,Physics [Sec A],J. Okyere Asirifi,1,Departmental,1,T,CS LAB,10:00am,3.0,10:00am - 12:30pm,12:30pm
+COSC 470,/ INFT 470 Computer & Cyber Forensics,M. Asare,1,Departmental,4,M,CS3,10:00am,3,10:00am - 12:30pm,12:30pm
+INFT 446,Systems and Network Administration [Sec A],M. Asare,2,Departmental,4,TH,GEN. LAB,7:00am,3,7:00am - 9:30am,9:30am
+INFT 459 / COSC 352,Enterprise Information Security [Sec A] / Computer Security [Sec A],M. Doe,1,Departmental,4,T,CS2,10:00am,3.0,10:00am - 12:30pm,12:30pm
+INFT 420,Computer-Human Interaction [Sec A],M. Doe,2,Departmental,4,T,CS2,2:00pm,3,2:00pm - 4:30pm,4:30pm
+STAT 202,Statistical Methods for Health Sciences [Sec A],O. Osei-Tutu,1,Departmental,2,F,CH1-1,10:00am,3.0,10:00am - 12:30pm,12:30pm
+STAT 202,Statistical Methods for Health Sciences [HAC Sec A],O. Osei-Tutu,2,Departmental,2,S,CH1-1,2:00pm,3.0,2:00pm - 4:30pm,4:30pm
+MATH 121,College Algebra [Sec A],O. Osei-Tutu,2,General,1,TH,American High,2:00pm,3.0,2:00pm - 4:30pm,4:30pm
+STAT 202,Statistical Methods for Health Sciences [Sec B],O. Osei-Tutu,2,Departmental,2,W,CH3-1&2,3:00pm,3.0,3:00pm - 5:30pm,5:30pm
+MATH 172,Discrete & Continuous Mathematics [Sec A],Prof. L. Asiedu,2,Departmental,1,F,CS3,7:00am,3.0,7:00am - 9:30am,9:30am
+CSCD 119,Introduction to Computer Science [Sec A],Prof. P. Yaw Owusu Amoako,1,Departmental,1,M,CS LAB,10:00am,3,10:00am - 12:30pm,12:30pm
+COSC 224,Object-Oriented Programming [Sec A],Prof. P. Yaw Owusu Amoako,1,Departmental,2,M,CS3,2:00pm,3,2:00pm - 4:30pm,4:30pm
+COCS 364 / INFT 364,Research Methods [Sec A],Prof. P. Yaw Owusu Amoako,1,Departmental,3,T,CS3,10:00am,3,10:00am - 12:30pm,12:30pm
+COSC 480,Compiler Design [Sec A],Prof. P. Yaw Owusu Amoako,1,Departmental,4,T,CS3,2:00pm,3,2:00pm - 4:30pm,4:30pm
+MATH 101,Algebra [Sec A],Prof. W. Oblitey,1,General,1,M,CC3,10:00am,3,10:00am - 12:30pm,12:30pm
+MATH 171,Introductory Mathematics for Computer Science,Prof. W. Oblitey,1,Departmental,1,T,CS1,10:00am,3,10:00am - 12:30pm,12:30pm
+BBIS 226,Business Process Modeling and Workflow [Sec A],Prof. W. Ofoe Larkotey,1,Departmental,2,TH,CS1,10:00am,3,10:00am - 12:30pm,12:30pm
+BBIS 432,IS Consultancy Practices Solution Develop [Sec A],Prof. W. Ofoe Larkotey,2,Departmental,4,TH,CS1,2:00pm,3,2:00pm - 4:30pm,4:30pm
+RNSG 101,Nursing and Midwifery Informatics [Sec A] [Jan. Batch],R. Amponsah,1,Departmental,1,M,CH3-1&2,10:00am,3,10:00am - 12:30pm,12:30pm
+COSC 346 / INFT 346,Software Engineering [Sec A] / Software Development Life Cycle [Sec A],R. Amponsah,1,Departmental,3,T,GEN. LAB,2:00pm,3,2:00pm - 4:30pm,4:30pm
+COSC 113,Elements of Programming [Sec A],R. Amponsah,1,Departmental,1,TH,CS LAB,2:00pm,3,2:00pm - 4:30pm,4:30pm
+INFT 281 / COSC 280 / BBIS 110,Management Information Systems [Sec A] / Information Systems [Sec A] / Introduction to Business Information Systems [Sec A],R. W. Ambeh-Doh,1,Departmental,2,M,CS LAB,7:00am,3,7:00am - 9:30am,9:30am
+BBIS 338,Enterprise Systems [Sec A],R. W. Ambeh-Doh,1,Departmental,3,M,CS1,10:00am,3,10:00am - 12:30pm,12:30pm
+INFT 115,Information Technology Foundation [Sec A],R. W. Ambeh-Doh,1,Departmental,1,W,GEN. LAB,10:00am,3,10:00am - 12:00pm,12:00pm
+INFT 480 / BBIS 304,Data Warehousing [Sec A] / Business Intelligence and Dataware Housing [Sec A],S. Ganu,2,Departmental,4,TH,CS LAB,10:00am,3.0,10:00am - 12:30pm,12:30pm
+BBIS 488,Decision Support Systems [Sec A],S. Ganu,2,Departmental,4,W,CS LAB,10:00am,3.0,10:00am - 12:00pm,12:00pm
+COSC 240 / INFT 346,Systems Programming {Sec A] / DotNet Programming [Sec A],S. Ganu,1,Departmental,2,W,CS3,7:00am,3.0,7:00am - 9:30am,9:30am
+INFT 410,Internet-Enabled Applications Systems Development,S. Sebuabe,1,Departmental,4,F,CS2,10:00am,3.0,10:00am - 12:30pm,12:30pm
+INFT 340,Computer Vision: Concepts and Application [Sec A],S. Sebuabe,2,Departmental,3,M,CS2,10:00am,3.0,10:00am - 12:30pm,12:30pm
+COSC 250 / BBIS 203,Computer Ethics [Sec A] / IT Professional Ethics and Practice [Sec A],S. Sebuabe,1,Departmental,2,W,CS2,10:00am,3.0,10:00am - 12:00pm,12:00pm
+STAT 384,Probability and Statistics [Sec A],TBA,2,Departmental,3,F,CS1,7:00am,3.0,7:00am - 9:30am,9:30am

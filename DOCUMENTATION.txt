@@ -1,0 +1,157 @@
+UNIVERSITY TIMETABLE SCHEDULER - COMPLETE AI DOCUMENTATION
+==========================================================
+
+1. PROJECT MISSION
+------------------
+To provide a reliable, automated solution for generating university timetables at Valley View University (VVU). 
+The system replaces manual scheduling—which is prone to human error and conflicts—with a Hybrid AI 
+engine that combines strict logic (Symbolic AI) with persistent historical learning (Statistical AI).
+
+2. SYSTEM ARCHITECTURE & UNIFIED WORKFLOW
+------------------------------------------
+The system operates as a single, linear pipeline:
+
+STEP 1: EXTRACTION (`basic.py`)
+- Purpose: Converts PDF timetables (General or Departmental) into raw digital data.
+- Feature: Uses 'lattice' detection to recognize table borders.
+- Interactive: Allows the user to choose between immediate extraction or extraction + cleaning.
+
+STEP 2: CLEANING & ALIGNMENT (`clean_up.py`)
+- Purpose: Standardizes messy raw data and prepares it for the AI.
+- Intelligent Alignment: Detects shifted rows and re-aligns them to correct headers.
+- Type & Level Detection: Automatically categorizes courses using `general_prefixes.csv` and `dept_keywords.csv`.
+- Level Identification: Uses the explicit `level_100.csv` through `level_400.csv` files as the source of truth.
+
+STEP 3: PERSISTENT LEARNING (`analyzer.py`)
+- Purpose: The "Memory" of the AI.
+- Process: Scans `vvu_historical_database.csv` to calculate probability scores for lecturer-time, 
+  course-room, and global slot success.
+- Output: `vvu_model.pkl` - A persistent binary file containing the "Trained AI Memory."
+
+STEP 4: SCHEDULING ENGINE (`main.py`, `csp.py`, `load_vvu.py`)
+- Purpose: Solves the mathematical puzzle of the timetable.
+- Hybrid Logic:
+  - Hard Constraints: Strictly prevents room/lecturer overlaps and same-level student clashes.
+  - Level-Aware Barrier: Ensures that 100-level General courses and 100-level Departmental courses 
+    never overlap, allowing students to attend both.
+  - Soft Preferences: Loads `vvu_model.pkl` to prioritize historically successful slots.
+  - Autonomous Fallback: If preferred days are full, the AI automatically finds the next best legal slot.
+- Self-Learning: Appends new successful schedules to the database and retrains the model automatically.
+- Evaluation: Calculates a "Schedule Accuracy" score (0-100%) based on how well the schedule matches lecturer availability/preferences.
+  - Tries to use `sklearn.metrics.accuracy_score` if installed.
+  - Falls back to internal manual calculation if `scikit-learn` is missing.
+
+STEP 5: PRESENTATION (`csv_to_pdf.py`)
+- Purpose: Formats the final solution into a professional, printable PDF.
+
+3. THE AI MODEL: HYBRID APPROACH
+--------------------------------
+This project uses a Hybrid AI Model:
+
+A. Symbolic AI (CSP Solver):
+- Uses Backtracking Search and the MRV (Minimum Remaining Values) heuristic.
+- Guarantees 100% legality: 0% conflicts (No room double-booking or lecturer overlap).
+
+B. Statistical Learning (Historical Memory):
+- Learns from `vvu_historical_database.csv` and persists it in `vvu_model.pkl`.
+- Heuristic Scoring: When deciding between valid slots, the AI scores them based on historical 
+  frequency. Higher scores are tried first.
+
+4. PROS AND CONS
+----------------
+
+PROS:
++ Guaranteed Legality: The AI will never double-book a room or lecturer.
++ Curriculum Awareness: Prevents clashes between General and Departmental courses of the same level.
++ Level File Support: Uses explicit `level_xxx.csv` files to eliminate level-assignment errors.
++ Self-Learning: The AI gets smarter every semester by archiving its own results.
++ Self-Healing: The cleaning script automatically repairs common PDF extraction errors.
++ Efficiency: Solves complex schedules in seconds by prioritizing "familiar" slots.
+
+CONS:
+- Data Quality: The AI is only as good as its input. Messy PDF data requires a robust `clean_up.py`.
+- Hard Constraint Bias: If a lecturer's availability is too narrow (e.g., 1 day), the AI may fallback 
+  to "unavailable" days to find a solution.
+- Static Rules: Learning is limited to the history provided; it cannot predict unprecedented changes.
+
+5. OPERATIONAL RULES
+--------------------
+- Diagnostic Warning: `diagnostics.py` identifies bottlenecks (overbooked lecturers/levels) before solving.
+- Level-Based Clashes: Guaranteed 0 overlaps for students taking 7-9 courses in their program path.
+- Smart Locking: Automatically locks General courses to their PDF slots while keeping 
+  Departmental courses flexible for optimization.
+- Room Fallback: If no room is specified in input, AI automatically picks an available room from `rooms.csv`.
+- Special Room Reservations: `special_rooms.csv` defines exclusive `Course <-> Room` pairings.
+  - Positive Rule: The specific course MUST use the reserved room.
+  - Negative Rule: No OTHER course can use that reserved room.
+
+6. DATA FILES SUMMARY
+---------------------
+- `vvu_historical_database.csv`: The source of AI "Learning."
+- `vvu_model.pkl`: The persistent, trained AI memory.
+- `vvu_current_input.csv`: The current semester's classes to be scheduled.
+- `lecturer_availability.csv`: Strict availability rules (1=Available, 0=Busy).
+- `rooms.csv`: Room names and capacities.
+- `level_100.csv` to `level_400.csv`: Explicit mappings of courses to academic levels.
+- `dept_keywords.csv` / `general_prefixes.csv`: Used for intelligent course categorization.
+- `special_rooms.csv`: Explicitly reserves specific rooms for specific courses (Exclusive usage).
+
+
+VVU AI Scheduler System Analysis
+Based on my analysis of your project files, here's a comprehensive overview of your system and recommended AI features:
+
+Current Architecture
+Component	Technology
+Frontend	PHP + Glass UI (admin dashboard, scheduling management)
+AI Engine	Python Flask + CSP Solver (ai_service.py)
+Solver	Constraint Satisfaction Problem (csp.py)
+ML Learning	Pickle-based model (analyzer.py)
+Database	MySQL (users, courses, rooms, schedules)
+Core AI Features to Implement
+Natural Language Scheduling
+
+Accept requests like "Schedule all CS Level 300 courses on Mondays morning"
+Parse intent and auto-generate scheduling constraints
+Smart Conflict Resolution
+
+When schedule fails, AI suggests exact changes (swap slots/rooms)
+Currently shows conflict heatmap via diagnostics.py
+Multi-Objective Optimization
+
+Balance lecturer travel time, room utilization, course spread
+Use Genetic Algorithm for complex optimization
+Quality Scoring Dashboard
+
+Score schedules (1-100) based on:
+Lecturer preference match rate
+Room utilization efficiency
+Student travel time minimization
+Real-Time Schedule Adjustment
+
+Drag-and-drop rescheduling with instant AI validation
+WebSocket-based conflict checking
+Lecturer Workload Balancing
+
+Fair distribution of morning/afternoon classes
+Equal teaching hours across lecturers
+Smart Room Recommendations
+
+Suggest optimal rooms based on course type, expected attendance, equipment needs
+Anomaly Detection
+
+Detect overloaded lecturers, underutilized rooms, repeated conflicts
+Learning from User Feedback
+
+Thumbs up/down on scheduled slots
+"Swap these two classes" feedback
+Auto-retrain model after each approval
+Implementation Priority
+Priority	Feature	Effort
+High	NLP Scheduling Interface	Medium
+High	Quality Scoring Dashboard	Low
+Medium	Multi-Objective Optimization	High
+Medium	Workload Balancing	Medium
+Quick Wins
+Add confidence scores to AI output (e.g., "95% confident schedule is optimal")
+Export schedule as PDF with AI summary
+Add "Re-optimize" button using previous schedule as warm start
