@@ -12,7 +12,7 @@ from load_data import get_department_room_file
 from typing import Callable, Optional
 
 
-def run_headless_exam(input_file: str, output_file: str, department: str | None = None, hall_name: str | None = None, hall_capacity: int | None = None, progress_callback: Optional[Callable] = None) -> bool:
+def run_headless_exam(input_file: str, output_file: str, department: str | None = None, hall_name: str | None = None, hall_capacity: int | None = None, blocked_schedule_paths=None, progress_callback: Optional[Callable] = None) -> bool:
     """Generate exam schedule with optional progress tracking
     
     Args:
@@ -63,12 +63,49 @@ def run_headless_exam(input_file: str, output_file: str, department: str | None 
         else:
             print("[WARNING] No hall capacity provided; falling back to room CSV capacity.")
 
+    blocked_blocks = []
+    from load_data import load_general_schedule_blocks
+    lock_paths = []
+    if isinstance(blocked_schedule_paths, list):
+        lock_paths.extend(blocked_schedule_paths)
+    elif blocked_schedule_paths:
+        lock_paths.append(blocked_schedule_paths)
+
+    for lock_path in lock_paths:
+        if lock_path and os.path.exists(lock_path):
+            extra_blocks = load_general_schedule_blocks(lock_path)
+            blocked_blocks.extend(extra_blocks)
+            print(f"[INFO] Added {len(extra_blocks)} exam smart-lock block(s) from {lock_path}")
+
+    if blocked_blocks:
+        print(f"[INFO] Total exam smart-lock blocks: {len(blocked_blocks)}")
+        unique_lock_courses = {
+            str(block.get('course_code', '')).strip().upper()
+            for block in blocked_blocks
+            if str(block.get('course_code', '')).strip()
+        }
+        unique_lecturer_slots = {
+            (
+                " ".join(str(block.get('lecturer_name', '')).strip().lower().replace('_', ' ').split()),
+                block.get('day'),
+                block.get('slot')
+            )
+            for block in blocked_blocks
+            if str(block.get('lecturer_name', '')).strip()
+        }
+        print(
+            f"[EXAM LOCK SUMMARY] blocks={len(blocked_blocks)} | "
+            f"courses={len(unique_lock_courses)} | "
+            f"lecturer_slots={len(unique_lecturer_slots)}"
+        )
+
     _emit_progress(20, "Loading exam data and rooms...")
     data = load_exam_data(
         [input_file],
         rooms_csv_path=rooms_path,
         exam_config_overrides=exam_config_overrides,
-        rooms_override=rooms_override
+        rooms_override=rooms_override,
+        blocked_blocks=blocked_blocks
     )
     
     _emit_progress(35, "Validating exam data...")
@@ -149,7 +186,7 @@ def run_headless_exam(input_file: str, output_file: str, department: str | None 
                     import sys
                     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
                     from b2_handler import B2Handler
-                    b2 = B2Handler()
+                    b2 = B2Handler(enable_cache=True, cache_dir="temp/b2_cache")
                     if b2.s3:
                         # Upload timestamped version
                         b2_history_key = f"csv/history/exam_{os.path.basename(history_timestamped)}"

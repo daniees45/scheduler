@@ -1,14 +1,15 @@
 <?php
 $page_title = 'Notifications & Reminders';
+$page_css = 'assets/notifications.css';
 include 'includes/header.php';
 requireRole(['student', 'lecturer']);
 $user_id = $_SESSION['user_id'];
 ?>
 
-<div class="container" style="max-width: 900px; margin: 0 auto; padding: 20px;">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+<div class="container notifications-container">
+    <div class="notifications-header">
         <h1><i class="fas fa-bell"></i> Notifications & Reminders</h1>
-        <div style="display: flex; gap: 10px;">
+        <div class="notifications-header-btns">
             <button class="glass-btn" onclick="markAllRead()">
                 <i class="fas fa-check-double"></i> Mark All Read
             </button>
@@ -18,38 +19,14 @@ $user_id = $_SESSION['user_id'];
         </div>
     </div>
     
-    <div class="glass-panel" style="padding: 1.5rem;">
+    <div class="glass-panel notifications-panel">
         <div id="notificationsList">
-            <div style="text-align: center; padding: 40px; color: var(--text-muted);">
+            <div class="notifications-loading">
                 Loading notifications...
             </div>
         </div>
     </div>
 </div>
-
-<style>
-.notification-item {
-    padding: 1rem;
-    background: rgba(15, 23, 42, 0.55);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 0.75rem;
-    margin-bottom: 0.8rem;
-    transition: all 0.2s;
-}
-
-.notification-item:hover {
-    background: rgba(15, 23, 42, 0.75);
-}
-
-.notification-unread {
-    border-left: 4px solid #6366f1;
-    background: rgba(99, 102, 241, 0.1);
-}
-
-.notification-high {
-    border-left: 4px solid #ef4444;
-}
-</style>
 
 <script>
 async function loadNotifications() {
@@ -70,21 +47,21 @@ async function loadNotifications() {
                 
                 html += `
                     <div class="${classes.join(' ')}">
-                        <div style="display: flex; justify-content: space-between; align-items: start;">
-                            <div style="flex: 1;">
-                                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 0.5rem;">
-                                    <h3 style="margin: 0;">${n.title}</h3>
-                                    ${isUnread ? '<span class="type-pill" style="background: rgba(99,102,241,0.3);">NEW</span>' : ''}
-                                    ${isPriority ? '<span class="type-pill" style="background: rgba(239,68,68,0.3);"><i class="fas fa-exclamation"></i> URGENT</span>' : ''}
+                        <div class="notification-body">
+                            <div class="notification-content">
+                                <div class="notification-title-row">
+                                    <h3 class="notification-title">${n.title}</h3>
+                                    ${isUnread ? '<span class="type-pill notification-pill--new">NEW</span>' : ''}
+                                    ${isPriority ? '<span class="type-pill notification-pill--urgent"><i class="fas fa-exclamation"></i> URGENT</span>' : ''}
                                 </div>
-                                <p style="margin: 0.5rem 0; font-size: 14px; color: var(--text-muted);">
+                                <p class="notification-message">
                                     ${n.message}
                                 </p>
-                                <div style="font-size: 12px; color: var(--text-muted);">
+                                <div class="notification-time">
                                     <i class="fas fa-clock"></i> ${time}
                                 </div>
                             </div>
-                            <div style="display: flex; gap: 8px;">
+                            <div class="notification-item-actions">
                                 ${isUnread ? `
                                     <button class="glass-btn small" onclick="markRead(${n.id})" title="Mark as read">
                                         <i class="fas fa-check"></i>
@@ -101,8 +78,8 @@ async function loadNotifications() {
             document.getElementById('notificationsList').innerHTML = html;
         } else {
             document.getElementById('notificationsList').innerHTML = `
-                <div style="text-align: center; padding: 60px; color: var(--text-muted);">
-                    <i class="fas fa-bell-slash" style="font-size: 48px; margin-bottom: 20px; opacity: 0.5;"></i>
+                <div class="notifications-empty">
+                    <i class="fas fa-bell-slash notifications-empty-icon"></i>
                     <p>No notifications yet</p>
                     <button class="glass-btn" onclick="generateReminders()">Generate Reminders</button>
                 </div>
@@ -110,7 +87,7 @@ async function loadNotifications() {
         }
     } catch (error) {
         document.getElementById('notificationsList').innerHTML = 
-            '<div style="color: #ef4444; padding: 20px;">Failed to load notifications</div>';
+            '<div class="notifications-error">Failed to load notifications</div>';
     }
 }
 
@@ -126,7 +103,7 @@ async function markRead(id) {
             loadNotifications();
         }
     } catch (error) {
-        alert('Failed to mark as read');
+        await showAlert('Failed to mark as read', 'Error');
     }
 }
 
@@ -140,15 +117,15 @@ async function markAllRead() {
         const data = await response.json();
         if (data.success) {
             loadNotifications();
-            alert(`Marked ${data.count} notifications as read`);
+            await showAlert(`Marked ${data.count} notifications as read`, 'Success');
         }
     } catch (error) {
-        alert('Failed to mark all as read');
+        await showAlert('Failed to mark all as read', 'Error');
     }
 }
 
 async function deleteNotification(id) {
-    if (!confirm('Delete this notification?')) return;
+    if (!await showConfirm('Delete this notification?', 'Delete Notification')) return;
     try {
         const response = await fetch('api/notifications.php', {
             method: 'POST',
@@ -160,7 +137,7 @@ async function deleteNotification(id) {
             loadNotifications();
         }
     } catch (error) {
-        alert('Failed to delete notification');
+        await showAlert('Failed to delete notification', 'Error');
     }
 }
 
@@ -169,11 +146,11 @@ async function generateReminders() {
         const response = await fetch('api/notifications.php?action=generate_reminders');
         const data = await response.json();
         if (data.success) {
-            alert(`Generated ${data.count} reminders`);
+            await showAlert(`Generated ${data.count} reminders`, 'Success');
             loadNotifications();
         }
     } catch (error) {
-        alert('Failed to generate reminders');
+        await showAlert('Failed to generate reminders', 'Error');
     }
 }
 

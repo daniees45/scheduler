@@ -1,5 +1,6 @@
-from typing import List, Dict, Tuple, Any
+from typing import List, Dict, Tuple, Any, Set
 from data_model import ClassSection, Lecturer
+import functools
 
 Constraint = Dict[str, Any]  # A mapping from constraint type to its parameters
 
@@ -7,37 +8,45 @@ Constraint = Dict[str, Any]  # A mapping from constraint type to its parameters
 def credit_hour_slot_constraint(assignment: Dict[str, Any],
                                 var_id: str,
                                 value: Any,
-                                sections: Dict[str, ClassSection]) -> bool:
+                                sections: Dict[str, ClassSection],
+                                csp_instance: Any = None) -> bool:
     """
-    Enforce credit hour restrictions on 5pm slot (slot 3) for GENERAL courses only.
-    General courses with 2+ credits cannot use 5pm slot.
-    Departmental courses have no 5pm restriction.
+    Enforce 5:00 PM - 6:00 PM slot constraints (Slot 3):
+    - For general sessions (course_type == 'General'), slot 3 is strictly reserved for NC or 1.0 credit hour courses.
+    - In both general and department sessions, departmental courses with 2.0 or 3.0 credit hours are strictly excluded from slot 3.
     """
     day, slot, _ = value
-    
-    # Slot 3 is 5pm-6pm
     if slot == 3:
         sec = sections[var_id]
-        
-        # Only apply restriction to GENERAL courses, not departmental
+        credit = str(sec.credit_hours).strip().upper()
+        # General session: Only NC or 1.0 allowed in slot 3
         if sec.course_type == "General":
-            credit = str(sec.credit_hours).strip().upper()
-            
-            # General courses with 2+ credits cannot use 5pm slot
-            # Only allow 1-credit or NC (No Credit) General courses in 5pm slot
             if credit not in ["1", "NC"]:
                 return False
-    
+        # Departmental session: 2.0 or 3.0 strictly excluded from slot 3
+        if sec.course_type == "Departmental":
+            if credit in ["2", "3", "2.0", "3.0"]:
+                return False
     return True
 
 
 def no_lecturer_conflict(assignment: Dict[str, Any], 
                          var_id: str,
                          value : Any,
-                         sections: Dict[str, ClassSection]) -> bool:
+                         sections: Dict[str, ClassSection],
+                         csp_instance: Any = None) -> bool:
     
     day, slot, _ = value
     this_lect = sections[var_id].lecturer_id
+    
+    if not this_lect:
+        return True # Without a lecturer, there can be no conflict
+        
+    # --- O(1) Check using CSP Tracker ---
+    if csp_instance and hasattr(csp_instance, 'lecturer_allocations'):
+        return (this_lect, day, slot) not in csp_instance.lecturer_allocations
+        
+    # Legacy fallback
     for other_id, other_val in assignment.items():
         if other_id == var_id:
             continue
@@ -48,8 +57,15 @@ def no_lecturer_conflict(assignment: Dict[str, Any],
 
 def no_room_conflict(assignment: Dict[str, Any], 
                      var_id: str,
-                     value : Any) -> bool:
+                     value : Any,
+                     csp_instance: Any = None) -> bool:
     day, slot, room_id = value
+    
+    # --- O(1) Check using CSP Tracker ---
+    if csp_instance and hasattr(csp_instance, 'room_allocations'):
+        return (room_id, day, slot) not in csp_instance.room_allocations
+        
+    # Legacy fallback
     for other_id, other_val in assignment.items():
         if other_id == var_id:
             continue
@@ -62,8 +78,8 @@ def no_room_conflict(assignment: Dict[str, Any],
 def no_student_cohort_conflict(assignment: Dict[str, Any], 
                                 var_id: str,
                                 value : Any,
-                                sections: Dict[str, ClassSection]) -> bool:
-    
+                                sections: Dict[str, ClassSection],
+                                csp_instance: Any = None) -> bool:
     
     """
     This ensures that no classes sharing the same student program and level
@@ -73,6 +89,30 @@ def no_student_cohort_conflict(assignment: Dict[str, Any],
     this_sec = sections[var_id]
     this_cohorts = this_sec.cohorts
     
+    if not this_cohorts:
+        return True # No cohorts to conflict with
+        
+    # --- O(1) Check using CSP Tracker ---
+    if csp_instance and hasattr(csp_instance, 'cohort_allocations'):
+        time_key = (day, slot)
+        if time_key in csp_instance.cohort_allocations:
+            active_cohorts = csp_instance.cohort_allocations[time_key]
+            # Simple intersection check against active cohorts
+            # Note: We are currently ignoring the semester exception in the fast path for speed,
+            # this might make tracking slightly tighter than before, but overwhelmingly correct.
+            # To handle semesters properly, cohorts should ideally include the semester.
+            common = this_cohorts.intersection(active_cohorts)
+            if common:
+                # However we need to check the semester exemption. The fast path triggers here
+                # Let's verify via the legacy loop if an intersection is found, 
+                # to guarantee we don't block valid different-semester cohorts.
+                pass # Proceed to legacy check if fast path fails
+            else:
+                return True # Fast path clean
+        else:
+            return True # Nobody scheduled at this time
+    
+    # Legacy fallback (needed if fast path flags an intersection to check semesters)
     for other_id, other_val in assignment.items():
         if other_id == var_id:
             continue
@@ -88,18 +128,14 @@ def no_student_cohort_conflict(assignment: Dict[str, Any],
             # SEMESTER CHECK:
             # Even if cohorts match (e.g. "General_100"), if they are explicitly for different semesters,
             # they do NOT conflict.
-            this_sem = sections[var_id].semester
-            other_sem = sections[other_id].semester
+            this_sem = this_sec.semester
+            other_sem = other_sec.semester
             
             # If both have semesters defined and they are DIFFERENT, then NO CONFLICT.
             if this_sem and other_sem and this_sem != other_sem:
-                 return True # Safe, different semesters
+                 continue # This specific intersection is safe, check others
             
             if common:
-                # OPTIMIZATION:
-                # If one is General and one is Departmental, this is a CRITICAL conflict.
-                # If both are Departmental, it might be an elective clash which is sometimes unavoidable.
-                # But for now, we treat all cohort clashes as invalid to ensure clean schedules.
                 return False
 
     return True
@@ -108,7 +144,8 @@ def no_student_cohort_conflict(assignment: Dict[str, Any],
 def shared_course_same_time_constraint(assignment: Dict[str, Any],
                                        var_id: str,
                                        value: Any,
-                                       sections: Dict[str, ClassSection]) -> bool:
+                                       sections: Dict[str, ClassSection],
+                                       csp_instance: Any = None) -> bool:
     """
     Enforce that courses in the same shared_group_id AND same section are scheduled at the SAME day/slot.
     
@@ -129,7 +166,7 @@ def shared_course_same_time_constraint(assignment: Dict[str, Any],
     shared_group = this_sec.shared_group_id
     this_section_title = this_sec.section_title
     
-    # Check all already-assigned sections
+    # Needs to scan assignment. Usually very few shared courses, but could be optimizing target later.
     for other_id, (other_day, other_slot, other_room) in assignment.items():
         if other_id == var_id:
             continue
@@ -151,7 +188,8 @@ def department_room_constraint(assignment: Dict[str, Any],
                                var_id: str,
                                value: Any,
                                sections: Dict[str, ClassSection],
-                               rooms: Dict[str, Any]) -> bool:
+                               rooms: Dict[str, Any],
+                               csp_instance: Any = None) -> bool:
     """
     Enforce that courses use only rooms from their owning department.
     
@@ -181,24 +219,74 @@ def no_blocked_slot_conflict(assignment: Dict[str, Any],
                               var_id: str,
                               value : Any,
                               sections: Dict[str, ClassSection],
-                              blocked_blocks: List[dict]) -> bool:
+                              blocked_blocks: List[dict],
+                              course_cohorts: Dict[str, set] = None,
+                              csp_instance: Any = None) -> bool:
     """
     Ensures that a Departmental course isn't scheduled during a time slot
-    where its students (based on Level/Semester) are busy with a General course.
+    where its students (based on Level/Semester) are busy with a General course
+    OR a shared course from another department.
     """
     if not blocked_blocks:
         return True
+
+    def _norm_level(raw_level: Any) -> str:
+        text = str(raw_level or '').strip()
+        if not text or text.lower() == 'nan':
+            return ''
+        try:
+            value = int(float(text))
+            if 0 < value < 10:
+                value *= 100
+            return str(value)
+        except Exception:
+            return text
+
+    def _norm_sem(raw_sem: Any) -> str:
+        text = str(raw_sem or '').strip()
+        if not text or text.lower() == 'nan':
+            return ''
+        return text
+
+    def _norm_lecturer(raw_name: Any) -> str:
+        name = str(raw_name or '').strip().lower().replace('_', ' ')
+        return ' '.join(name.split())
         
     day, slot, _ = value
     sec = sections[var_id]
+    sec_level = _norm_level(sec.course_level)
+    sec_sem = _norm_sem(sec.semester)
+    sec_lecturer = _norm_lecturer(sec.lecturer_id)
     
     for block in blocked_blocks:
-        if block['level'] == str(sec.course_level) and \
-           (block['semester'] is None or sec.semester is None or block['semester'] == str(sec.semester)):
-               if day == block['day']:
-                   if slot == block['slot']:
-                       return False
-                       
+        # 1. Check Day/Slot match
+        if day != block['day'] or slot != block['slot']:
+            continue
+
+        # 1b. Lecturer occupancy from blocked schedules (cross-department guard)
+        block_lecturer = _norm_lecturer(block.get('lecturer_name', ''))
+        if block_lecturer and sec_lecturer and block_lecturer == sec_lecturer:
+            return False
+            
+        # 2. Check Level/Semester match
+        block_level = _norm_level(block.get('level', ''))
+        block_sem = _norm_sem(block.get('semester', ''))
+        level_match = (not block_level) or (block_level == sec_level)
+        sem_match = (not block_sem) or (block_sem == sec_sem)
+        
+        if level_match and sem_match:
+            # 3. SMART COHORT CHECK:
+            # If the block has a course_code, we check if those specific students are affected.
+            block_code = block.get('course_code')
+            if block_code and course_cohorts:
+                block_cohorts = course_cohorts.get(block_code, set())
+                # Only block if there is a student overlap (common cohorts)
+                if not sec.cohorts.intersection(block_cohorts):
+                    continue # No shared students, this slot is FREE for this department
+            
+            # If it's a legacy block (no course_code) or cohorts overlap, BLOCK the slot
+            return False
+                        
     return True
 
 
@@ -206,7 +294,8 @@ def flexible_lecturer_assignment(assignment: Dict[str, Any],
                                   var_id: str,
                                   value: Any,
                                   sections: Dict[str, ClassSection],
-                                  lecturers: Dict[str, Lecturer]) -> bool:
+                                  lecturers: Dict[str, Lecturer],
+                                  csp_instance: Any = None) -> bool:
     """
     Soft constraint that encourages flexible assignment when lecturer slots are occupied.
     
@@ -262,47 +351,24 @@ def flexible_lecturer_assignment(assignment: Dict[str, Any],
 
 
 def make_constraints(sections: list,  rooms: dict, preference_model: dict = None, blocked_blocks: list = None,
-                    lecturers: dict = None, enable_flexibility: bool = True):
+                    lecturers: dict = None, enable_flexibility: bool = True, course_cohorts: dict = None):
     sections_by_id = {sec.id: sec for sec in sections}
 
-    def lecturer_conflict_wrapper(assignment, var_id, value):
-        return no_lecturer_conflict(assignment, var_id, value, sections_by_id)
-    
-    def cohort_conflict_wrapper(assignment, var_id, value):
-        return no_student_cohort_conflict(assignment, var_id, value, sections_by_id)
-    
-    def shared_time_wrapper(assignment, var_id, value):
-        return shared_course_same_time_constraint(assignment, var_id, value, sections_by_id)
-    
-    def dept_room_wrapper(assignment, var_id, value):
-        return department_room_constraint(assignment, var_id, value, sections_by_id, rooms)
-    
-    def credit_slot_wrapper(assignment, var_id, value):
-        return credit_hour_slot_constraint(assignment, var_id, value, sections_by_id)
-        
-    def blocked_slot_wrapper(assignment, var_id, value):
-        if not blocked_blocks: return True
-        return no_blocked_slot_conflict(assignment, var_id, value, sections_by_id, blocked_blocks)
-    
-    def flexible_assignment_wrapper(assignment, var_id, value):
-        if not lecturers or not enable_flexibility: return True
-        return flexible_lecturer_assignment(assignment, var_id, value, sections_by_id, lecturers)
-    
     base_constraints = [
-        lecturer_conflict_wrapper,
+        functools.partial(no_lecturer_conflict, sections=sections_by_id),
         no_room_conflict,
-        cohort_conflict_wrapper,
-        shared_time_wrapper,
-        dept_room_wrapper,
-        credit_slot_wrapper  # 5pm restriction for General courses only
+        functools.partial(no_student_cohort_conflict, sections=sections_by_id),
+        functools.partial(shared_course_same_time_constraint, sections=sections_by_id),
+        functools.partial(credit_hour_slot_constraint, sections=sections_by_id)
     ]
     
     # Add flexible assignment constraint if lecturers provided and flexibility enabled
     if lecturers and enable_flexibility:
-        base_constraints.append(flexible_assignment_wrapper)
+        base_constraints.append(functools.partial(flexible_lecturer_assignment, sections=sections_by_id, lecturers=lecturers))
     
     if blocked_blocks:
-        base_constraints.append(blocked_slot_wrapper)
+        base_constraints.append(functools.partial(no_blocked_slot_conflict, sections=sections_by_id, 
+                                                 blocked_blocks=blocked_blocks, course_cohorts=course_cohorts))
         
     return base_constraints
 

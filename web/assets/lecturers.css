@@ -1,0 +1,145 @@
+.lecturers-panel {
+    padding: 1.5rem;
+}
+
+.lecturers-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    gap: 1rem;
+}
+
+.lecturers-search-form {
+    display: flex;
+    gap: 10px;
+    flex: 1;
+    max-width: 400px;
+}
+
+.lecturers-table {
+    width: 100%;
+}
+
+.lecturers-name-cell {
+    font-weight: 500;
+}
+
+.lecturers-muted-cell {
+    color: var(--text-muted);
+}
+
+.lecturers-availability-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.lecturers-availability-track {
+    height: 8px;
+    flex: 1;
+    max-width: 100px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.lecturers-availability-text {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.lecturers-inline-form {
+    display: inline;
+}
+
+.lecturers-delete-btn {
+    padding: 6px 10px;
+    color: var(--danger);
+    border-color: rgba(239, 68, 68, 0.3);
+}
+
+.lecturers-edit-btn {
+    padding: 6px 10px;
+    display: inline-block;
+    text-decoration: none;
+}
+
+.lecturers-empty-state {
+    text-align: center;
+    padding: 2rem;
+}
+
+.lecturers-pagination {
+    margin-top: 1.5rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+}
+
+.lecturers-pagination-label {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+}
+
+.lecturers-page-link-disabled {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.lecturers-modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+}
+
+.lecturers-modal-panel {
+    width: 100%;
+    max-width: 400px;
+    padding: 2rem;
+}
+
+.lecturers-modal-title {
+    margin-bottom: 1.5rem;
+}
+
+.lecturers-modal-grid {
+    display: grid;
+    gap: 1rem;
+}
+
+.lecturers-modal-label {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+}
+
+.lecturers-modal-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 1rem;
+}
+
+.lecturers-modal-save {
+    flex: 1;
+}
+
+@media (max-width: 720px) {
+    .lecturers-header-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .lecturers-search-form,
+    .lecturers-modal-actions {
+        max-width: none;
+        width: 100%;
+    }
+}

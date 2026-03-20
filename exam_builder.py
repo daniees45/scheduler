@@ -20,7 +20,19 @@ def build_exam_domain(data: dict) -> Domain:
 
     for sec in sections:
         if sec.fixed_day is not None and sec.fixed_slot is not None:
-            req_room_id = next(iter(rooms)) if rooms else None
+            req_room_id = None
+            if sec.requested_room and sec.requested_room in rooms:
+                req_room_id = sec.requested_room
+            elif sec.requested_room:
+                requested_name = str(sec.requested_room).replace("_", " ").strip().lower()
+                for room_id, room in rooms.items():
+                    if str(room.name).strip().lower() == requested_name:
+                        req_room_id = room_id
+                        break
+
+            if req_room_id is None:
+                req_room_id = next(iter(rooms)) if rooms else None
+
             if req_room_id:
                 domains[sec.id] = [(sec.fixed_day, sec.fixed_slot, req_room_id)]
             else:

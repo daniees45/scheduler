@@ -162,19 +162,70 @@ function deleteNotification($user_id, $notification_id, $conn) {
 // REMINDER SETTINGS
 // ============================================================================
 
-function getReminderSettings($user_id, $conn) {
-    $stmt = $conn->prepare("
-        SELECT * FROM reminder_settings WHERE user_id = ?
-    ");
+function ensureUnifiedNotificationSettingsRow($user_id, $conn) {
+    $stmt = $conn->prepare("INSERT IGNORE INTO notification_settings (user_id) VALUES (?)");
     $stmt->bind_param("i", $user_id);
     $stmt->execute();
-    $result = $stmt->get_result();
-    
-    $settings = [];
-    while ($row = $result->fetch_assoc()) {
-        $settings[] = $row;
-    }
-    
+}
+
+function ensureAiSettingsRow($user_id, $conn) {
+    $stmt = $conn->prepare("INSERT IGNORE INTO ai_settings (user_id) VALUES (?)");
+    $stmt->bind_param("i", $user_id);
+    $stmt->execute();
+}
+
+function getUnifiedReminderSettingsRows($user_id, $conn) {
+    ensureUnifiedNotificationSettingsRow($user_id, $conn);
+    ensureAiSettingsRow($user_id, $conn);
+
+    $stmt = $conn->prepare("SELECT * FROM notification_settings WHERE user_id = ? LIMIT 1");
+    $stmt->bind_param("i", $user_id);
+    $stmt->execute();
+    $notif = $stmt->get_result()->fetch_assoc() ?: [];
+
+    $stmt = $conn->prepare("SELECT free_time_auto_suggest FROM ai_settings WHERE user_id = ? LIMIT 1");
+    $stmt->bind_param("i", $user_id);
+    $stmt->execute();
+    $ai = $stmt->get_result()->fetch_assoc() ?: [];
+
+    $minutes = intval($notif['reminder_lead_time'] ?? 30);
+    $delivery = intval($notif['in_app_toggles'] ?? 1) ? 'in_app' : (intval($notif['email_toggles'] ?? 0) ? 'email' : 'in_app');
+
+    return [
+        [
+            'user_id' => $user_id,
+            'reminder_type' => 'course_reminder',
+            'enabled' => intval($notif['class_reminders'] ?? 1),
+            'minutes_before' => $minutes,
+            'delivery_method' => $delivery
+        ],
+        [
+            'user_id' => $user_id,
+            'reminder_type' => 'exam_reminder',
+            'enabled' => intval($notif['exam_reminders'] ?? 1),
+            'minutes_before' => $minutes,
+            'delivery_method' => $delivery
+        ],
+        [
+            'user_id' => $user_id,
+            'reminder_type' => 'personal_event',
+            'enabled' => intval($notif['personal_event_reminders'] ?? 1),
+            'minutes_before' => $minutes,
+            'delivery_method' => $delivery
+        ],
+        [
+            'user_id' => $user_id,
+            'reminder_type' => 'study_session',
+            'enabled' => intval($ai['free_time_auto_suggest'] ?? 0),
+            'minutes_before' => $minutes,
+            'delivery_method' => $delivery
+        ]
+    ];
+}
+
+function getReminderSettings($user_id, $conn) {
+    $settings = getUnifiedReminderSettingsRows($user_id, $conn);
+
     return [
         'success' => true,
         'settings' => $settings
@@ -185,34 +236,50 @@ function updateReminderSettings($user_id, $data, $conn) {
     if (empty($data['reminder_type'])) {
         return ['success' => false, 'error' => 'Reminder type required'];
     }
-    
-    $stmt = $conn->prepare("
-        INSERT INTO reminder_settings 
-        (user_id, reminder_type, enabled, minutes_before, delivery_method)
-        VALUES (?, ?, ?, ?, ?)
-        ON DUPLICATE KEY UPDATE
-            enabled = VALUES(enabled),
-            minutes_before = VALUES(minutes_before),
-            delivery_method = VALUES(delivery_method)
-    ");
-    
+
+    ensureUnifiedNotificationSettingsRow($user_id, $conn);
+    ensureAiSettingsRow($user_id, $conn);
+
+    $type = $data['reminder_type'];
     $enabled = isset($data['enabled']) ? ($data['enabled'] ? 1 : 0) : 1;
-    $minutes = $data['minutes_before'] ?? 30;
+    $minutes = intval($data['minutes_before'] ?? 30);
     $delivery = $data['delivery_method'] ?? 'in_app';
-    
-    $stmt->bind_param("isiss",
-        $user_id,
-        $data['reminder_type'],
-        $enabled,
-        $minutes,
-        $delivery
-    );
-    
-    if ($stmt->execute()) {
-        return ['success' => true, 'message' => 'Reminder settings updated'];
+
+    $columnMap = [
+        'course_reminder' => 'class_reminders',
+        'exam_reminder' => 'exam_reminders',
+        'personal_event' => 'personal_event_reminders'
+    ];
+
+    if (isset($columnMap[$type])) {
+        $column = $columnMap[$type];
+        $sql = "UPDATE notification_settings SET {$column} = ?, reminder_lead_time = ? WHERE user_id = ?";
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param("iii", $enabled, $minutes, $user_id);
+        $stmt->execute();
+    } elseif ($type === 'study_session') {
+        $stmt = $conn->prepare("UPDATE ai_settings SET free_time_auto_suggest = ? WHERE user_id = ?");
+        $stmt->bind_param("ii", $enabled, $user_id);
+        $stmt->execute();
+
+        $stmt = $conn->prepare("UPDATE notification_settings SET reminder_lead_time = ? WHERE user_id = ?");
+        $stmt->bind_param("ii", $minutes, $user_id);
+        $stmt->execute();
+    } else {
+        return ['success' => false, 'error' => 'Unsupported reminder type'];
     }
-    
-    return ['success' => false, 'error' => 'Failed to update settings'];
+
+    if ($delivery === 'email') {
+        $stmt = $conn->prepare("UPDATE notification_settings SET email_toggles = 1, in_app_toggles = 0 WHERE user_id = ?");
+        $stmt->bind_param("i", $user_id);
+        $stmt->execute();
+    } elseif ($delivery === 'in_app') {
+        $stmt = $conn->prepare("UPDATE notification_settings SET in_app_toggles = 1 WHERE user_id = ?");
+        $stmt->bind_param("i", $user_id);
+        $stmt->execute();
+    }
+
+    return ['success' => true, 'message' => 'Reminder settings updated'];
 }
 
 // ============================================================================
@@ -221,16 +288,15 @@ function updateReminderSettings($user_id, $data, $conn) {
 
 function generateReminders($user_id, $conn, $user_role, $lecturer_id) {
     $generated = 0;
-    
-    // Get reminder settings
-    $stmt = $conn->prepare("SELECT * FROM reminder_settings WHERE user_id = ? AND enabled = TRUE");
-    $stmt->bind_param("i", $user_id);
-    $stmt->execute();
-    $settings_result = $stmt->get_result();
-    
+
+    // Get unified reminder settings
+    $settings_result = getUnifiedReminderSettingsRows($user_id, $conn);
+
     $settings = [];
-    while ($row = $settings_result->fetch_assoc()) {
-        $settings[$row['reminder_type']] = $row;
+    foreach ($settings_result as $row) {
+        if (intval($row['enabled'] ?? 0) === 1) {
+            $settings[$row['reminder_type']] = $row;
+        }
     }
     
     // Generate course reminders

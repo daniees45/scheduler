@@ -62,6 +62,8 @@ def generate_conflict_heatmap(variables, domains, day_names):
     slot_contention = {} # (day, slot) -> count
     
     for var_id in domains:
+        if var_id == 'all_rooms':
+            continue
         seen_in_var = set()
         for day, slot, room_id in domains[var_id]:
             pair = (day, slot)

@@ -1,0 +1,16 @@
+{
+  "course_type": "Departmental",
+  "department": "CS/IT/BBIS",
+  "availability_mode": "1",
+  "exam_mode": false,
+  "semester": "1",
+  "model": "ensemble",
+  "general_schedule_paths": ["csv/general/vvu_general_schedule.csv"],
+  "weight_room": 10.0,
+  "weight_lecturer": 5.0,
+  "weight_balance": 8.0,
+  "include_schedule_data": true,
+  "max_schedule_rows": 200,
+  "use_session": false,
+  "input_file": "csv/department/departmental_courses.csv"
+}

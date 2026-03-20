@@ -1,0 +1,142 @@
+.reminder-settings-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.reminder-settings-subtitle {
+    color: var(--text-muted);
+    margin-bottom: 2rem;
+}
+
+.reminder-settings-panel {
+    padding: 1.5rem;
+}
+
+.reminder-settings-placeholder {
+    text-align: center;
+    padding: 40px;
+    color: var(--text-muted);
+}
+
+.reminder-settings-actions {
+    margin-top: 2rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.reminder-settings-generate-btn {
+    margin-left: 10px;
+}
+
+.reminder-settings-error {
+    color: #ef4444;
+    padding: 20px;
+}
+
+.setting-item {
+    padding: 1.2rem;
+    background: rgba(15, 23, 42, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.setting-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.setting-title {
+    margin: 0 0 0.3rem 0;
+}
+
+.setting-description {
+    margin: 0;
+    font-size: 14px;
+    color: var(--text-muted);
+}
+
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 24px;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    inset: 0;
+    background-color: #374151;
+    transition: 0.4s;
+    border-radius: 24px;
+}
+
+.toggle-slider:before {
+    position: absolute;
+    content: '';
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: 0.4s;
+    border-radius: 50%;
+}
+
+.toggle-switch input:checked + .toggle-slider {
+    background-color: #6366f1;
+}
+
+.toggle-switch input:checked + .toggle-slider:before {
+    transform: translateX(26px);
+}
+
+.setting-controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.setting-controls-disabled {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.input-group label {
+    font-size: 14px;
+    color: var(--text-muted);
+}
+
+@media (max-width: 640px) {
+    .setting-header,
+    .reminder-settings-actions {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.75rem;
+    }
+
+    .setting-controls {
+        grid-template-columns: 1fr;
+    }
+
+    .reminder-settings-generate-btn {
+        margin-left: 0;
+    }
+}

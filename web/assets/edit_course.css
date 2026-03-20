@@ -1,0 +1,56 @@
+.edit-course-not-found {
+    padding: 2rem;
+}
+
+.edit-course-panel {
+    padding: 2rem;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.edit-course-title {
+    margin-bottom: 2rem;
+}
+
+.edit-course-alert {
+    margin-bottom: 1rem;
+}
+
+.edit-course-form-grid {
+    display: grid;
+    gap: 1.5rem;
+}
+
+.edit-course-two-col-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.edit-course-select {
+    background: rgba(15, 23, 42, 0.9);
+}
+
+.edit-course-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 1rem;
+}
+
+.edit-course-submit {
+    flex: 1;
+}
+
+.edit-course-cancel {
+    text-align: center;
+}
+
+@media (max-width: 640px) {
+    .edit-course-two-col-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .edit-course-actions {
+        flex-direction: column;
+    }
+}

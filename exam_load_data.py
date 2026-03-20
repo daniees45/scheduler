@@ -48,7 +48,8 @@ def load_exam_data(paths: List[str],
                    curriculum_path: str = "curriculum.csv",
                    exam_config_path: str = "json/exam_config.json",
                    exam_config_overrides: dict | None = None,
-                   rooms_override: dict | None = None):
+                   rooms_override: dict | None = None,
+                   blocked_blocks: List[dict] | None = None):
     config = _load_exam_config(exam_config_path)
     if exam_config_overrides:
         config.update(exam_config_overrides)
@@ -149,6 +150,37 @@ def load_exam_data(paths: List[str],
                 return int(ch)
         return 1
 
+    def _normalize_level_token(raw_level) -> str:
+        level_num = _normalize_level(_parse_int(raw_level, 0))
+        return str(level_num * 100)
+
+    def _normalize_semester_token(raw_semester) -> str:
+        text = str(raw_semester or '').strip()
+        if not text or text.lower() == 'nan':
+            return ''
+        return text
+
+    def _normalize_block_code(raw_code: str) -> str:
+        code = str(raw_code or '').strip().upper()
+        if not code:
+            return ''
+        code = code.split(':')[0].strip()
+        return code.split(' / ')[0].strip()
+
+    # Smart-lock lookup from provided blocked schedules
+    course_to_fixed_exact = {}
+    course_to_fixed_code_only = {}
+    if blocked_blocks:
+        for block in blocked_blocks:
+            code = _normalize_block_code(block.get('course_code', ''))
+            if not code:
+                continue
+            level_tok = _normalize_level_token(block.get('level', '')) if block.get('level') is not None else ''
+            sem_tok = _normalize_semester_token(block.get('semester', ''))
+            lock_tuple = (block.get('day'), block.get('slot'), block.get('room_name'))
+            course_to_fixed_exact[(code, level_tok, sem_tok)] = lock_tuple
+            course_to_fixed_code_only[code] = lock_tuple
+
     def _get_enrollment(row_obj) -> int:
         for key in [
             "no_of_students",
@@ -239,6 +271,7 @@ def load_exam_data(paths: List[str],
             # Fixed day/slot from first row (if any)
             fixed_day = None
             fixed_slot = None
+            fixed_room = None
             if "day" in combined_df.columns and "start_time" in combined_df.columns:
                 day = str(first_row.get("day", "")).strip()
                 start_time = str(first_row.get("start_time", "")).split("-")[0].strip().lower()
@@ -246,6 +279,16 @@ def load_exam_data(paths: List[str],
                     fixed_day = day_to_index[day]
                 if start_time in time_to_slot:
                     fixed_slot = time_to_slot[start_time]
+                fixed_room = str(first_row.get("room_name", "")).strip() or None
+
+            # Smart lock from external blocked schedules
+            lock_key = (course_code, str(level * 100), _normalize_semester_token(semester))
+            if fixed_day is None and lock_key in course_to_fixed_exact:
+                fixed_day, fixed_slot, fixed_room = course_to_fixed_exact[lock_key]
+                print(f"[INFO] Smart Locked exam course {course_code} to Day {fixed_day}, Slot {fixed_slot}, Room {fixed_room}")
+            elif fixed_day is None and course_code in course_to_fixed_code_only:
+                fixed_day, fixed_slot, fixed_room = course_to_fixed_code_only[course_code]
+                print(f"[INFO] Smart Locked exam course {course_code} to Day {fixed_day}, Slot {fixed_slot}, Room {fixed_room}")
             
             sec_id = f"{course_code}_EXAM"
             sections.append(ClassSection(
@@ -259,6 +302,7 @@ def load_exam_data(paths: List[str],
                 cohorts=cohorts,
                 fixed_day=fixed_day,
                 fixed_slot=fixed_slot,
+                requested_room=(str(fixed_room).strip().replace(" ", "_") if fixed_room else None),
                 semester=semester,
                 departmental_group="Other"
             ))
@@ -302,6 +346,7 @@ def load_exam_data(paths: List[str],
 
             fixed_day = None
             fixed_slot = None
+            fixed_room = None
             if "day" in combined_df.columns and "start_time" in combined_df.columns:
                 day = str(row.get("day", "")).strip()
                 start_time = str(row.get("start_time", "")).split("-")[0].strip().lower()
@@ -309,6 +354,16 @@ def load_exam_data(paths: List[str],
                     fixed_day = day_to_index[day]
                 if start_time in time_to_slot:
                     fixed_slot = time_to_slot[start_time]
+                fixed_room = str(row.get("room_name", "")).strip() or None
+
+            # Smart lock from external blocked schedules
+            lock_key = (course_code, str(level * 100), _normalize_semester_token(semester))
+            if fixed_day is None and lock_key in course_to_fixed_exact:
+                fixed_day, fixed_slot, fixed_room = course_to_fixed_exact[lock_key]
+                print(f"[INFO] Smart Locked exam course {course_code} to Day {fixed_day}, Slot {fixed_slot}, Room {fixed_room}")
+            elif fixed_day is None and course_code in course_to_fixed_code_only:
+                fixed_day, fixed_slot, fixed_room = course_to_fixed_code_only[course_code]
+                print(f"[INFO] Smart Locked exam course {course_code} to Day {fixed_day}, Slot {fixed_slot}, Room {fixed_room}")
 
             invigilator_name = _get_invigilator(row)
             enrollment = _get_enrollment(row)
@@ -325,6 +380,7 @@ def load_exam_data(paths: List[str],
                 cohorts=cohorts,
                 fixed_day=fixed_day,
                 fixed_slot=fixed_slot,
+                requested_room=(str(fixed_room).strip().replace(" ", "_") if fixed_room else None),
                 semester=semester,
                 departmental_group="Other"
             ))

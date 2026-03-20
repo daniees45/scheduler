@@ -1,0 +1,27 @@
+{
+  "model_name": "nn_scheduler",
+  "last_trained": "20260312_215547",
+  "backend": "tensorflow",
+  "model_file": "models/nn/nn_scheduler.h5",
+  "training_stats": {
+    "final_loss": 0.0016433808486908674,
+    "final_accuracy": 1.0,
+    "epochs_trained": 50
+  },
+  "data_metadata": {
+    "num_records": 224,
+    "unique_courses": 0,
+    "unique_lecturers": 0,
+    "unique_rooms": 0,
+    "date_range": "unknown"
+  },
+  "architecture": {
+    "embedding_dim": 32,
+    "hidden_dim": 128,
+    "num_courses": 19,
+    "num_lecturers": 19,
+    "num_rooms": 11,
+    "num_slots": 40,
+    "num_context_features": 13
+  }
+}

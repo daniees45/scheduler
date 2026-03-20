@@ -1,7 +1,13 @@
 <?php
+session_start();
+require_once 'api/db.php';
+require_once 'includes/access_control.php';
+
+// Restrict access to admins only
+requireRole(['super_admin', 'faculty_admin']);
+
 $page_title = 'View Schedule';
 include 'includes/header.php';
-require_once 'api/db.php';
 require_once '../lib/B2Storage.php';
 
 // Prefer schedule ID (generated_schedules table)
@@ -19,8 +25,9 @@ if (!isset($_GET['file']) || $_GET['file'] === '' || $_GET['file'] === 'null' ||
         if (!empty($latest['success']) && !empty($latest['files'][0]['key'])) {
             $requested_file = $latest['files'][0]['key'];
         }
-    } catch (Exception $e) {
-        // Keep default fallback path if B2 is unavailable
+    }
+    catch (Exception $e) {
+    // Keep default fallback path if B2 is unavailable
     }
 }
 
@@ -58,13 +65,13 @@ if ($schedule_id > 0) {
         $decoded = json_decode($json, true);
         if (is_array($decoded) && count($decoded) > 0) {
             $headers = array_shift($decoded);
-            
+
             // Detect exam format from headers
             $headers_lower = array_map('strtolower', $headers);
             if (in_array('invigilator', $headers_lower) || in_array('invigilator name', $headers_lower)) {
                 $is_exam_schedule = true;
             }
-            
+
             // Parse data according to format
             foreach ($decoded as $row) {
                 if ($is_exam_schedule) {
@@ -77,7 +84,8 @@ if ($schedule_id > 0) {
                         'day' => $row[7] ?? '',
                         'time' => $row[8] ?? ''
                     ];
-                } else {
+                }
+                else {
                     // Regular format: Course Code, Course Title, Credit Hrs, Lecturer Name, Room Name, Day, Time
                     $data[] = [
                         'code' => $row[0] ?? '',
@@ -89,23 +97,25 @@ if ($schedule_id > 0) {
                     ];
                 }
             }
-        } elseif (!empty($json)) {
+        }
+        elseif (!empty($json)) {
             // Fallback: schedule_data stored as CSV string (legacy)
             $lines = preg_split('/\r\n|\r|\n/', $json);
             $rows = [];
             foreach ($lines as $line) {
-                if (trim($line) === '') continue;
+                if (trim($line) === '')
+                    continue;
                 $rows[] = str_getcsv($line);
             }
             if (!empty($rows)) {
                 $headers = array_shift($rows);
-                
+
                 // Detect exam format from headers
                 $headers_lower = array_map('strtolower', $headers);
                 if (in_array('invigilator', $headers_lower) || in_array('invigilator name', $headers_lower)) {
                     $is_exam_schedule = true;
                 }
-                
+
                 // Parse data according to format
                 foreach ($rows as $row) {
                     if ($is_exam_schedule) {
@@ -118,7 +128,8 @@ if ($schedule_id > 0) {
                             'day' => $row[7] ?? '',
                             'time' => $row[8] ?? ''
                         ];
-                    } else {
+                    }
+                    else {
                         // Regular format: Course Code, Course Title, Credit Hrs, Lecturer Name, Room Name, Day, Time
                         $data[] = [
                             'code' => $row[0] ?? '',
@@ -139,7 +150,7 @@ if ($schedule_id > 0) {
 if (empty($data)) {
     // Try B2 first
     $b2 = new B2Storage();
-    
+
     // Key is likely the requested_file itself e.g., csv/final/schedule.csv
     // But we need to be careful about keys.
     // If requested_file starts with csv/, use it.
@@ -147,24 +158,25 @@ if (empty($data)) {
     if (strpos($b2_key, 'csv/') !== 0) {
         $b2_key = 'csv/final/' . $requested_file;
     }
-    
+
     $download = $b2->download($b2_key);
     $csv_content = null;
-    
+
     if ($download['success']) {
         $csv_content = $download['content'];
-    } elseif (file_exists($csv_file)) {
+    }
+    elseif (file_exists($csv_file)) {
         // Fallback to local file
         $csv_content = file_get_contents($csv_file);
     }
-    
+
     if ($csv_content !== null) {
         $handle = fopen('php://memory', 'r+');
         fwrite($handle, $csv_content);
         rewind($handle);
-        
+
         $headers = fgetcsv($handle); // "Course Code","Course Title",...
-        
+
         // Detect exam format from headers
         if ($headers) {
             $headers_lower = array_map('strtolower', $headers);
@@ -172,7 +184,7 @@ if (empty($data)) {
                 $is_exam_schedule = true;
             }
         }
-        
+
         // Parse data according to format
         while (($row = fgetcsv($handle, 1000, ",")) !== FALSE) {
             if ($is_exam_schedule) {
@@ -185,7 +197,8 @@ if (empty($data)) {
                     'day' => $row[7] ?? '',
                     'time' => $row[8] ?? ''
                 ];
-            } else {
+            }
+            else {
                 // Regular format: Course Code, Course Title, Credit Hrs, Lecturer Name, Room Name, Day, Time
                 $data[] = [
                     'code' => $row[0] ?? '',
@@ -220,18 +233,21 @@ if ($user_role === 'lecturer' && !empty($_SESSION['lecturer_id'])) {
     // Clear other filters for lecturers - they can only see their own schedule
     $filter_room = '';
     $filter_day = $_GET['day'] ?? ''; // Allow day filter for lecturers
-} elseif ($user_role === 'student') {
+}
+elseif ($user_role === 'student') {
     // Students: FORCE filter to show only enrolled courses - override any GET parameters
     $enrolled_course_codes = [];
     if (!empty($_SESSION['user_id'])) {
+        $student_semester = (string)($_SESSION['semester'] ?? '1');
         require_once 'api/db.php';
         $stmt = $conn->prepare("
             SELECT c.course_code
             FROM student_enrollments se
             JOIN courses c ON se.course_id = c.id
             WHERE se.user_id = ?
+              AND (se.semester = ? OR se.semester IS NULL OR TRIM(se.semester) = '')
         ");
-        $stmt->bind_param("i", $_SESSION['user_id']);
+        $stmt->bind_param("is", $_SESSION['user_id'], $student_semester);
         $stmt->execute();
         $result = $stmt->get_result();
         while ($row = $result->fetch_assoc()) {
@@ -245,24 +261,24 @@ if ($user_role === 'lecturer' && !empty($_SESSION['lecturer_id'])) {
 }
 
 if ($filter_lecturer) {
-    $data = array_filter($data, function($item) use ($filter_lecturer) {
+    $data = array_filter($data, function ($item) use ($filter_lecturer) {
         return stripos($item['lecturer'], $filter_lecturer) !== false;
     });
 }
 if ($filter_room) {
-    $data = array_filter($data, function($item) use ($filter_room) {
+    $data = array_filter($data, function ($item) use ($filter_room) {
         return stripos($item['room'], $filter_room) !== false;
     });
 }
 if ($filter_day) {
-    $data = array_filter($data, function($item) use ($filter_day) {
+    $data = array_filter($data, function ($item) use ($filter_day) {
         return stripos($item['day'], $filter_day) !== false;
     });
 }
 
 // Filter for students - only show enrolled courses
 if ($user_role === 'student' && !empty($enrolled_course_codes)) {
-    $data = array_filter($data, function($item) use ($enrolled_course_codes) {
+    $data = array_filter($data, function ($item) use ($enrolled_course_codes) {
         return in_array(strtolower(trim($item['code'])), $enrolled_course_codes);
     });
 }
@@ -279,10 +295,11 @@ $offset = ($current_page - 1) * $items_per_page;
 
 // Sort by Day then Time before slicing
 $day_order = array_flip($days);
-usort($data, function($a, $b) use ($day_order) {
+usort($data, function ($a, $b) use ($day_order) {
     $da = $day_order[$a['day']] ?? 99;
     $db = $day_order[$b['day']] ?? 99;
-    if ($da != $db) return $da - $db;
+    if ($da != $db)
+        return $da - $db;
     return strcmp($a['time'], $b['time']);
 });
 
@@ -313,143 +330,160 @@ $paged_data = array_slice($data, $offset, $items_per_page);
             </div>
         </div>
     </div>
-    <?php endif; ?>
+    <?php
+endif; ?>
     
-    <!-- Header & Controls -->
-    <div style="display: grid; grid-template-columns: 3fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
+    <!-- Control Center: Filters & Actions in Separate Cards on Same Line -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; max-width: 1200px; margin: 0 auto; margin-bottom: 1.5rem;">
         
-        <?php if ($user_role === 'super_admin' || $user_role === 'faculty_admin'): ?>
-        <!-- Filters Card (Admin Only) -->
+        <!-- Card 1: Advanced Filters -->
         <div class="glass-panel" style="padding: 1.5rem;">
-            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 1rem; color: var(--primary-color);">
-                <i class="fa-solid fa-filter"></i>
-                <h3 style="margin: 0; font-size: 1.1rem;">Filter Schedule</h3>
+            <?php if ($user_role === 'super_admin' || $user_role === 'faculty_admin'): ?>
+            <!-- Admin Filters -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border-color);">
+                <h3 style="margin: 0; font-size: 1.1rem; color: var(--primary-color); display: flex; align-items: center; gap: 10px;">
+                    <i class="fa-solid fa-filter"></i> Advanced Filters
+                </h3>
+                <div style="position: relative; width: 200px;">
+                    <i class="fa-solid fa-search"
+                        style="position: absolute; left: 10px; top: 10px; color: var(--text-muted); font-size: 0.8rem;"></i>
+                    <input type="text" id="liveSearch" class="glass-input" placeholder="Quick search..."
+                        style="padding-left: 30px; font-size: 0.85rem; background: rgba(0,0,0,0.1); border-radius: 16px;">
+                </div>
             </div>
-            
-            <form method="GET" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem;">
+            <form action="" method="GET"
+                style="display: grid; grid-template-columns: 1fr; gap: 1rem;">
                 <?php if ($schedule_id > 0): ?>
-                    <input type="hidden" name="id" value="<?php echo $schedule_id; ?>">
-                <?php endif; ?>
+                <input type="hidden" name="id" value="<?php echo $schedule_id; ?>">
+                <?php
+    endif; ?>
                 <?php if (isset($_GET['file'])): ?>
-                    <input type="hidden" name="file" value="<?php echo htmlspecialchars($_GET['file']); ?>">
-                <?php endif; ?>
+                <input type="hidden" name="file" value="<?php echo htmlspecialchars($_GET['file']); ?>">
+                <?php
+    endif; ?>
                 <div>
-                    <label class="stat-label" style="font-size: 0.8rem;"><?php echo $is_exam_schedule ? 'Invigilator' : 'Lecturer'; ?></label>
+                    <label class="stat-label" style="font-size: 0.75rem;">
+                        <?php echo $is_exam_schedule ? 'Invigilator' : 'Lecturer'; ?>
+                    </label>
                     <div style="position: relative;">
-                        <i class="fa-solid <?php echo $is_exam_schedule ? 'fa-user-shield' : 'fa-user-tie'; ?>" style="position: absolute; left: 10px; top: 12px; color: var(--text-muted); font-size: 0.9rem;"></i>
-                        <input type="text" name="lecturer" class="glass-input" style="padding-left: 35px;" placeholder="Search Name..." value="<?php echo htmlspecialchars($filter_lecturer); ?>">
+                        <i class="fa-solid <?php echo $is_exam_schedule ? 'fa-user-shield' : 'fa-user-tie'; ?>"
+                            style="position: absolute; left: 10px; top: 12px; color: var(--text-muted); font-size: 0.85rem;"></i>
+                        <input type="text" name="lecturer" class="glass-input small" style="padding-left: 32px;"
+                            placeholder="Name..." value="<?php echo htmlspecialchars($filter_lecturer); ?>">
                     </div>
                 </div>
                 <div>
-                    <label class="stat-label" style="font-size: 0.8rem;"><?php echo $is_exam_schedule ? 'Exam Hall' : 'Room'; ?></label>
+                    <label class="stat-label" style="font-size: 0.75rem;">
+                        <?php echo $is_exam_schedule ? 'Exam Hall' : 'Room'; ?>
+                    </label>
                     <div style="position: relative;">
-                        <i class="fa-solid <?php echo $is_exam_schedule ? 'fa-building' : 'fa-location-dot'; ?>" style="position: absolute; left: 10px; top: 12px; color: var(--text-muted); font-size: 0.9rem;"></i>
-                        <input type="text" name="room" class="glass-input" style="padding-left: 35px;" placeholder="<?php echo $is_exam_schedule ? 'Search Hall...' : 'Search Room...'; ?>" value="<?php echo htmlspecialchars($filter_room); ?>">
+                        <i class="fa-solid <?php echo $is_exam_schedule ? 'fa-building' : 'fa-location-dot'; ?>"
+                            style="position: absolute; left: 10px; top: 12px; color: var(--text-muted); font-size: 0.85rem;"></i>
+                        <input type="text" name="room" class="glass-input small" style="padding-left: 32px;"
+                            placeholder="Room..."
+                            value="<?php echo htmlspecialchars($filter_room); ?>">
                     </div>
                 </div>
                 <div>
-                    <label class="stat-label" style="font-size: 0.8rem;">Day</label>
+                    <label class="stat-label" style="font-size: 0.75rem;">Day</label>
                     <div style="position: relative;">
-                        <i class="fa-solid fa-calendar-day" style="position: absolute; left: 10px; top: 12px; color: var(--text-muted); font-size: 0.9rem;"></i>
-                        <select name="day" class="glass-input" style="padding-left: 35px; background: rgba(15, 23, 42, 0.8);">
+                        <i class="fa-solid fa-calendar-day"
+                            style="position: absolute; left: 10px; top: 12px; color: var(--text-muted); font-size: 0.85rem;"></i>
+                        <select name="day" class="glass-input small"
+                            style="padding-left: 32px; background: rgba(15, 23, 42, 0.8);">
                             <option value="">All Days</option>
-                            <?php foreach($days as $d): ?>
-                                <option value="<?php echo $d; ?>" <?php if($filter_day == $d) echo 'selected'; ?>><?php echo $d; ?></option>
-                            <?php endforeach; ?>
+                            <?php foreach ($days as $d): ?>
+                            <option value="<?php echo $d; ?>" <?php if ($filter_day == $d)
+            echo 'selected'; ?>>
+                                <?php echo $d; ?>
+                            </option>
+                            <?php
+    endforeach; ?>
                         </select>
                     </div>
                 </div>
-                <div style="display: flex; align-items: flex-end;">
-                    <button type="submit" class="glass-btn primary" style="width: 100%; justify-content: center;">
-                        <i class="fa-solid fa-magnifying-glass"></i> Apply
-                    </button>
-                </div>
+                <button type="submit" class="glass-btn primary small" style="width: 100%; justify-content: center;">
+                    <i class="fa-solid fa-sync"></i> Apply Filters
+                </button>
             </form>
-        </div>
-        <?php else: ?>
-        <!-- Info Card for Students and Lecturers -->
-        <div class="glass-panel" style="padding: 1.5rem;">
-            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 1rem; color: var(--primary-color);">
-                <i class="fa-solid fa-info-circle"></i>
-                <h3 style="margin: 0; font-size: 1.1rem;">Your Schedule</h3>
-            </div>
-            <div style="padding: 1rem; background: rgba(99, 102, 241, 0.12); border-radius: 8px; border: 1px solid rgba(99, 102, 241, 0.35);">
-                <?php if ($user_role === 'lecturer'): ?>
-                    <p style="margin: 0; color: var(--text-main); line-height: 1.6;">
-                        <i class="fa-solid fa-lock" style="color: var(--warning);"></i> 
-                        You are viewing only the classes assigned to you. 
-                        This is your personalized teaching schedule.
+            <?php
+else: ?>
+            <!-- Session Overview (Student/Lecturer) -->
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <div class="horizontal-card-icon" style="background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)); width: 45px; height: 45px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                    <i class="fa-solid fa-calendar-check" style="color: white; font-size: 1.1rem;"></i>
+                </div>
+                <div>
+                    <h3 style="margin: 0 0 0.2rem 0; font-size: 1rem; color: var(--text-main);">Your Timetable</h3>
+                    <p style="margin: 0; color: var(--text-muted); font-size: 0.85rem;">
+                        <?php if ($user_role === 'lecturer'): ?>
+                        Your assigned classes
+                        <?php
+    elseif ($user_role === 'student'): ?>
+                        Your enrolled courses
+                        <?php
+    endif; ?>
                     </p>
-                <?php elseif ($user_role === 'student'): ?>
-                    <p style="margin: 0; color: var(--text-main); line-height: 1.6;">
-                        <i class="fa-solid fa-lock" style="color: var(--warning);"></i> 
-                        You are viewing only the courses you are enrolled in. 
-                        This is your personalized class schedule.
-                    </p>
-                <?php endif; ?>
+                </div>
             </div>
+            <?php
+endif; ?>
         </div>
-        <?php endif; ?>
 
-        <!-- Versions Card -->
-        <div class="glass-panel" style="padding: 1.5rem; display: flex; flex-direction: column;">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; color: var(--warning);">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <i class="fa-solid fa-code-branch"></i>
-                    <h3 style="margin: 0; font-size: 1.1rem;">Actions</h3>
-                </div>
-                <div style="display: flex; gap: 5px;">
-                    <button onclick="saveVersion()" class="glass-btn small" title="Save Current State"><i class="fa-solid fa-floppy-disk"></i></button>
-                    <button onclick="exportToPDF()" class="glass-btn small primary" title="Export to PDF"><i class="fa-solid fa-file-pdf"></i></button>
-                    <button onclick="exportB2ToPDF()" class="glass-btn small" style="background: rgba(138, 43, 226, 0.2); border: 1px solid rgba(138, 43, 226, 0.5);" title="Export from B2 to PDF"><i class="fa-solid fa-cloud"></i> PDF</button>
-                </div>
-            </div>
-            
-            <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 0.5rem;">
-                <label class="stat-label" style="font-size: 0.8rem;">B2 Generated Files</label>
-                <div style="display: flex; gap: 5px;">
-                    <select id="b2ScheduleSelect" class="glass-input" style="padding: 8px; font-size: 0.9rem; background: rgba(0,0,0,0.3);">
-                        <option value="">Loading B2 files...</option>
-                    </select>
-                    <button onclick="viewSelectedB2Schedule()" class="glass-btn secondary small" title="View Selected B2 Schedule">
-                        <i class="fa-solid fa-eye"></i>
+        <!-- Card 2: Quick Actions -->
+        <div class="glass-panel" style="padding: 1.5rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border-color);">
+                <h3 style="margin: 0; font-size: 1.1rem; color: var(--warning); display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-bolt"></i> Quick Actions
+                </h3>
+                <div style="display: flex; gap: 6px;">
+                    <button onclick="saveVersion()" class="glass-btn small" title="Save Snapshot" style="padding: 8px 10px !important; font-size: 0.8rem;">
+                        <i class="fa-solid fa-save"></i>
+                    </button>
+                    <button onclick="exportToPDF()" class="glass-btn small primary" title="Download PDF" style="padding: 8px 10px !important; font-size: 0.8rem;">
+                        <i class="fa-solid fa-download"></i>
+                    </button>
+                    <button onclick="exportB2ToPDF()" class="glass-btn small"
+                        style="background: rgba(138, 43, 226, 0.2); border: 1px solid rgba(138, 43, 226, 0.5); padding: 8px 10px !important; font-size: 0.8rem;"
+                        title="Cloud Export">
+                        <i class="fa-solid fa-cloud-arrow-down"></i>
                     </button>
                 </div>
             </div>
-            <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 0.5rem;">
-                <label class="stat-label" style="font-size: 0.8rem;">Database Save (Manual)</label>
-                <div style="display: flex; gap: 5px;">
-                    <button onclick="saveSelectedB2ToDb()" class="glass-btn" style="background: linear-gradient(135deg, #10b981, #059669); width: 100%; justify-content: center;">
-                        <i class="fa-solid fa-floppy-disk"></i> Save Selected B2 Schedule to DB
+
+            <div style="display: grid; grid-template-columns: 1fr; gap: 0.8rem;">
+                <div>
+                    <label class="stat-label" style="font-size: 0.75rem;">AI Scenarios (B2 Cloud)</label>
+                    <div style="display: flex; gap: 5px;">
+                        <select id="b2ScheduleSelect" class="glass-input small"
+                            style="background: rgba(0,0,0,0.2); font-size: 0.85rem; flex: 1;">
+                            <option value="">Loading scenarios...</option>
+                        </select>
+                        <button onclick="viewSelectedB2Schedule()" class="glass-btn secondary small" style="padding: 8px 12px !important;">
+                            <i class="fa-solid fa-play"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 8px;">
+                    <button onclick="saveSelectedB2ToDb()" class="glass-btn small"
+                        style="background: linear-gradient(135deg, #10b981, #059669); flex: 1; padding: 9px !important; font-size: 0.8rem;">
+                        <i class="fa-solid fa-check"></i> Commit to DB
+                    </button>
+                    <button onclick="acceptAndLearnFromSavedSchedule()" class="glass-btn small"
+                        style="background: linear-gradient(135deg, #0ea5e9, #6366f1); flex: 1; padding: 9px !important; font-size: 0.8rem;">
+                        <i class="fa-solid fa-brain"></i> AI Learn
                     </button>
                 </div>
+                
+                <?php if ($user_role === 'super_admin' || $user_role === 'faculty_admin'): ?>
+                <button id="editModeBtn" onclick="toggleEditMode()" class="glass-btn small"
+                    style="background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.2); width: 100%; padding: 9px !important; border-radius: 8px; font-size: 0.8rem;">
+                    <i class="fa-solid fa-arrows-alt"></i> Enable Drag-Drop
+                </button>
+                <?php
+endif; ?>
             </div>
-            <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 0.5rem;">
-                <label class="stat-label" style="font-size: 0.8rem;">AI Learning</label>
-                <div style="display: flex; gap: 5px;">
-                    <button onclick="acceptAndLearnFromSavedSchedule()" class="glass-btn" style="background: linear-gradient(135deg, #0ea5e9, #6366f1); width: 100%; justify-content: center;">
-                        <i class="fa-solid fa-thumbs-up"></i> Accept &amp; Learn
-                    </button>
-                </div>
-            </div>
-            <div id="saveRecommendation" style="margin-top: 0.75rem; padding: 0.75rem; border-radius: 8px; background: rgba(99, 102, 241, 0.12); border: 1px solid rgba(99, 102, 241, 0.35); color: var(--text-main); font-size: 0.85rem;">
-                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
-                    <i id="saveRecommendationIcon" class="fa-solid fa-circle-info" style="color: #818cf8;"></i>
-                    <strong id="saveRecommendationTitle">Recommendation</strong>
-                </div>
-                <div id="saveRecommendationText" style="color: var(--text-muted); line-height: 1.4;">
-                    Select a B2 schedule to see save recommendation.
-                </div>
-            </div>
-            <!-- <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 0.5rem;">
-                <label class="stat-label" style="font-size: 0.8rem;">Restore Previous</label>
-                <div style="display: flex; gap: 5px;">
-                    <select id="versionSelect" class="glass-input" style="padding: 8px; font-size: 0.9rem; background: rgba(0,0,0,0.3);">
-                        <option value="">Select Version...</option>
-                    </select>
-                    <button onclick="loadVersion()" class="glass-btn secondary small"><i class="fa-solid fa-rotate-left"></i></button>
-                </div>
-            </div> -->
         </div>
     </div>
 
@@ -458,43 +492,54 @@ $paged_data = array_slice($data, $offset, $items_per_page);
         <!-- Gradient Line Top -->
         <?php if ($is_exam_schedule): ?>
         <div style="height: 3px; background: linear-gradient(90deg, #ef4444, #fb923c, #fbbf24);"></div>
-        <?php else: ?>
+        <?php
+else: ?>
         <div style="height: 3px; background: linear-gradient(90deg, var(--primary), var(--secondary));"></div>
-        <?php endif; ?>
+        <?php
+endif; ?>
         
-        <div class="table-container" style="max-height: 700px; overflow-y: auto;">
+        <div class="table-container" style="max-height: 900px; overflow-y: auto;">
         <?php if (empty($data)): ?>
             <div style="text-align: center; padding: 4rem 2rem; color: var(--text-muted); display: flex; flex-direction: column; align-items: center;">
                 <?php if (!file_exists($csv_file)): ?>
                     <div style="width: 80px; height: 80px; background: rgba(255,255,255,0.05); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 1.5rem;">
                         <?php if ($is_exam_schedule): ?>
                         <i class="fa-solid fa-file-pen" style="font-size: 2.5rem; opacity: 0.5; color: #fb923c;"></i>
-                        <?php else: ?>
+                        <?php
+        else: ?>
                         <i class="fa-solid fa-calendar-xmark" style="font-size: 2.5rem; opacity: 0.5;"></i>
-                        <?php endif; ?>
+                        <?php
+        endif; ?>
                     </div>
                     <?php if ($is_exam_schedule): ?>
                     <h3 style="margin-bottom: 0.5rem; color: #fbbf24;">No Exam Schedule Generated</h3>
                     <p style="margin-bottom: 2rem;">Use the AI Generator to create your exam timetable.</p>
-                    <?php else: ?>
+                    <?php
+        else: ?>
                     <h3 style="margin-bottom: 0.5rem;">No Schedule Generated</h3>
                     <p style="margin-bottom: 2rem;">Use the AI Generator to create your first schedule.</p>
-                    <?php endif; ?>
+                    <?php
+        endif; ?>
                     <a href="generate.php" class="glass-btn"><i class="fa-solid fa-wand-magic-sparkles"></i> Go to Generator</a>
-                <?php else: ?>
+                <?php
+    else: ?>
                     <div style="width: 80px; height: 80px; background: rgba(255,255,255,0.05); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 1.5rem;">
                         <i class="fa-solid fa-filter-circle-xmark" style="font-size: 2.5rem; opacity: 0.5;"></i>
                     </div>
                     <?php if ($is_exam_schedule): ?>
                     <h3>No Exams Found</h3>
-                    <?php else: ?>
+                    <?php
+        else: ?>
                     <h3>No Classes Found</h3>
-                    <?php endif; ?>
+                    <?php
+        endif; ?>
                     <p>Try adjusting your search filters.</p>
-                <?php endif; ?>
+                <?php
+    endif; ?>
             </div>
-        <?php else: ?>
-            <table style="width: 100%; border-collapse: collapse; font-size: 0.95rem;">
+        <?php
+else: ?>
+            <table class="schedule-table" style="width: 100%; border-collapse: collapse; font-size: 0.95rem;">
                 <?php if ($is_exam_schedule): ?>
                 <!-- EXAM SCHEDULE TABLE -->
                 <thead style="background: rgba(239, 68, 68, 0.15); position: sticky; top: 0; z-index: 10; backdrop-filter: blur(5px); border-bottom: 2px solid rgba(239, 68, 68, 0.3);">
@@ -517,35 +562,35 @@ $paged_data = array_slice($data, $offset, $items_per_page);
                     </tr>
                 </thead>
                 <tbody>
-                    <?php foreach ($paged_data as $idx => $row): 
-                        $bg = $idx % 2 == 0 ? 'rgba(239, 68, 68, 0.05)' : 'rgba(251, 146, 60, 0.03)';
-                    ?>
+                    <?php foreach ($paged_data as $idx => $row):
+            $bg = $idx % 2 == 0 ? 'rgba(239, 68, 68, 0.05)' : 'rgba(251, 146, 60, 0.03)';
+?>
                         <tr style="background: <?php echo $bg; ?>; border-bottom: 1px solid rgba(255,255,255,0.02); transition: all 0.3s; border-left: 3px solid transparent;" 
                             onmouseover="this.style.background='rgba(251, 146, 60, 0.12)'; this.style.borderLeftColor='#fb923c';" 
                             onmouseout="this.style.background='<?php echo $bg; ?>'; this.style.borderLeftColor='transparent';">
-                            <td style="padding: 1.2rem 1rem;">
+                            <td data-label="Day" style="padding: 1.2rem 1rem;">
                                 <span style="font-weight: 700; color: #fbbf24; font-size: 1rem; display: inline-flex; align-items: center; gap: 6px;">
                                     <i class="fa-solid fa-calendar" style="font-size: 0.85rem; opacity: 0.7;"></i>
                                     <?php echo htmlspecialchars($row['day']); ?>
                                 </span>
                             </td>
-                            <td style="padding: 1.2rem 1rem;">
+                            <td data-label="Time" style="padding: 1.2rem 1rem;">
                                 <div style="display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(251, 146, 60, 0.2)); padding: 8px 16px; border-radius: 20px; font-family: 'Courier New', monospace; font-size: 0.9rem; color: white; font-weight: 600; border: 1px solid rgba(251, 146, 60, 0.4);">
                                     <i class="fa-regular fa-clock" style="font-size: 1rem;"></i> 
                                     <?php echo htmlspecialchars($row['time']); ?>
                                 </div>
                             </td>
-                            <td style="padding: 1.2rem 1rem;">
+                            <td data-label="Course" style="padding: 1.2rem 1rem;">
                                 <div style="font-weight: 700; color: #60a5fa; margin-bottom: 5px; font-size: 1.05rem;"><?php echo htmlspecialchars($row['code']); ?></div>
                                 <div style="font-size: 0.88rem; color: var(--text-muted); line-height: 1.4;"><?php echo htmlspecialchars($row['title']); ?></div>
                             </td>
-                            <td style="padding: 1.2rem 1rem;">
+                            <td data-label="Hall" style="padding: 1.2rem 1rem;">
                                 <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(16, 185, 129, 0.15); padding: 8px 14px; border-radius: 8px; border: 1px solid rgba(16, 185, 129, 0.3);">
                                     <i class="fa-solid fa-door-open" style="font-size: 1rem; color: #10b981;"></i>
                                     <span style="color: #34d399; font-weight: 600;"><?php echo htmlspecialchars($row['room']); ?></span>
                                 </div>
                             </td>
-                            <td style="padding: 1.2rem 1rem;">
+                            <td data-label="Invigilator" style="padding: 1.2rem 1rem;">
                                 <div style="display: flex; align-items: center; gap: 10px;">
                                     <div style="width: 32px; height: 32px; background: linear-gradient(135deg, #f59e0b, #ef4444); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; color: white; font-weight: 700; box-shadow: 0 2px 8px rgba(245, 158, 11, 0.4);">
                                         <?php echo strtoupper(substr($row['lecturer'], 0, 1)); ?>
@@ -554,10 +599,12 @@ $paged_data = array_slice($data, $offset, $items_per_page);
                                 </div>
                             </td>
                         </tr>
-                    <?php endforeach; ?>
+                    <?php
+        endforeach; ?>
                 </tbody>
                 
-                <?php else: ?>
+                <?php
+    else: ?>
                 <!-- REGULAR CLASS SCHEDULE TABLE -->
                 <thead style="background: rgba(0,0,0,0.2); position: sticky; top: 0; z-index: 10; backdrop-filter: blur(5px);">
                     <tr>
@@ -569,28 +616,28 @@ $paged_data = array_slice($data, $offset, $items_per_page);
                     </tr>
                 </thead>
                 <tbody>
-                    <?php foreach ($paged_data as $idx => $row): 
-                        $bg = $idx % 2 == 0 ? 'rgba(255,255,255,0.01)' : 'transparent';
-                    ?>
+                    <?php foreach ($paged_data as $idx => $row):
+            $bg = $idx % 2 == 0 ? 'rgba(255,255,255,0.01)' : 'transparent';
+?>
                         <tr style="background: <?php echo $bg; ?>; border-bottom: 1px solid rgba(255,255,255,0.02); transition: background 0.2s;">
-                            <td style="padding: 1rem;">
+                            <td data-label="Day" style="padding: 1rem;">
                                 <span style="font-weight: 600; color: var(--text-main);"><?php echo htmlspecialchars($row['day']); ?></span>
                             </td>
-                            <td style="padding: 1rem;">
+                            <td data-label="Time" style="padding: 1rem;">
                                 <div style="display: inline-flex; align-items: center; gap: 5px; background: rgba(255,255,255,0.05); padding: 4px 10px; border-radius: 20px; font-family: monospace; font-size: 0.85rem; color: var(--warning);">
                                     <i class="fa-regular fa-clock"></i> <?php echo htmlspecialchars($row['time']); ?>
                                 </div>
                             </td>
-                            <td style="padding: 1rem;">
+                            <td data-label="Course" style="padding: 1rem;">
                                 <div style="font-weight: 700; color: var(--primary-color); margin-bottom: 3px;"><?php echo htmlspecialchars($row['code']); ?></div>
                                 <div style="font-size: 0.85rem; color: var(--text-muted);"><?php echo htmlspecialchars($row['title']); ?></div>
                             </td>
-                            <td style="padding: 1rem;">
+                            <td data-label="Room" style="padding: 1rem;">
                                 <div style="color: #4ade80; display: flex; align-items: center; gap: 5px;">
                                     <i class="fa-solid fa-door-open" style="font-size: 0.8rem;"></i> <?php echo htmlspecialchars($row['room']); ?>
                                 </div>
                             </td>
-                            <td style="padding: 1rem;">
+                            <td data-label="Lecturer" style="padding: 1rem;">
                                 <div style="display: flex; align-items: center; gap: 8px;">
                                     <div style="width: 25px; height: 25px; background: linear-gradient(45deg, #4f46e5, #ec4899); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; color: white;">
                                         <?php echo substr($row['lecturer'], 0, 1); ?>
@@ -599,31 +646,40 @@ $paged_data = array_slice($data, $offset, $items_per_page);
                                 </div>
                             </td>
                         </tr>
-                    <?php endforeach; ?>
+                    <?php
+        endforeach; ?>
                 </tbody>
-                <?php endif; ?>
+                <?php
+    endif; ?>
             </table>
             
             <!-- Pagination Controls -->
             <?php if ($total_pages > 1): ?>
             <div style="padding: 1rem; border-top: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: center; align-items: center; gap: 1rem;">
-                <?php 
-                    $params = $_GET;
-                    function build_query($p, $params) {
-                        $params['page'] = $p;
-                        return '?' . http_build_query($params);
-                    }
-                ?>
-                <a href="<?php echo build_query(max(1, $current_page - 1), $params); ?>" class="glass-btn secondary small <?php if($current_page <= 1) echo 'disabled'; ?>" style="<?php if($current_page <= 1) echo 'opacity: 0.5; pointer-events: none;'; ?>">
+                <?php
+        $params = $_GET;
+        function build_query($p, $params)
+        {
+            $params['page'] = $p;
+            return '?' . http_build_query($params);
+        }
+?>
+                <a href="<?php echo build_query(max(1, $current_page - 1), $params); ?>" class="glass-btn secondary small <?php if ($current_page <= 1)
+            echo 'disabled'; ?>" style="<?php if ($current_page <= 1)
+            echo 'opacity: 0.5; pointer-events: none;'; ?>">
                     <i class="fa-solid fa-chevron-left"></i>
                 </a>
                 <span style="font-size: 0.9rem; color: var(--text-muted);">Page <?php echo $current_page; ?> of <?php echo $total_pages; ?></span>
-                <a href="<?php echo build_query(min($total_pages, $current_page + 1), $params); ?>" class="glass-btn secondary small <?php if($current_page >= $total_pages) echo 'disabled'; ?>" style="<?php if($current_page >= $total_pages) echo 'opacity: 0.5; pointer-events: none;'; ?>">
+                <a href="<?php echo build_query(min($total_pages, $current_page + 1), $params); ?>" class="glass-btn secondary small <?php if ($current_page >= $total_pages)
+            echo 'disabled'; ?>" style="<?php if ($current_page >= $total_pages)
+            echo 'opacity: 0.5; pointer-events: none;'; ?>">
                     <i class="fa-solid fa-chevron-right"></i>
                 </a>
             </div>
-            <?php endif; ?>
-        <?php endif; ?>
+            <?php
+    endif; ?>
+        <?php
+endif; ?>
         </div>
     </div>
 </div>
@@ -724,12 +780,12 @@ function updateSaveRecommendation() {
     }
 }
 
-function viewSelectedB2Schedule() {
+async function viewSelectedB2Schedule() {
     const select = document.getElementById('b2ScheduleSelect');
     if (!select) return;
     const file = select.value;
     if (!file) {
-        customAlert('Select File', 'Please choose a B2 schedule first.', 'warning');
+        await customAlert('Select File', 'Please choose a B2 schedule first.', 'warning');
         return;
     }
     window.location.href = 'view_schedule.php?file=' + encodeURIComponent(file);
@@ -933,7 +989,7 @@ async function exportToPDF() {
 async function exportB2ToPDF() {
     // Get selected B2 file
     const select = document.getElementById('b2ScheduleSelect');
-    const selectedFile = select.value;
+    const selectedFile = select?.value;
     
     if (!selectedFile) {
         await customAlert("No File Selected", "Please select a B2 schedule file to export", "warning");
@@ -1011,15 +1067,40 @@ async function exportB2ToPDF() {
 }
 
 function showLoadingModal(title, message) {
-    const modal = document.getElementById('globalModal');
-    const icon = '<i class="fa-solid fa-spinner fa-spin" style="color: var(--primary);"></i>';
-    
-    document.getElementById('modalIcon').innerHTML = icon;
-    document.getElementById('modalTitle').textContent = title;
-    document.getElementById('modalMessage').innerHTML = message;
-    document.getElementById('modalActions').innerHTML = '';
-    
-    modal.style.display = 'flex';
+    hideGlobalModal();
+
+    const container = document.getElementById('customModalContainer') || document.body;
+    const overlay = document.createElement('div');
+    overlay.className = 'custom-modal-overlay';
+    overlay.id = 'exportLoadingOverlay';
+    overlay.innerHTML = `
+        <div class="custom-modal glass-panel" style="max-width: 420px; width: 90%; text-align: center;">
+            <div class="custom-modal-header">
+                <h3 style="margin: 0; display: flex; align-items: center; justify-content: center; gap: 12px;">
+                    <i class="fa-solid fa-spinner fa-spin" style="color: var(--primary-color);"></i>
+                    <span>${escapeHtml(title)}</span>
+                </h3>
+            </div>
+            <div class="custom-modal-body">
+                <p style="margin: 0; line-height: 1.6;">${message.includes('<') ? message : escapeHtml(message)}</p>
+            </div>
+        </div>
+    `;
+    container.appendChild(overlay);
+}
+
+function hideGlobalModal() {
+    const overlay = document.getElementById('exportLoadingOverlay');
+    if (!overlay) {
+        return;
+    }
+
+    overlay.style.opacity = '0';
+    const modal = overlay.querySelector('.custom-modal');
+    if (modal) {
+        modal.style.transform = 'scale(0.95)';
+    }
+    setTimeout(() => overlay.remove(), 200);
 }
 
 function promptDepartmentSelection(defaultDept) {
@@ -1116,6 +1197,116 @@ function customPDFPrompt(title) {
 loadVersionList();
 loadDbSchedules();
 document.getElementById('b2ScheduleSelect')?.addEventListener('change', updateSaveRecommendation);
+
+// Live Search for Schedule Table
+document.getElementById('liveSearch')?.addEventListener('keyup', function() {
+    const term = this.value.toLowerCase();
+    const rows = document.querySelectorAll('.schedule-table tbody tr');
+    
+    rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        if (text.includes(term)) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+});
+
+let editMode = false;
+let draggedRow = null;
+
+async function toggleEditMode() {
+    editMode = !editMode;
+    const btn = document.getElementById('editModeBtn');
+    const rows = document.querySelectorAll('.schedule-table tbody tr');
+    
+    if (editMode) {
+        btn.innerHTML = '<i class="fa-solid fa-check"></i> Exit Edit Mode';
+        btn.classList.add('active');
+        btn.style.background = 'rgba(16, 185, 129, 0.2)';
+        btn.style.borderColor = 'rgba(16, 185, 129, 0.6)';
+        
+        rows.forEach(row => {
+            row.setAttribute('draggable', true);
+            row.style.cursor = 'move';
+            row.classList.add('draggable-row');
+            
+            // Add listeners
+            row.addEventListener('dragstart', handleDragStart);
+            row.addEventListener('dragover', handleDragOver);
+            row.addEventListener('drop', handleDrop);
+            row.addEventListener('dragend', handleDragEnd);
+        });
+        
+        await customAlert('Edit Mode Enabled', 'You can now drag rows to reorder them.', 'info');
+    } else {
+        // ... (rest of function unchanged)
+        btn.innerHTML = '<i class="fa-solid fa-arrows-alt"></i> Enable Drag-Drop';
+        btn.classList.remove('active');
+        btn.style.background = '';
+        btn.style.borderColor = '';
+        
+        rows.forEach(row => {
+            row.removeAttribute('draggable');
+            row.style.cursor = '';
+            row.classList.remove('draggable-row');
+            
+            // Remove listeners
+            row.removeEventListener('dragstart', handleDragStart);
+            row.removeEventListener('dragover', handleDragOver);
+            row.removeEventListener('drop', handleDrop);
+            row.removeEventListener('dragend', handleDragEnd);
+        });
+    }
+}
+
+function handleDragStart(e) {
+    draggedRow = this;
+    this.style.opacity = '0.4';
+    this.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+}
+
+function handleDragOver(e) {
+    if (e.preventDefault) {
+        e.preventDefault(); 
+    }
+    e.dataTransfer.dropEffect = 'move';
+    return false;
+}
+
+function handleDrop(e) {
+    if (e.stopPropagation) {
+        e.stopPropagation(); 
+    }
+    
+    if (draggedRow !== this) {
+        const tbody = this.parentNode;
+        const allRows = Array.from(tbody.querySelectorAll('tr'));
+        const draggedIdx = allRows.indexOf(draggedRow);
+        const targetIdx = allRows.indexOf(this);
+        
+        if (draggedIdx < targetIdx) {
+            tbody.insertBefore(draggedRow, this.nextSibling);
+        } else {
+            tbody.insertBefore(draggedRow, this);
+        }
+    }
+    
+    return false;
+}
+
+function handleDragEnd(e) {
+    this.style.opacity = '1';
+    const rows = document.querySelectorAll('.schedule-table tbody tr');
+    rows.forEach(row => {
+        row.classList.remove('dragging');
+        row.classList.remove('drag-over');
+    });
+}
+
+
 </script>
 
 <?php include 'includes/footer.php'; ?>

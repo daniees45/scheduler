@@ -1,0 +1,36 @@
+/* ============================================================
+   edit_lecturer.css — Edit Lecturer page styles
+   ============================================================ */
+
+.edit-lecturer-container {
+    padding: 2rem;
+    max-width: 500px;
+    margin: 0 auto;
+}
+
+.edit-lecturer-title {
+    margin-bottom: 2rem;
+}
+
+.edit-lecturer-not-found {
+    padding: 2rem;
+}
+
+.edit-lecturer-form-grid {
+    display: grid;
+    gap: 1.5rem;
+}
+
+.edit-lecturer-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 1rem;
+}
+
+.edit-lecturer-submit-btn {
+    flex: 1;
+}
+
+.edit-lecturer-cancel-btn {
+    text-align: center;
+}

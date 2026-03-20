@@ -282,12 +282,12 @@ document.getElementById('priorityForm').addEventListener('submit', async (e) => 
             closeModal('priorityModal');
             e.target.reset();
             loadPriorities();
-            alert('Priority added successfully!');
+            await showAlert('Priority added successfully!', 'Success');
         } else {
-            alert('Failed to add priority: ' + result.error);
+            await showAlert('Failed to add priority: ' + result.error, 'Error');
         }
     } catch (error) {
-        alert('Error adding priority');
+        await showAlert('Error adding priority', 'Error');
     }
 });
 
@@ -307,17 +307,17 @@ document.getElementById('goalForm').addEventListener('submit', async (e) => {
             closeModal('goalModal');
             e.target.reset();
             loadGoals();
-            alert('Goal added successfully!');
+            await showAlert('Goal added successfully!', 'Success');
         } else {
-            alert('Failed to add goal: ' + result.error);
+            await showAlert('Failed to add goal: ' + result.error, 'Error');
         }
     } catch (error) {
-        alert('Error adding goal');
+        await showAlert('Error adding goal', 'Error');
     }
 });
 
 async function deletePriority(id) {
-    if (!confirm('Delete this priority?')) return;
+    if (!await showConfirm('Delete this priority?', 'Delete Priority')) return;
     try {
         const response = await fetch(`api/personal_priorities.php?action=delete_priority&id=${id}`, {method: 'POST'});
         const data = await response.json();
@@ -325,12 +325,12 @@ async function deletePriority(id) {
             loadPriorities();
         }
     } catch (error) {
-        alert('Failed to delete priority');
+        await showAlert('Failed to delete priority', 'Error');
     }
 }
 
 async function deleteGoal(id) {
-    if (!confirm('Delete this goal?')) return;
+    if (!await showConfirm('Delete this goal?', 'Delete Goal')) return;
     try {
         const response = await fetch(`api/personal_priorities.php?action=delete_goal&id=${id}`, {method: 'POST'});
         const data = await response.json();
@@ -338,12 +338,12 @@ async function deleteGoal(id) {
             loadGoals();
         }
     } catch (error) {
-        alert('Failed to delete goal');
+        await showAlert('Failed to delete goal', 'Error');
     }
 }
 
 async function updateProgress(id, currentProgress) {
-    const newProgress = prompt(`Update progress (current: ${currentProgress}%):`, currentProgress);
+    const newProgress = await showPrompt(`Update progress (current: ${currentProgress}%):`, currentProgress, 'Update Goal Progress');
     if (newProgress === null) return;
     
     try {
@@ -357,7 +357,7 @@ async function updateProgress(id, currentProgress) {
             loadGoals();
         }
     } catch (error) {
-        alert('Failed to update progress');
+        await showAlert('Failed to update progress', 'Error');
     }
 }
 

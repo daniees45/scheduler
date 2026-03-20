@@ -1,0 +1,101 @@
+{
+  "American High": {
+    "capacity": 400,
+    "utilization_rate": 0.78,
+    "avg_courses_per_day": 5,
+    "best_usage_day": "Monday",
+    "preferred_times": [
+      "7:00am - 9:30am",
+      "10:00am - 12:30pm"
+    ],
+    "total_bookings": 8,
+    "usage_history": [
+      {
+        "timestamp": "2026-02-22T09:50:00.733355",
+        "bookings": 5
+      },
+      {
+        "timestamp": "2026-02-25T18:44:22.430699",
+        "bookings": 3
+      }
+    ]
+  },
+  "Baobab RM1": {
+    "capacity": 80,
+    "utilization_rate": 0.85,
+    "avg_courses_per_day": 3,
+    "best_usage_day": "Tuesday",
+    "preferred_times": [
+      "7:00am - 9:30am"
+    ],
+    "total_bookings": 7,
+    "usage_history": [
+      {
+        "timestamp": "2026-02-22T09:50:00.733355",
+        "bookings": 5
+      },
+      {
+        "timestamp": "2026-02-25T18:44:22.430699",
+        "bookings": 2
+      }
+    ]
+  },
+  "Bulley Room 1": {
+    "capacity": 60,
+    "utilization_rate": 0.72,
+    "avg_courses_per_day": 2,
+    "best_usage_day": "Wednesday",
+    "preferred_times": [
+      "10:00am - 12:30pm"
+    ]
+  },
+  "Baobab RM3": {
+    "total_bookings": 7,
+    "usage_history": [
+      {
+        "timestamp": "2026-02-22T09:50:00.733355",
+        "bookings": 5
+      },
+      {
+        "timestamp": "2026-02-25T18:44:22.430699",
+        "bookings": 2
+      }
+    ]
+  },
+  "Baobab RM5": {
+    "total_bookings": 3,
+    "usage_history": [
+      {
+        "timestamp": "2026-02-22T09:50:00.733355",
+        "bookings": 3
+      }
+    ]
+  },
+  "Baobab RM6": {
+    "total_bookings": 2,
+    "usage_history": [
+      {
+        "timestamp": "2026-02-25T18:44:22.430699",
+        "bookings": 2
+      }
+    ]
+  },
+  "Boabab RM4": {
+    "total_bookings": 2,
+    "usage_history": [
+      {
+        "timestamp": "2026-02-25T18:44:22.430699",
+        "bookings": 2
+      }
+    ]
+  },
+  "Boabab RM2": {
+    "total_bookings": 2,
+    "usage_history": [
+      {
+        "timestamp": "2026-02-25T18:44:22.430699",
+        "bookings": 2
+      }
+    ]
+  }
+}

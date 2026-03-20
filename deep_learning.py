@@ -64,27 +64,38 @@ class ScheduleFeatures:
         if self.peak_productivity_hours is None:
             self.peak_productivity_hours = []
         
-        peak_hours = np.zeros(24)
+        peak_hours = np.zeros(24, dtype=np.float32)
         for hour in self.peak_productivity_hours:
-            if 0 <= hour < 24:
-                peak_hours[hour] = 1
+            try:
+                h = int(hour)
+                if 0 <= h < 24:
+                    peak_hours[h] = 1.0
+            except (ValueError, TypeError):
+                continue
         
-        # Create feature vector: 17 scalar features + 24 hour indicators
+        # Helper to safely convert to float
+        def safe_float(val, default=0.0):
+            try:
+                return float(val) if val is not None else default
+            except (ValueError, TypeError):
+                return default
+
+        # Create feature vector: 14 scalar features + 24 hour indicators
         features = np.array([
-            self.num_events,
-            self.total_hours,
-            self.avg_gap_between,
-            self.morning_load,
-            self.afternoon_load,
-            self.evening_load,
-            self.num_conflicts,
-            self.avg_event_duration,
-            self.q_learner_accept_rate,
-            self.q_learner_confidence,
-            self.num_learned_preferences,
-            self.avg_quality_rating,
-            self.completion_rate,
-            self.user_load_factor,
+            safe_float(self.num_events),
+            safe_float(self.total_hours),
+            safe_float(self.avg_gap_between),
+            safe_float(self.morning_load),
+            safe_float(self.afternoon_load),
+            safe_float(self.evening_load),
+            safe_float(self.num_conflicts),
+            safe_float(self.avg_event_duration),
+            safe_float(self.q_learner_accept_rate),
+            safe_float(self.q_learner_confidence),
+            safe_float(self.num_learned_preferences),
+            safe_float(self.avg_quality_rating),
+            safe_float(self.completion_rate),
+            safe_float(self.user_load_factor),
         ], dtype=np.float32)
         
         return np.concatenate([features, peak_hours])
@@ -166,6 +177,7 @@ class ScheduleQualityClassifier:
         
         self.classes_ = ["poor", "fair", "good", "excellent"]
         self.is_trained = False
+        self.last_accuracy = None
         
         # Try to load existing model
         self._load_model()
@@ -179,9 +191,26 @@ class ScheduleQualityClassifier:
                 self.pipeline = state['pipeline']
                 self.probability_model = state['probability_model']
                 self.is_trained = state.get('is_trained', True)
+                self.last_accuracy = state.get('last_accuracy', None)
                 logger.info(f"[NN] Model loaded from {self.model_path}")
             except Exception as e:
-                logger.warning(f"[NN] Failed to load model: {e}")
+                error_text = str(e)
+                if "BitGenerator module" in error_text or "MT19937" in error_text:
+                    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                    backup_path = f"{self.model_path}.incompatible_{timestamp}"
+                    try:
+                        os.rename(self.model_path, backup_path)
+                        logger.warning(
+                            f"[NN] Incompatible model format detected ({error_text}). "
+                            f"Moved old model to {backup_path}. A fresh model will be trained."
+                        )
+                    except Exception as move_err:
+                        logger.warning(
+                            f"[NN] Incompatible model format detected ({error_text}), "
+                            f"and failed to move old model: {move_err}. A fresh model will be trained."
+                        )
+                else:
+                    logger.warning(f"[NN] Failed to load model: {e}")
     
     def _save_model(self):
         """Save trained model to disk"""
@@ -191,6 +220,7 @@ class ScheduleQualityClassifier:
                 'pipeline': self.pipeline,
                 'probability_model': self.probability_model,
                 'is_trained': self.is_trained,
+                'last_accuracy': self.last_accuracy,
                 'timestamp': datetime.now().isoformat()
             }
             with open(self.model_path, 'wb') as f:
@@ -202,10 +232,6 @@ class ScheduleQualityClassifier:
     def train(self, training_data: List[Tuple[ScheduleFeatures, str]]):
         """
         Train neural network on labeled schedule data
-        
-        Args:
-            training_data: List of (features, quality_label) tuples
-                          where quality_label in ["poor", "fair", "good", "excellent"]
         """
         if not training_data:
             logger.warning("[NN] No training data provided")
@@ -217,36 +243,47 @@ class ScheduleQualityClassifier:
             arr = features.to_array()
             X_list.append(arr)
         
+        # Ensure all arrays are the same shape before conversion
+        if not all(a.shape == X_list[0].shape for a in X_list):
+            logger.error(f"[NN] Feature shape mismatch identified: {[a.shape for a in X_list]}")
+            return
+
         X = np.array(X_list, dtype=np.float32)
-        y = np.array([str(label) for _, label in training_data], dtype=str)
+        
+        # Use LabelEncoder to ensure numeric labels for the classifier
+        from sklearn.preprocessing import LabelEncoder
+        self.label_encoder = LabelEncoder()
+        y_raw = [str(label) for _, label in training_data]
+        y = self.label_encoder.fit_transform(y_raw)
+        
+        logger.info(f"[NN] Prepared training data: X={X.shape}, y={y.shape}")
         
         # Train classifier
         try:
             self.pipeline.fit(X, y)
             self.is_trained = True
+            self.last_accuracy = float(self.pipeline.score(X, y))
             logger.info(f"[NN] Classifier trained on {len(training_data)} samples")
         except Exception as e:
             logger.error(f"[NN] Classifier training failed: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
         
         # Train probability predictor (use numerical labels)
-        y_prob = np.array([self._quality_to_score(label) for label in y], dtype=np.float32)
         try:
+            y_prob = np.array([self._quality_to_score(label) for label in y_raw], dtype=np.float32)
             self.probability_model.fit(X, y_prob)
             logger.info(f"[NN] Probability model trained")
         except Exception as e:
             logger.error(f"[NN] Probability model training failed: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
         
         self._save_model()
     
     def predict(self, features: ScheduleFeatures) -> ScheduleQuality:
         """
         Predict schedule quality from features
-        
-        Args:
-            features: ScheduleFeatures object
-        
-        Returns:
-            ScheduleQuality prediction
         """
         if not self.is_trained:
             # Return default prediction if model not trained
@@ -262,10 +299,19 @@ class ScheduleQualityClassifier:
         
         # Get quality class prediction
         try:
-            predicted_class = self.pipeline.predict(X)[0]
+            predicted_idx = self.pipeline.predict(X)[0]
+            # Convert back to string label
+            if hasattr(self, 'label_encoder'):
+                predicted_class = self.label_encoder.inverse_transform([predicted_idx])[0]
+            else:
+                # Fallback for old models
+                classes = ["poor", "fair", "good", "excellent"]
+                predicted_class = classes[min(int(predicted_idx), 3)]
+                
             class_proba = self.pipeline.predict_proba(X)[0]
             confidence = np.max(class_proba)
-        except:
+        except Exception as e:
+            logger.warning(f"[NN] Prediction failed: {e}")
             predicted_class = "fair"
             confidence = 0.0
         
@@ -424,7 +470,9 @@ class BidirectionalFeedback:
             "feedback_actions": self._count_actions(),
             "q_learner_active": self.q_learner is not None,
             "nn_classifier_active": self.nn_classifier is not None,
-            "nn_confidence": self.nn_classifier.pipeline.score if self.nn_classifier else 0.0
+            "nn_confidence": float(self.nn_classifier.last_accuracy)
+            if self.nn_classifier and isinstance(self.nn_classifier.last_accuracy, (int, float))
+            else None
         }
     
     def _count_actions(self) -> Dict[str, int]:

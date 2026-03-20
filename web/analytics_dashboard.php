@@ -16,7 +16,7 @@ require_once 'api/db.php';
 
 // Role-based access
 if (!isset($_SESSION['role']) || (isset($_SESSION['role']) && $_SESSION['role'] !== 'admin')) {
-    echo "<script>alert('Access denied. Admin privileges required.'); window.location.href='index.php';</script>";
+    echo "<script>showAlert('Access denied. Admin privileges required.', 'Access Denied').then(() => window.location.href='index.php');</script>";
     exit;
 }
 

@@ -36,6 +36,21 @@ class FeasibilityClassifier:
             'training_samples': 0,
             'feature_importances': {}
         }
+
+    @staticmethod
+    def _normalize_accuracy(value):
+        """Normalize accuracy value to fraction [0,1] when possible."""
+        if value is None:
+            return 0.0
+        try:
+            if isinstance(value, str):
+                value = value.strip().replace('%', '')
+            acc = float(value)
+            if acc > 1.0:
+                acc = acc / 100.0
+            return max(0.0, min(1.0, acc))
+        except Exception:
+            return 0.0
     
     @staticmethod
     def extract_level(course_code):
@@ -382,14 +397,69 @@ class FeasibilityClassifier:
         try:
             with open(self.model_path, 'rb') as f:
                 model_data = pickle.load(f)
-            
-            self.classifier = model_data.get('classifier')
-            self.label_encoders = model_data.get('label_encoders', {})
-            self.feature_names = model_data.get('feature_names', [])
-            self.metadata = model_data.get('metadata', {})
+
+            default_metadata = {
+                'trained': False,
+                'accuracy': 0.0,
+                'precision': 0.0,
+                'recall': 0.0,
+                'f1': 0.0,
+                'training_samples': 0,
+                'feature_importances': {}
+            }
+
+            if isinstance(model_data, dict):
+                self.classifier = model_data.get('classifier') or model_data.get('model')
+                self.label_encoders = model_data.get('label_encoders', {})
+                self.feature_names = model_data.get('feature_names', [])
+
+                loaded_meta = model_data.get('metadata', {})
+                if not isinstance(loaded_meta, dict):
+                    loaded_meta = {}
+
+                # Backward-compatible accuracy extraction from alternative structures
+                if 'accuracy' not in loaded_meta:
+                    metrics = model_data.get('metrics', {}) if isinstance(model_data.get('metrics', {}), dict) else {}
+                    training_stats = model_data.get('training_stats', {}) if isinstance(model_data.get('training_stats', {}), dict) else {}
+                    candidate_acc = (
+                        metrics.get('accuracy')
+                        or metrics.get('test_accuracy')
+                        or training_stats.get('final_accuracy')
+                        or model_data.get('accuracy')
+                    )
+                    if candidate_acc is not None:
+                        loaded_meta['accuracy'] = candidate_acc
+
+                self.metadata = {**default_metadata, **loaded_meta}
+            else:
+                # Legacy format: pickle may store classifier directly
+                self.classifier = model_data
+                self.label_encoders = {}
+                self.feature_names = []
+                self.metadata = default_metadata.copy()
+
+            # Guard: if pickle does not contain a classifier object, this is the wrong model file type.
+            if self.classifier is None:
+                if isinstance(model_data, dict):
+                    keys = sorted(model_data.keys())
+                    print(f"[WARNING] Invalid feasibility model file: missing classifier/model object in {self.model_path}")
+                    print(f"          Found keys: {keys}")
+                else:
+                    print(f"[WARNING] Invalid feasibility model object in {self.model_path}: {type(model_data).__name__}")
+                return False
+
+            # Normalize/repair status metadata for loaded models
+            self.metadata['accuracy'] = self._normalize_accuracy(self.metadata.get('accuracy', 0.0))
+            self.metadata['trained'] = bool(self.metadata.get('trained')) or (self.classifier is not None)
+            self.metadata['precision'] = self._normalize_accuracy(self.metadata.get('precision', 0.0))
+            self.metadata['recall'] = self._normalize_accuracy(self.metadata.get('recall', 0.0))
+            self.metadata['f1'] = self._normalize_accuracy(self.metadata.get('f1', 0.0))
             
             print(f"[CLASSIFIER] Model loaded from {self.model_path}")
-            print(f"  Accuracy: {self.metadata.get('accuracy', 0):.2%}")
+            if self.metadata.get('accuracy', 0.0) > 0:
+                print(f"  Accuracy: {self.metadata.get('accuracy', 0):.2%}")
+            else:
+                print("  Accuracy: N/A (metadata missing in model file)")
             print(f"  Trained: {self.metadata.get('trained', False)}")
             return True
         except Exception as e:

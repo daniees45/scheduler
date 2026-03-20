@@ -1,0 +1,74 @@
+{
+  "7:00am - 9:30am": {
+    "popularity": "very_high",
+    "course_count": 125,
+    "avg_quality": 0.94,
+    "congestion_level": "high"
+  },
+  "10:00am - 12:30pm": {
+    "popularity": "high",
+    "course_count": 98,
+    "avg_quality": 0.91,
+    "congestion_level": "medium"
+  },
+  "2:00pm - 4:30pm": {
+    "popularity": "medium",
+    "course_count": 62,
+    "avg_quality": 0.87,
+    "congestion_level": "low"
+  },
+  "5:00pm - 6:00pm": {
+    "popularity": "low",
+    "course_count": 15,
+    "avg_quality": 0.79,
+    "congestion_level": "very_low"
+  },
+  "Monday_7:00am - 9:30am": {
+    "total_uses": 9,
+    "last_updated": "2026-02-25T18:44:22.430699"
+  },
+  "Tuesday_7:00am - 9:30am": {
+    "total_uses": 8,
+    "last_updated": "2026-02-22T09:50:00.733355"
+  },
+  "Wednesday_7:00am - 9:30am": {
+    "total_uses": 9,
+    "last_updated": "2026-02-25T18:44:22.430699"
+  },
+  "Thursday_7:00am - 9:30am": {
+    "total_uses": 7,
+    "last_updated": "2026-02-25T18:44:22.430699"
+  },
+  "Friday_7:00am - 9:30am": {
+    "total_uses": 8,
+    "last_updated": "2026-02-25T18:44:22.430699"
+  },
+  "Tuesday_10:00am - 12:30pm": {
+    "total_uses": 2,
+    "last_updated": "2026-02-25T18:44:22.430699"
+  },
+  "Monday_5:00pm - 6:00pm": {
+    "total_uses": 1,
+    "last_updated": "2026-02-25T18:44:22.430699"
+  },
+  "Thursday_10:00am - 12:30pm": {
+    "total_uses": 1,
+    "last_updated": "2026-02-25T18:44:22.430699"
+  },
+  "Wednesday_10:00am - 12:30pm": {
+    "total_uses": 1,
+    "last_updated": "2026-02-25T18:44:22.430699"
+  },
+  "Monday_2:00pm - 4:30pm": {
+    "total_uses": 1,
+    "last_updated": "2026-02-25T18:44:22.430699"
+  },
+  "Tuesday_2:00pm - 4:30pm": {
+    "total_uses": 1,
+    "last_updated": "2026-02-25T18:44:22.430699"
+  },
+  "Wednesday_2:00pm - 4:30pm": {
+    "total_uses": 1,
+    "last_updated": "2026-02-25T18:44:22.430699"
+  }
+}

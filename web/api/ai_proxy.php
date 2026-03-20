@@ -4,6 +4,8 @@
  * Helps browsers (e.g. Safari) avoid CORS/mixed-content issues.
  */
 
+require_once __DIR__ . '/../../config/bootstrap.php';
+
 session_start();
 header('Content-Type: application/json');
 
@@ -34,7 +36,9 @@ $allowed = [
     '/suggestions',
     '/diagnostics',
     '/analytics/performance',
-    '/explain/schedule'
+    '/explain/schedule',
+    '/api/feasibility/heatmap',
+    '/api/conflicts/relax'
 ];
 
 $baseEndpoint = explode('?', $endpoint, 2)[0];
@@ -44,11 +48,20 @@ if (!in_array($baseEndpoint, $allowed, true)) {
     exit;
 }
 
-$targetBase = getenv('AI_PROXY_BASE_URL') ?: 'http://127.0.0.1:5000';
+$targetBase = scheduler_ai_base_url();
 $targetUrl = rtrim($targetBase, '/') . $endpoint;
 
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $rawBody = file_get_contents('php://input');
+
+if (!function_exists('curl_init')) {
+    http_response_code(500);
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'PHP cURL extension is not enabled on this server.'
+    ]);
+    exit;
+}
 
 $ch = curl_init($targetUrl);
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);

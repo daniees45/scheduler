@@ -1,0 +1,38 @@
+Course Code,Course Title,Credit Hrs,Lecturer Name,Room Name,Day,Time,course_level,Semester,start_time,no_of_students,enrollment
+PSYC 105,PSYC 105,3,Akua K. Amponsah,Boabab RM4,Tuesday,07:00 AM - 09:30 AM,100,2,07:00 AM,30,30
+GNED 230,GNED 230,NC,Ama O. Karikari,Baobab RM5,Thursday,07:00 AM - 09:30 AM,100,1,07:00 AM,30,30
+GNED 468,GNED 468,NC,Ama O. Karikari,Baobab RM5,Wednesday,07:00 AM - 09:30 AM,100,1,07:00 AM,30,30
+GNED 125,GNED 125,NC,Ama O. Karikari,Boabab RM4,Thursday,05:00 PM - 06:00 PM,100,2,05:00 PM,30,30
+GNED 125,GNED 125,NC,Ama O. Karikari,Baobab RM5,Friday,07:00 AM - 09:30 AM,100,2,07:00 AM,30,30
+ENGL 112,ENGL 112,2,C. Pokuaa,Baobab RM1,Monday,02:00 PM - 04:30 PM,100,1,02:00 PM,30,30
+ENGL 112,ENGL 112,2,C. Pokuaa,Baobab RM3,Friday,10:00 AM - 12:30 PM,100,1,10:00 AM,30,30
+ENGL 112,ENGL 112,2,C. Pokuaa,Baobab RM1,Thursday,02:00 PM - 04:30 PM,100,1,02:00 PM,30,30
+CMME 115,CMME 115,2,Dr. A. Oye,American High,Tuesday,10:00 AM - 12:30 PM,100,2,10:00 AM,30,30
+CMME 115,CMME 115,2,Dr. A. Oye,Boabab RM4,Monday,02:00 PM - 04:30 PM,100,2,02:00 PM,30,30
+CMME 115,CMME 115,2,Dr. A. Oye,American High,Monday,10:00 AM - 12:30 PM,100,2,10:00 AM,30,30
+SOCI 115,SOCI 115,3,Dr. D. Dovie,Boabab RM4,Thursday,10:00 AM - 12:30 PM,100,2,10:00 AM,30,30
+RELB 163,RELB 163,3,Dr. F. Tenortey,Boabab RM4,Thursday,02:00 PM - 04:30 PM,100,2,02:00 PM,30,30
+RELB 163,RELB 163,3,Dr. F. Tenortey,Baobab RM5,Tuesday,02:00 PM - 04:30 PM,100,2,02:00 PM,30,30
+RELB 163,RELB 163,3,Dr. F. Tenortey,Baobab RM3,Wednesday,10:00 AM - 12:30 PM,100,2,10:00 AM,30,30
+RELG 451,RELG 451,3,Dr. J. Andor,Baobab RM3,Monday,07:00 AM - 09:30 AM,100,1,07:00 AM,30,30
+ENGL 111,ENGL 111,2,Dr. S. Adjei-Mensah,Boabab RM4,Tuesday,02:00 PM - 04:30 PM,100,2,02:00 PM,30,30
+ENGL 111,ENGL 111,2,Dr. S. Adjei-Mensah,Baobab RM5,Wednesday,02:00 PM - 04:30 PM,100,2,02:00 PM,30,30
+ENGL 111,ENGL 111,2,Dr. S. Adjei-Mensah,Baobab RM1,Thursday,10:00 AM - 12:30 PM,100,2,10:00 AM,30,30
+ENGL 111,ENGL 111,2,Dr. S. Adjei-Mensah,Baobab RM3,Thursday,07:00 AM - 09:30 AM,100,2,07:00 AM,30,30
+RELG 451,RELG 451,3,Dr. S. Amoh,Boabab RM4,Monday,10:00 AM - 12:30 PM,100,1,10:00 AM,30,30
+AFST 205,AFST 205,1,E. Boahen,Baobab RM1,Monday,07:00 AM - 09:30 AM,100,2,07:00 AM,30,30
+AFST 205,AFST 205,1,E. Boahen,Baobab RM3,Wednesday,05:00 PM - 06:00 PM,100,2,05:00 PM,30,30
+AFST 243,AFST 243,1,F. Opoku,Baobab RM3,Thursday,05:00 PM - 06:00 PM,100,2,05:00 PM,30,30
+AFST 243,AFST 243,1,F. Opoku,Baobab RM1,Friday,10:00 AM - 12:30 PM,100,2,10:00 AM,30,30
+FREN 121,FREN 121,2,J. Elorm Doufodji,Boabab RM4,Friday,07:00 AM - 09:30 AM,100,1,07:00 AM,30,30
+FREN 121,FREN 121,2,J. Elorm Doufodji,Baobab RM1,Tuesday,07:00 AM - 09:30 AM,100,1,07:00 AM,30,30
+FREN 122,FREN 122,2,J. Rhule,Baobab RM1,Wednesday,02:00 PM - 04:30 PM,100,1,02:00 PM,30,30
+FREN 122,FREN 122,2,J. Rhule,Baobab RM5,Tuesday,10:00 AM - 12:30 PM,100,1,10:00 AM,30,30
+PEAC 100,PEAC 100,NC,K. Oheneba Nti,B. Ball Court,Monday,05:00 PM - 06:00 PM,100,1,05:00 PM,30,30
+HLTH 200,HLTH 200,3,K. Oheneba Nti,Boabab RM4,Wednesday,07:00 AM - 09:30 AM,100,1,07:00 AM,30,30
+HLTH 200,HLTH 200,3,K. Oheneba Nti,Boabab RM4,Wednesday,10:00 AM - 12:30 PM,100,1,10:00 AM,30,30
+MATH 121,MATH 121,3,O. Osei-Tutu,Baobab RM5,Monday,07:00 AM - 09:30 AM,100,2,07:00 AM,30,30
+RELB 250,RELB 250,3,Ps. E. Osei,Boabab RM4,Monday,07:00 AM - 09:30 AM,100,1,07:00 AM,30,30
+RELT 385,RELT 385,3,Ps. E. Takyi,Baobab RM1,Monday,10:00 AM - 12:30 PM,100,2,10:00 AM,30,30
+RELT 385,RELT 385,3,Ps. I. Kyere,Baobab RM3,Monday,10:00 AM - 12:30 PM,100,2,10:00 AM,30,30
+RELB 250,RELB 250,3,Ps. P. Obeng Manu,American High,Monday,07:00 AM - 09:30 AM,100,1,07:00 AM,30,30

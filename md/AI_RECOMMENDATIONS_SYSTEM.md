@@ -354,3 +354,44 @@ Enrollment patterns are logged to:
 **Version:** 1.0  
 **Date:** February 20, 2026  
 **Status:** Production Ready ✅
+
+---
+
+# Core Scheduling AI: Research & Recommendation
+
+While the system above handles student-facing course suggestions, the core scheduling engine (the "brain" that builds the timetable) can also leverage advanced AI paradigms. Below is an analysis of how **Ensemble Methods**, **Neural Networks**, and **Reinforcement Learning** apply to the VVU Scheduler.
+
+## 1. Feasibility Analysis
+
+| Paradigms | Best For | Status in VVU Scheduler |
+| :--- | :--- | :--- |
+| **Ensemble Methods** | Fast filtering and feasibility prediction | ✅ **Implemented** in `FeasibilityClassifier` |
+| **Neural Networks** | Quality scoring and complex pattern detection | ✅ **Implemented** in `ScheduleQualityClassifier` |
+| **Reinforcement Learning** | Real-time user preference learning | ✅ **Implemented** in `QLearner` |
+
+## 2. Approach Benefits
+
+### A. Ensemble Methods (Random Forest / Gradient Boosting)
+*   **Benefits**: Handles tabular data extremely well with low training requirements. It can identify which specific constraints (e.g., "Lecturer conflict on Monday") are making a schedule impossible before the solver even starts.
+*   **Why use it?**: It acts as a "Bouncer" that rejects invalid constraint sets instantly, saving massive computation time.
+
+### B. Neural Networks (NN / Deep Learning)
+*   **Benefits**: Capable of learning non-linear relationships that simple algorithms miss (e.g., "Students are 40% more likely to miss classes if they have three 2-hour sessions in a row").
+*   **Why use it?**: It provides the **Quality Score** (Good/Fair/Poor). It doesn't just find a *valid* schedule; it finds a *high-quality* one based on historical success.
+
+### C. Reinforcement Learning (RL)
+*   **Benefits**: Learns by trial and error. Every time an admin manually changes a room or time, the RL agent (Q-Learner) updates its weights to "remember" that preference.
+*   **Why use it?**: It makes the AI feel "alive." It adapts to the user's stylistic choices without needing a new developer to update the code.
+
+## 3. The Final Recommendation: The Hybrid AI Architecture
+
+For this project, no single model should be used in isolation. The most powerful implementation is the **Hybrid Pipeline** (already being integrated):
+
+1.  **Ensemble** (High-Level Filter): Pre-checks the input CSV for logical impossibilities.
+2.  **CSP Solver** (The Engine): Generates the mathematically correct solution.
+3.  **RL Fine-Tuning** (Personalization): Adjusts the CSP's behavior based on learned user preferences from `q_model.pkl`.
+4.  **NN Evaluation** (The Critic): Scores the final output and suggests improvements (e.g., "Consider adding more morning buffers").
+
+### Recommendation for Your Project:
+**Continue refining the Hybrid Model.** You have already established the base classes for all three. The best path forward is to ensure the `BidirectionalFeedback` system connects the user's manual edits back into the `QLearner`, which then influences the next generation of schedules.
+

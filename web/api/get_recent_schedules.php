@@ -55,12 +55,11 @@ function local_line_count_for_path($relative_path) {
     return max(0, $line_count - 1);
 }
 
-// 1) Primary source: generated_schedules table filtered to GENERAL schedules
+// 1) Primary source: generated_schedules table filtered to GENERAL schedules  WHERE department IS NULL
+          // OR TRIM(department) = ''
+           //OR LOWER(TRIM(department)) = 'general'
 $sql = "SELECT id, schedule_name, created_at, schedule_data, department
         FROM generated_schedules
-        WHERE department IS NULL
-           OR TRIM(department) = ''
-           OR LOWER(TRIM(department)) = 'general'
         ORDER BY created_at DESC
         LIMIT ?";
 
@@ -91,6 +90,7 @@ if ($stmt = $conn->prepare($sql)) {
             'lines' => $line_count,
             'generated_at' => $created_ts ? date('M d, Y h:i A', $created_ts) : 'Unknown date',
             'timestamp' => $created_ts,
+            'department' => $row['department'] ?? 'General',
             'source' => 'db'
         ];
 
@@ -99,81 +99,7 @@ if ($stmt = $conn->prepare($sql)) {
     }
 }
 
-// 2) Fallback/enrichment: B2 csv/final files (general-like names first)
-if (count($schedules) < $limit && $b2->isEnabled()) {
-    $result = $b2->listFiles('csv/final/', max($limit * 3, 20));
-    if (!empty($result['success']) && !empty($result['files'])) {
-        foreach ($result['files'] as $file) {
-            if (count($schedules) >= $limit) break;
-
-            $key = (string)($file['key'] ?? '');
-            if ($key === '' || !preg_match('/\.csv$/i', $key)) continue;
-
-            $filename = basename($key);
-            $name_l = strtolower($filename);
-            if (strpos($name_l, 'general') === false && strpos($name_l, 'final_web_schedule') === false) {
-                continue;
-            }
-
-            $path = 'csv/final/' . $filename;
-            if (isset($seen_paths[$path])) continue;
-
-            $ts = isset($file['modified']) ? (int)$file['modified'] : 0;
-            $line_count = local_line_count_for_path($path);
-
-            $schedules[] = [
-                'name' => $filename,
-                'path' => $path,
-                'lines' => $line_count,
-                'generated_at' => $ts ? date('M d, Y h:i A', $ts) : 'Unknown date',
-                'timestamp' => $ts,
-                'source' => 'b2'
-            ];
-            $seen_paths[$path] = true;
-        }
-    }
-}
-
-// 3) Final fallback: local csv/final files
-if (count($schedules) < $limit) {
-    $final_dir = realpath(__DIR__ . '/../../csv/final');
-    if (is_dir($final_dir)) {
-        $files = array_filter(
-            scandir($final_dir, SCANDIR_SORT_DESCENDING),
-            function($f) { return pathinfo($f, PATHINFO_EXTENSION) === 'csv'; }
-        );
-
-        foreach ($files as $file) {
-            if (count($schedules) >= $limit) break;
-
-            $name_l = strtolower($file);
-            if (strpos($name_l, 'general') === false && strpos($name_l, 'final_web_schedule') === false) {
-                continue;
-            }
-
-            $path = 'csv/final/' . $file;
-            if (isset($seen_paths[$path])) continue;
-
-            $filepath = $final_dir . '/' . $file;
-            if (!is_file($filepath)) continue;
-
-            $mtime = filemtime($filepath);
-            $line_count = local_line_count_for_path($path);
-
-            $schedules[] = [
-                'name' => $file,
-                'path' => $path,
-                'lines' => $line_count,
-                'generated_at' => date('M d, Y h:i A', $mtime),
-                'timestamp' => (int)$mtime,
-                'source' => 'local'
-            ];
-            $seen_paths[$path] = true;
-        }
-    }
-}
-
-// Sort newest first and cap
+// 2) Sorting newest first and capping results
 usort($schedules, function($a, $b) {
     return (int)($b['timestamp'] ?? 0) <=> (int)($a['timestamp'] ?? 0);
 });

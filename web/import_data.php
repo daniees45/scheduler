@@ -302,6 +302,57 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['import'])) {
     </div>
 </div>
 
+<!-- Interactive Data Editor -->
+<!-- <div class="glass-panel" style="padding: 2rem; max-width: 1200px; margin: 2rem auto;">
+    <h2 style="margin-bottom: 1.5rem; text-align: center;"><i class="fa-solid fa-edit"></i> Quick Data Editor</h2>
+    
+    <!-- Tab Buttons -->
+    <div style="display: flex; gap: 1rem; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 1.5rem; position: relative;">
+        <button class="tab-btn" onclick="switchTab('rooms')" style="padding: 1rem 1.5rem; background: none; border: none; color: #a855f7; border-bottom: 2px solid #a855f7; cursor: pointer; font-size: 1rem; position: relative; top: 2px;">
+            <i class="fa-solid fa-door-open"></i> Rooms
+        </button>
+        <button class="tab-btn" onclick="switchTab('lecturers')" style="padding: 1rem 1.5rem; background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 1rem;">
+            <i class="fa-solid fa-user-tie"></i> Lecturers
+        </button>
+        <button class="tab-btn" onclick="switchTab('courses')" style="padding: 1rem 1.5rem; background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 1rem;">
+            <i class="fa-solid fa-book"></i> Courses
+        </button>
+    </div>
+
+    <!-- Rooms Tab -->
+    <div id="tab-rooms" class="tab-content" style="display: block;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3 style="font-size: 1.1rem;"><i class="fa-solid fa-door-open"></i> Manage Rooms</h3>
+            <button onclick="addRoom()" class="glass-btn small">
+                <i class="fa-solid fa-plus"></i> Add Room
+            </button>
+        </div>
+        <div id="roomsList" style="display: flex; flex-direction: column; gap: 0.5rem;"></div>
+    </div>
+
+    <!-- Lecturers Tab -->
+    <div id="tab-lecturers" class="tab-content" style="display: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3 style="font-size: 1.1rem;"><i class="fa-solid fa-user-tie"></i> Manage Lecturers</h3>
+            <button onclick="addLecturer()" class="glass-btn small">
+                <i class="fa-solid fa-plus"></i> Add Lecturer
+            </button>
+        </div>
+        <div id="lecturersList" style="display: flex; flex-direction: column; gap: 0.5rem;"></div>
+    </div>
+
+    <!-- Courses Tab -->
+    <div id="tab-courses" class="tab-content" style="display: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3 style="font-size: 1.1rem;"><i class="fa-solid fa-book"></i> Manage Courses</h3>
+            <button onclick="addCourse()" class="glass-btn small">
+                <i class="fa-solid fa-plus"></i> Add Course
+            </button>
+        </div>
+        <div id="coursesList" style="display: flex; flex-direction: column; gap: 0.5rem;"></div>
+    </div>
+<!--</div> -->
+
 <script>
 async function runAnalysis() {
     const btn = document.getElementById('analyzeBtn');
@@ -400,9 +451,12 @@ function switchTab(tab) {
 }
 
 async function loadRooms() {
-    const res = await fetch('api/db_query.php?type=rooms');
-    const data = await res.json();
     const list = document.getElementById('roomsList');
+    if (!list) return;
+
+    const sourceKey = 'csv/general/rooms.csv';
+    const res = await fetch(`api/get_room_source.php?source_key=${encodeURIComponent(sourceKey)}`);
+    const data = await res.json();
     list.innerHTML = '';
     
     if (data.rooms && data.rooms.length > 0) {
@@ -427,15 +481,15 @@ async function loadRooms() {
 }
 
 async function addRoom() {
-    const name = prompt('Enter room name:');
+    const name = await showPrompt('Enter room name:', '', 'Add Room');
     if (!name) return;
-    const cap = prompt('Enter capacity:', '50');
+    const cap = await showPrompt('Enter capacity:', '50', 'Room Capacity');
     if (!cap) return;
     
     const res = await fetch('api/save_data_edits.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({action: 'save_room', name, capacity: parseInt(cap)})
+        body: JSON.stringify({action: 'save_room', name, capacity: parseInt(cap), source_key: 'csv/general/rooms.csv'})
     });
     const data = await res.json();
     if (data.status === 'success') {
@@ -447,18 +501,18 @@ async function saveRoom(id, name, cap) {
     const res = await fetch('api/save_data_edits.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({action: 'save_room', id, name, capacity: parseInt(cap)})
+        body: JSON.stringify({action: 'save_room', id, name, capacity: parseInt(cap), source_key: 'csv/general/rooms.csv'})
     });
     const data = await res.json();
     console.log(data);
 }
 
 async function deleteRoom(id) {
-    if (!confirm('Delete this room?')) return;
+    if (!await showConfirm('Delete this room? This action cannot be undone.', 'Delete Room')) return;
     const res = await fetch('api/save_data_edits.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({action: 'delete_room', id})
+        body: JSON.stringify({action: 'delete_room', id, source_key: 'csv/general/rooms.csv'})
     });
     const data = await res.json();
     if (data.status === 'success') {
@@ -493,7 +547,7 @@ async function loadLecturers() {
 }
 
 async function addLecturer() {
-    const name = prompt('Enter lecturer name:');
+    const name = await showPrompt('Enter lecturer name:', '', 'Add Lecturer');
     if (!name) return;
     
     const res = await fetch('api/save_data_edits.php', {
@@ -516,7 +570,7 @@ async function saveLecturer(id, name) {
 }
 
 async function deleteLecturer(id) {
-    alert('Lecturer deletion not implemented. Delete from database directly.');
+    await showAlert('Lecturer deletion not implemented. Please delete from database directly.', 'Not Implemented');
 }
 
 async function loadCourses() {
@@ -551,9 +605,9 @@ async function loadCourses() {
 }
 
 async function addCourse() {
-    const code = prompt('Enter course code:');
+    const code = await showPrompt('Enter course code:', '', 'Add Course');
     if (!code) return;
-    const title = prompt('Enter course title:');
+    const title = await showPrompt('Enter course title:', '', 'Course Title');
     if (!title) return;
     
     const res = await fetch('api/save_data_edits.php', {

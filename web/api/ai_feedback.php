@@ -4,6 +4,8 @@
  * Also stores a local audit trail in user_feedback.csv.
  */
 
+require_once __DIR__ . '/../../config/bootstrap.php';
+
 session_start();
 header('Content-Type: application/json');
 
@@ -69,11 +71,11 @@ if ($fp) {
     fclose($fp);
 }
 
-// Forward to AI service via localhost first, then deployed fallback
-$targets = [
-    getenv('AI_PROXY_BASE_URL') ?: 'http://127.0.0.1:5000',
+// Forward to the configured AI service first, then the legacy fallback.
+$targets = array_values(array_unique(array_filter([
+    scheduler_ai_base_url(),
     'https://my-ai-service-yj44.onrender.com'
-];
+])));
 
 $forwarded = false;
 $forwardError = null;

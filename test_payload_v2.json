@@ -1,0 +1,7 @@
+{
+  "file": "csv/general/rooms.csv",
+  "data": [
+    ["room_name", "capacity"],
+    ["Test Room", "77"]
+  ]
+}

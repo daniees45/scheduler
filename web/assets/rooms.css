@@ -1,0 +1,88 @@
+.rooms-panel {
+    padding: 2rem;
+    max-width: 1100px;
+    margin: 0 auto;
+}
+
+.rooms-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.5rem;
+}
+
+.rooms-title {
+    margin: 0;
+}
+
+.rooms-subtitle {
+    color: var(--text-muted);
+    margin-top: 0.35rem;
+}
+
+.rooms-toolbar {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.rooms-source-status {
+    margin-bottom: 1rem;
+    color: var(--text-muted);
+}
+
+.rooms-status-warning {
+    color: #f59e0b;
+}
+
+.rooms-table-wrap {
+    overflow-x: auto;
+}
+
+.rooms-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.rooms-table-head-row {
+    border-bottom: 2px solid rgba(255, 255, 255, 0.12);
+}
+
+.rooms-head-cell {
+    padding: 0.8rem;
+    text-align: left;
+}
+
+.rooms-capacity-col {
+    width: 180px;
+}
+
+.rooms-action-col {
+    width: 70px;
+    text-align: center;
+}
+
+.rooms-table-row {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.rooms-body-cell {
+    padding: 0.7rem;
+}
+
+.rooms-action-cell {
+    text-align: center;
+}
+
+.rooms-input {
+    font-size: 0.9rem;
+}
+
+@media (max-width: 720px) {
+    .rooms-toolbar {
+        grid-template-columns: 1fr;
+    }
+}

@@ -1,0 +1,42 @@
+Course Code,Course Title,Credit Hrs,Lecturer Name,Room Name,Day,Time,course_level,Semester,start_time,no_of_students,enrollment
+CSCD 119,Introduction to Computer Science [Sec A],3.0,Prof. P. Yaw Owusu Amoako,GEN. LAB,Monday,7:00 AM - 9:30 AM,100,1,7:00 AM,30,30
+COSC 224,Object-Oriented Programming [Sec A],3.0,Prof. P. Yaw Owusu Amoako,GEN. LAB,Thursday,7:00 AM - 9:30 AM,200,1,7:00 AM,30,30
+COCS 364 / INFT 364,Research Methods [Sec A],3.0,Prof. P. Yaw Owusu Amoako,CS LAB,Monday,10:00 AM - 12:30 PM,300,1,10:00 AM,30,30
+COSC 480,Compiler Design [Sec A],3.0,Prof. P. Yaw Owusu Amoako,American High,Monday,2:00 PM - 4:30 PM,400,1,2:00 PM,30,30
+COSC 117,Fundamentals of Computing Skills [Sec B],3.0,G. Preprah Tanoah,American High,Thursday,7:00 AM - 9:30 AM,100,1,7:00 AM,30,30
+BBIS 213,IT for Business (MOS) [Sec A],3.0,G. Preprah Tanoah,CS2,Friday,10:00 AM - 12:30 PM,200,1,10:00 AM,30,30
+COSC 117,Fundamentals of Computing Skills [Sec A],3.0,G. Preprah Tanoah,CS3,Thursday,10:00 AM - 12:30 PM,100,2,10:00 AM,30,30
+BBIS 260,Web and Social Management Tools [Sec A],3.0,G. Preprah Tanoah,CS2,Wednesday,7:00 AM - 9:30 AM,200,2,7:00 AM,30,30
+STAT 202,Statistical Methods for Health Sciences [Sec A],3.0,O. Osei-Tutu,American High,Wednesday,10:00 AM - 12:30 PM,200,1,10:00 AM,30,30
+STAT 202,Statistical Methods for Health Sciences [HAC Sec A],3.0,O. Osei-Tutu,CS2,Wednesday,2:00 PM - 4:30 PM,200,2,2:00 PM,30,30
+MATH 121,College Algebra [Sec A],3.0,O. Osei-Tutu,CS LAB,Thursday,7:00 AM - 9:30 AM,100,2,7:00 AM,30,30
+STAT 202,Statistical Methods for Health Sciences [Sec B],3.0,O. Osei-Tutu,CS3,Monday,7:00 AM - 9:30 AM,200,2,7:00 AM,30,30
+COSC 272 / INFT 372,Data Communication & Computer Network II [Sec A] / Network Project Management,3.0,E. Okoe,American High,Friday,10:00 AM - 12:30 PM,200,2,10:00 AM,30,30
+COSC 130,Digital Electronics [Sec A],3.0,E. Okoe,GEN. LAB,Wednesday,7:00 AM - 9:30 AM,100,1,7:00 AM,30,30
+COSC 124,Procedural Programming [Sec A],3.0,E. Okoe,GEN. LAB,Tuesday,7:00 AM - 9:30 AM,100,2,7:00 AM,30,30
+RNSG 101,Nursing and Midwifery Informatics [Sec A] [Jan. Batch],3.0,R. Amponsah,CS1,Wednesday,10:00 AM - 12:30 PM,100,1,10:00 AM,30,30
+COSC 346 / INFT 346,Software Engineering [Sec A] / Software Development Life Cycle [Sec A],3.0,R. Amponsah,CS3,Friday,7:00 AM - 9:30 AM,300,1,7:00 AM,30,30
+COSC 113,Elements of Programming [Sec A],3.0,R. Amponsah,CS1,Monday,2:00 PM - 4:30 PM,100,1,2:00 PM,30,30
+INFT 281 / COSC 280 / BBIS 110,Management Information Systems [Sec A] / Information Systems [Sec A] / Introduction to Business Information Systems [Sec A],3.0,R. W. Ambeh-Doh,CS LAB,Wednesday,10:00 AM - 12:30 PM,200,1,10:00 AM,30,30
+BBIS 338,Enterprise Systems [Sec A],3.0,R. W. Ambeh-Doh,CS3,Thursday,2:00 PM - 4:30 PM,300,1,2:00 PM,30,30
+INFT 115,Information Technology Foundation [Sec A],3.0,R. W. Ambeh-Doh,American High,Monday,7:00 AM - 9:30 AM,100,1,7:00 AM,30,30
+INFT 480 / BBIS 304,Data Warehousing [Sec A] / Business Intelligence and Dataware Housing [Sec A],3.0,S. Ganu,GEN. LAB,Thursday,2:00 PM - 4:30 PM,400,2,2:00 PM,30,30
+BBIS 488,Decision Support Systems [Sec A],3.0,S. Ganu,CS2,Tuesday,7:00 AM - 9:30 AM,400,2,7:00 AM,30,30
+COSC 240 / INFT 346,Systems Programming {Sec A] / DotNet Programming [Sec A],3.0,S. Ganu,CS LAB,Friday,10:00 AM - 12:30 PM,200,1,10:00 AM,30,30
+INFT 410,Internet-Enabled Applications Systems Development,3.0,S. Sebuabe,CS LAB,Wednesday,7:00 AM - 9:30 AM,400,1,7:00 AM,30,30
+INFT 340,Computer Vision: Concepts and Application [Sec A],3.0,S. Sebuabe,GEN. LAB,Tuesday,2:00 PM - 4:30 PM,300,2,2:00 PM,30,30
+COSC 250 / BBIS 203,Computer Ethics [Sec A] / IT Professional Ethics and Practice [Sec A],3.0,S. Sebuabe,American High,Monday,10:00 AM - 12:30 PM,200,1,10:00 AM,30,30
+MATH 112,Calculus I [Sec A],3.0,Dr. G. Biney,CS3,Tuesday,10:00 AM - 12:30 PM,100,2,10:00 AM,30,30
+MATH 214,Multivariable Calculus [Sec A],3.0,Dr. G. Biney,GEN. LAB,Monday,10:00 AM - 12:30 PM,200,2,10:00 AM,30,30
+COSC 470 / INFT 470,Computer & Cyber Forensics,3.0,M. Asare,CS LAB,Tuesday,2:00 PM - 4:30 PM,400,1,2:00 PM,30,30
+INFT 446,Systems and Network Administration [Sec A],3.0,M. Asare,CS3,Tuesday,7:00 AM - 9:30 AM,400,2,7:00 AM,30,30
+INFT 459 / COSC 352,Enterprise Information Security [Sec A] / Computer Security [Sec A],3.0,M. Doe,GEN. LAB,Monday,2:00 PM - 4:30 PM,400,1,2:00 PM,30,30
+INFT 420,Computer-Human Interaction [Sec A],3.0,M. Doe,CS2,Thursday,7:00 AM - 9:30 AM,400,2,7:00 AM,30,30
+MATH 101,Algebra [Sec A],3.0,Prof. W. Oblitey,CS2,Monday,2:00 PM - 4:30 PM,100,1,2:00 PM,30,30
+MATH 171,Introductory Mathematics for Computer Science,3.0,Prof. W. Oblitey,CS3,Wednesday,10:00 AM - 12:30 PM,100,1,10:00 AM,30,30
+BBIS 226,Business Process Modeling and Workflow [Sec A],3.0,Prof. W. Ofoe Larkotey,CS3,Friday,10:00 AM - 12:30 PM,200,1,10:00 AM,30,30
+BBIS 432,IS Consultancy Practices Solution Develop [Sec A],3.0,Prof. W. Ofoe Larkotey,CS1,Thursday,10:00 AM - 12:30 PM,400,2,10:00 AM,30,30
+COSC 370 / INFT 370,Operations Research [Sec A] / Management Science [Sec A],3.0,Dr. A. Adu-Sackey,CS3,Wednesday,7:00 AM - 9:30 AM,300,1,7:00 AM,30,30
+PHYS 103,Physics [Sec A],3.0,J. Okyere Asirifi,CS1,Monday,7:00 AM - 9:30 AM,100,1,7:00 AM,30,30
+MATH 172,Discrete & Continuous Mathematics [Sec A],3.0,Prof. L. Asiedu,CS1,Wednesday,2:00 PM - 4:30 PM,100,2,2:00 PM,30,30
+STAT 384,Probability and Statistics [Sec A],3.0,TBA,GEN. LAB,Wednesday,2:00 PM - 4:30 PM,300,2,2:00 PM,30,30

@@ -1,0 +1,54 @@
+2026-03-02 04:44:55.634691: I tensorflow/core/platform/cpu_feature_guard.cc:210] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: AVX2 FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+2026-03-02 04:45:02,419 - timetable_engine.ai_unified_scheduler - INFO - Neural Network Scheduler initialized
+
+Testing Neural Network Scheduler Fix...
+This test verifies that the NN auto-trains from historical data
+or uses intelligent heuristics when no training data is available.
+
+======================================================================
+TESTING NEURAL NETWORK AUTO-TRAINING
+======================================================================
+
+1. Initializing AI Unified Scheduler with NN enabled...
+======================================================================
+AI UNIFIED SCHEDULER INITIALIZED
+======================================================================
+GA Scheduler: ✗
+RL Scheduler: ✗
+NN Scheduler: ✓
+Ensemble ML: ✗
+======================================================================
+✓ NN Scheduler initialized
+
+2. Testing NN schedule generation (will auto-train if historical data exists)...
+
+======================================================================
+NEURAL NETWORK SCHEDULING
+======================================================================
+[NN] Model not trained. Attempting to load historical data...
+[NN] Loaded 57 historical records from ./temp/historical_schedule.csv
+[NN] Training with 76 samples...
+[NN] Training complete. Accuracy: 100.00%
+[NN] ✓ Using trained model for scheduling 3 courses...
+
+✓ Schedule generated: 3 assignments
+✓ Quality score: 0.856
+✓ Method: Neural Network
+✓ Training stats: {'final_loss': 0.014721004292368889, 'final_accuracy': 1.0}
+✓ All 3 courses placed successfully
+⚠ NN model is using heuristic fallback (no historical data found)
+
+======================================================================
+✓ TEST PASSED: Neural Network Scheduler is working
+
+The NN will:
+  1. Auto-load historical_schedule.csv if available
+  2. Train itself automatically on first use
+  3. Use intelligent heuristics if no training data exists
+
+To improve NN performance:
+  - Generate more schedules to build historical_schedule.csv
+  - Use other algorithms (GA, RL, Ensemble) to create training data
+  - NN will get smarter over time as it learns from history
+======================================================================

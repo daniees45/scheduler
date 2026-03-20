@@ -1,33 +1,56 @@
 <?php
 // as/api/db.php
-$host = '127.0.0.1';
-$db   = 'vvu_scheduler';
-$user = 'root';
-$pass = ''; // Default XAMPP password
-$charset = 'utf8mb4';
+require_once __DIR__ . '/../../config/bootstrap.php';
+
+$host = (string)scheduler_config('database.host', '127.0.0.1');
+$db = (string)scheduler_config('database.name', 'vvu_scheduler');
+$user = (string)scheduler_config('database.user', 'root');
+$pass = (string)scheduler_config('database.pass', '');
+$charset = (string)scheduler_config('database.charset', 'utf8mb4');
+$port = (int)scheduler_config('database.port', 3307);
+$socket = scheduler_config('database.socket', null);
 
 // Create connection
 try {
-    // Standardize on localhost for socket connection (XAMPP default)
-    $conn = new mysqli('localhost', $user, $pass, $db);
-} catch (mysqli_sql_exception $e) {
-    // Fallback to 127.0.0.1 if localhost fails
-    try {
-        $conn = new mysqli('127.0.0.1', $user, $pass, $db);
-    } catch (mysqli_sql_exception $e2) {
-        error_log("DB Connection Failed: " . $e2->getMessage());
-        // Handle gracefully for HTML pages
+    $socketPath = is_string($socket) && trim($socket) !== '' ? $socket : null;
+    $conn = new mysqli($host, $user, $pass, $db, $port, $socketPath);
+}
+catch (mysqli_sql_exception $e) {
+    $fallbackHosts = [];
+
+    if ($socket && $host !== '127.0.0.1') {
+        $fallbackHosts[] = ['127.0.0.1', $port, null];
+    }
+    if ($host !== 'localhost') {
+        $fallbackHosts[] = ['localhost', $port, $socket];
+    }
+
+    $lastException = $e;
+
+    foreach ($fallbackHosts as [$fallbackHost, $fallbackPort, $fallbackSocket]) {
+        try {
+            $socketPath = is_string($fallbackSocket) && trim((string)$fallbackSocket) !== '' ? $fallbackSocket : null;
+            $conn = new mysqli($fallbackHost, $user, $pass, $db, (int)$fallbackPort, $socketPath);
+            $lastException = null;
+            break;
+        }
+        catch (mysqli_sql_exception $fallbackException) {
+            $lastException = $fallbackException;
+        }
+    }
+
+    if ($lastException instanceof mysqli_sql_exception) {
+        error_log("DB Connection Failed: " . $lastException->getMessage());
         if (basename($_SERVER['PHP_SELF']) == 'login.php' || basename($_SERVER['PHP_SELF']) == 'index.php') {
             die("<div style='padding: 20px; color: red; text-align: center; font-family: sans-serif;'>
                     <h2>System Maintenance</h2>
                     <p>The database service is currently unavailable. Please check configuration.</p>
-                    <p><small>" . htmlspecialchars($e2->getMessage()) . "</small></p>
+                    <p><small>" . htmlspecialchars($lastException->getMessage()) . "</small></p>
                  </div>");
         }
-        
-        header('Content-Type: application/json');
-        http_response_code(500);
-        echo json_encode(['error' => 'Database connection failed: ' . $e2->getMessage()]);
+
+        $GLOBALS['db_connection_error'] = $lastException->getMessage();
+        if (ob_get_level() == 0) ob_start();
         exit;
     }
 }
@@ -42,7 +65,8 @@ $conn->set_charset($charset);
 /**
  * Ensure special_rooms table exists before any query that depends on it.
  */
-function ensure_special_rooms_table(mysqli $conn): bool {
+function ensure_special_rooms_table(mysqli $conn): bool
+{
     $sql = "CREATE TABLE IF NOT EXISTS special_rooms (
         id INT AUTO_INCREMENT PRIMARY KEY,
         course_code VARCHAR(50) NOT NULL UNIQUE,
@@ -56,6 +80,38 @@ function ensure_special_rooms_table(mysqli $conn): bool {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
 
     return (bool)$conn->query($sql);
+}
+
+/**
+ * Trigger background synchronization to B2.
+ */
+function trigger_b2_sync(): void
+{
+    try {
+        $configuredBase = scheduler_web_callback_base_url();
+        if ($configuredBase) {
+            $url = scheduler_url_join($configuredBase, 'api/sync.php');
+        } else {
+            $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? "https" : "http";
+            $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+            $path = dirname($_SERVER['PHP_SELF']);
+            if (strpos($path, '/api') !== false) {
+                $url = "$protocol://$host" . dirname($path) . "/api/sync.php";
+            }
+            else {
+                $url = "$protocol://$host$path/api/sync.php";
+            }
+        }
+
+        $ch = curl_init($url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+        curl_exec($ch);
+        curl_close($ch);
+    }
+    catch (Exception $e) {
+        error_log("B2 Sync Trigger Failed: " . $e->getMessage());
+    }
 }
 
 // Start Session globally for auth

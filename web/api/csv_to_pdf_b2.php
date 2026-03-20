@@ -26,6 +26,51 @@ function json_error(string $message, int $status = 500, array $extra = []): void
     exit;
 }
 
+function create_temp_file_path(string $label, string $suffix = ''): string
+{
+    $candidates = [
+        (string)ini_get('upload_tmp_dir'),
+        sys_get_temp_dir(),
+        '/private/tmp',
+        '/tmp',
+    ];
+
+    foreach ($candidates as $candidate) {
+        $candidate = rtrim((string)$candidate, '/');
+        if ($candidate === '') {
+            continue;
+        }
+
+        $tmp = @tempnam($candidate, 'vvu_pdf_');
+        if ($tmp !== false && is_string($tmp) && $tmp !== '') {
+            if ($suffix !== '' && !str_ends_with($tmp, $suffix)) {
+                $with_suffix = $tmp . $suffix;
+                if (@rename($tmp, $with_suffix)) {
+                    return $with_suffix;
+                }
+                @unlink($tmp);
+                continue;
+            }
+            return $tmp;
+        }
+    }
+
+    $fallback = @tempnam('', 'vvu_pdf_');
+    if ($fallback !== false && is_string($fallback) && $fallback !== '') {
+        if ($suffix !== '' && !str_ends_with($fallback, $suffix)) {
+            $with_suffix = $fallback . $suffix;
+            if (@rename($fallback, $with_suffix)) {
+                return $with_suffix;
+            }
+            @unlink($fallback);
+        } else {
+            return $fallback;
+        }
+    }
+
+    throw new RuntimeException('No writable temp file location available');
+}
+
 if (!isset($_SESSION['user_id'])) {
     json_error('Unauthorized', 401);
 }
@@ -56,26 +101,13 @@ $temp_pdf = null;
 try {
     $b2 = new B2Storage();
 
-    // Temp directory setup
-    $temp_dir = realpath(__DIR__ . '/../../temp');
-    if ($temp_dir === false) {
-        $temp_dir = __DIR__ . '/../../temp';
-        if (!is_dir($temp_dir) && !mkdir($temp_dir, 0755, true) && !is_dir($temp_dir)) {
-            throw new RuntimeException('Failed to create temp directory');
-        }
-        $temp_dir = realpath($temp_dir);
-        if ($temp_dir === false) {
-            throw new RuntimeException('Failed to resolve temp directory path');
-        }
-    }
-
     // Download CSV from B2
     $csv_result = $b2->download($csv_key);
     if (empty($csv_result['success'])) {
         throw new RuntimeException('Failed to download CSV from B2: ' . ($csv_result['message'] ?? 'Unknown error'));
     }
 
-    $temp_csv = $temp_dir . '/csv_to_pdf_' . uniqid('', true) . '.csv';
+    $temp_csv = create_temp_file_path('csv', '.csv');
     if (file_put_contents($temp_csv, (string)$csv_result['content']) === false) {
         throw new RuntimeException('Failed to write CSV temp file');
     }
@@ -112,7 +144,7 @@ try {
     }
 
     // Generate PDF
-    $temp_pdf = $temp_dir . '/pdf_output_' . uniqid('', true) . '.pdf';
+    $temp_pdf = create_temp_file_path('pdf', '.pdf');
 
     $py_script = realpath(__DIR__ . '/../../csv_to_pdf.py');
     if ($py_script === false || !is_file($py_script)) {
@@ -165,6 +197,10 @@ try {
     // Download response
     if ($return_download) {
         $filename = $pdf_filename !== '' ? $pdf_filename : (basename($csv_key, '.csv') . '.pdf');
+
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
 
         if (!headers_sent()) {
             header('Content-Type: application/pdf');

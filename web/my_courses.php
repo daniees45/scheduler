@@ -1,8 +1,13 @@
 <?php
 $page_title = 'My Courses';
-include 'includes/header.php';
 require_once 'api/db.php';
 require_once 'includes/ai_predictions.php';
+require_once 'includes/unified_schedule_service.php';
+require_once 'includes/access_control.php';
+
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 requireRole(['student']);
 
@@ -14,6 +19,13 @@ $semester = (string)($_SESSION['semester'] ?? '1');
 $message = '';
 $message_type = '';
 $show_completed = isset($_GET['show_completed']) && $_GET['show_completed'] === '1';
+$saved_at_selection = '';
+
+if (isset($_SESSION['my_courses_flash']) && is_array($_SESSION['my_courses_flash'])) {
+    $message = (string)($_SESSION['my_courses_flash']['message'] ?? '');
+    $message_type = (string)($_SESSION['my_courses_flash']['type'] ?? 'success');
+    unset($_SESSION['my_courses_flash']);
+}
 
 // Defensive table for student-managed completed courses
 $conn->query("CREATE TABLE IF NOT EXISTS student_completed_courses (
@@ -80,6 +92,10 @@ $column_exists = static function (mysqli $conn, string $table, string $column): 
 };
 
 $has_section_column = $column_exists($conn, 'student_enrollments', 'section');
+if (!$has_section_column) {
+    $conn->query("ALTER TABLE student_enrollments ADD COLUMN section VARCHAR(32) NULL AFTER course_id");
+    $has_section_column = $column_exists($conn, 'student_enrollments', 'section');
+}
 
 // Enrolled courses
 $enrolled_courses = [];
@@ -114,218 +130,91 @@ if ($completed_id_stmt) {
     }
 }
 
-// Smart detection from DB: latest departmental + latest general timetable
-$latest_schedule_labels = [];
+// Smart detection from DB: unified cross-department timetable (latest only for students)
 $detected_codes = [];
 $course_slot_map = [];
 $course_source_map = [];
 $course_section_map = [];
 $detected_catalog = [];
 
-$normalize_row = static function (array $row): array {
-    return array_change_key_case($row, CASE_LOWER);
-};
+$unified_payload = unified_schedule_fetch($conn, $_SESSION, [
+    'semester' => $semester,
+    'saved_at' => $saved_at_selection,
+]);
 
-$extract_rows_from_schedule_data = static function ($schedule_data) use ($normalize_row): array {
-    $rows_out = [];
-    $decoded = json_decode((string)$schedule_data, true);
+foreach (($unified_payload['rows'] ?? []) as $r) {
+    $code = strtoupper(trim((string)($r['course_code'] ?? '')));
+    if ($code === '') {
+        continue;
+    }
 
-    // JSON array with header row + data rows (common format)
-    if (is_array($decoded) && !empty($decoded)) {
-        $first = $decoded[0] ?? null;
-        if (is_array($first) && isset($first[0]) && is_string($first[0])) {
-            $headers = array_map(static function ($h) {
-                return strtolower(trim((string)$h, "\" "));
-            }, $first);
-
-            for ($i = 1; $i < count($decoded); $i++) {
-                if (!is_array($decoded[$i])) continue;
-                $assoc = [];
-                foreach ($headers as $idx => $h) {
-                    $assoc[$h] = $decoded[$i][$idx] ?? '';
-                }
-                $rows_out[] = $normalize_row($assoc);
-            }
-        } else {
-            foreach ($decoded as $entry) {
-                if (is_array($entry)) {
-                    $rows_out[] = $normalize_row($entry);
-                }
-            }
-        }
-    } elseif (is_string($schedule_data) && trim($schedule_data) !== '') {
-        // Legacy CSV text
-        $lines = preg_split('/\r\n|\r|\n/', trim($schedule_data));
-        $csv_rows = [];
-        foreach ($lines as $ln) {
-            if (trim($ln) === '') continue;
-            $csv_rows[] = str_getcsv($ln);
-        }
-        if (!empty($csv_rows)) {
-            $headers = array_map(static function ($h) {
-                return strtolower(trim((string)$h, "\" "));
-            }, array_shift($csv_rows));
-            foreach ($csv_rows as $r) {
-                $assoc = [];
-                foreach ($headers as $idx => $h) {
-                    $assoc[$h] = $r[$idx] ?? '';
-                }
-                $rows_out[] = $normalize_row($assoc);
-            }
+    $row_level_raw = trim((string)($r['level'] ?? ''));
+    if ($row_level_raw !== '' && preg_match('/\d+/', $row_level_raw, $m)) {
+        $row_level = (int)$m[0];
+        if ($row_level > 0 && $row_level !== $level) {
+            continue;
         }
     }
 
-    return $rows_out;
-};
+    $detected_codes[$code] = true;
+    $detected_dept = trim((string)($r['department'] ?? ''));
+    if ($detected_dept === '') {
+        $detected_dept = $department ?: 'General';
+    }
 
-$latest_department_schedule = null;
-$latest_general_schedule = null;
+    $detected_level = $level;
+    if (!empty($row_level_raw) && preg_match('/\d+/', $row_level_raw, $lm)) {
+        $detected_level = (int)$lm[0] ?: $level;
+    }
 
-$dept_stmt = $conn->prepare("SELECT id, schedule_name, department, semester, created_at, schedule_data
-                                                         FROM generated_schedules
-                                                         WHERE LOWER(TRIM(department)) = LOWER(TRIM(?))
-                                                             AND (schedule_name NOT LIKE 'exam_%' OR schedule_name IS NULL)
-                                                             AND (semester = ? OR semester IS NULL OR TRIM(semester) = '')
-                                                         ORDER BY created_at DESC
-                                                         LIMIT 1");
-if ($dept_stmt) {
-        $dept_stmt->bind_param('ss', $department, $semester);
-    $dept_stmt->execute();
-    $dept_res = $dept_stmt->get_result();
-    $latest_department_schedule = $dept_res ? $dept_res->fetch_assoc() : null;
-}
+    if (!isset($detected_catalog[$code])) {
+        $detected_catalog[$code] = [
+            'course_code' => $code,
+            'course_title' => trim((string)($r['course_title'] ?? $code)),
+            'level' => $detected_level,
+            'department' => $detected_dept
+        ];
+    }
 
-$general_stmt = $conn->prepare("SELECT id, schedule_name, department, semester, created_at, schedule_data
-                                                                FROM generated_schedules
-                                                                WHERE (
-                                                                        department IS NULL
-                                                                        OR TRIM(department) = ''
-                                                                        OR LOWER(TRIM(department)) = 'general'
-                                                                )
-                                                                    AND (schedule_name NOT LIKE 'exam_%' OR schedule_name IS NULL)
-                                                                    AND (semester = ? OR semester IS NULL OR TRIM(semester) = '')
-                                                                ORDER BY created_at DESC
-                                                                LIMIT 1");
-if ($general_stmt) {
-        $general_stmt->bind_param('s', $semester);
-        $general_stmt->execute();
-    $general_res = $general_stmt->get_result();
-    $latest_general_schedule = $general_res ? $general_res->fetch_assoc() : null;
-}
+    $section = $extract_section(($r['section'] ?? '') . ' ' . ($r['course_title'] ?? '') . ' ' . ($r['course_code'] ?? ''));
+    $section_key = $section !== '' ? $section : 'DEFAULT';
 
-$schedule_sources = [];
-if (!empty($latest_department_schedule)) $schedule_sources[] = ['type' => 'department', 'row' => $latest_department_schedule];
-if (!empty($latest_general_schedule)) $schedule_sources[] = ['type' => 'general', 'row' => $latest_general_schedule];
+    if (!isset($course_slot_map[$code])) {
+        $course_slot_map[$code] = [];
+    }
 
-foreach ($schedule_sources as $sourceItem) {
-    $sourceType = $sourceItem['type'];
-    $sourceRow = $sourceItem['row'];
-    $sourceLabel = $sourceType === 'department'
-        ? ('Department (' . ($sourceRow['department'] ?: $department ?: 'N/A') . ')')
-        : 'General';
+    if (!isset($course_slot_map[$code][$section_key])) {
+        $course_slot_map[$code][$section_key] = [
+            'day' => trim((string)($r['day'] ?? 'Monday')),
+            'time' => trim((string)($r['time'] ?? '09:00-10:00')),
+            'room' => trim((string)($r['room'] ?? '')),
+            'section' => $section
+        ];
+    }
 
-    $latest_schedule_labels[] = $sourceLabel . ' • ' . ($sourceRow['schedule_name'] ?? 'Unnamed') . ' • ' . ($sourceRow['created_at'] ?? '');
+    if (!isset($course_section_map[$code]) && $section_key !== 'DEFAULT') {
+        $course_section_map[$code] = $section_key;
+    }
 
-    $parsed_rows = $extract_rows_from_schedule_data($sourceRow['schedule_data'] ?? '');
-    foreach ($parsed_rows as $r) {
-        $code = strtoupper(trim((string)($r['course code'] ?? ($r['course'] ?? ($r['code'] ?? '')))));
-        if ($code === '') continue;
-
-        $row_level_raw = trim((string)($r['level'] ?? ''));
-        if ($row_level_raw !== '' && preg_match('/\d+/', $row_level_raw, $m)) {
-            $row_level = (int)$m[0];
-            if ($row_level > 0 && $row_level !== $level) {
-                continue;
-            }
-        }
-
-        $detected_codes[$code] = true;
-        $detected_dept = trim((string)($r['department'] ?? ''));
-        if ($detected_dept === '') {
-            $detected_dept = $sourceType === 'general' ? 'General' : ($department ?: 'General');
-        }
-
-        $detected_level = $level;
-        if (!empty($row_level_raw) && preg_match('/\d+/', $row_level_raw, $lm)) {
-            $detected_level = (int)$lm[0] ?: $level;
-        }
-
-        if (!isset($detected_catalog[$code])) {
-            $detected_catalog[$code] = [
-                'course_code' => $code,
-                'course_title' => trim((string)($r['course title'] ?? ($r['title'] ?? $code))),
-                'level' => $detected_level,
-                'department' => $detected_dept
-            ];
-        }
-
-        $section = $extract_section(($r['section'] ?? '') . ' ' . ($r['course title'] ?? '') . ' ' . ($r['title'] ?? '') . ' ' . ($r['course'] ?? '') . ' ' . ($r['code'] ?? ''));
-        $section_key = $section !== '' ? $section : 'DEFAULT';
-
-        if (!isset($course_slot_map[$code])) {
-            $course_slot_map[$code] = [];
-        }
-
-        if (!isset($course_slot_map[$code][$section_key])) {
-            $course_slot_map[$code][$section_key] = [
-                'day' => trim((string)($r['day'] ?? 'Monday')),
-                'time' => trim((string)($r['time'] ?? '09:00-10:00')),
-                'room' => trim((string)($r['room name'] ?? ($r['room'] ?? ''))),
-                'section' => $section
-            ];
-        }
-
-        if (!isset($course_section_map[$code]) && $section_key !== 'DEFAULT') {
-            $course_section_map[$code] = $section_key;
-        }
-
-        if (!isset($course_source_map[$code])) {
-            $course_source_map[$code] = $sourceType;
-        }
+    if (!isset($course_source_map[$code])) {
+        $course_source_map[$code] = strtolower($detected_dept === 'General' ? 'general' : 'department');
     }
 }
 
-// Upload detected timetable courses into courses catalog for enrollment
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && (($_POST['action'] ?? '') === 'sync_detected_courses' || isset($_POST['sync_detected']))) {
-    $inserted = 0;
-    $updated = 0;
-
-    if (empty($detected_catalog)) {
-        $message = 'No detected timetable courses found to upload.';
-        $message_type = 'warning';
-    } else {
-        $insert_stmt = $conn->prepare("INSERT IGNORE INTO courses (course_code, course_title, credit_hours, level, semester, department)
-                                       VALUES (?, ?, 3, ?, '1', ?)");
-        $update_stmt = $conn->prepare("UPDATE courses SET course_title = COALESCE(NULLIF(?, ''), course_title),
-                                                          level = ?,
-                                                          department = COALESCE(NULLIF(?, ''), department)
-                                       WHERE course_code = ?");
-
-        foreach ($detected_catalog as $code => $meta) {
-            $ccode = $meta['course_code'];
-            $ctitle = $meta['course_title'];
+// Auto-sync detected courses into catalog to ensure students always see enrollable rows
+if (!empty($detected_catalog)) {
+    $sync_stmt = $conn->prepare("INSERT IGNORE INTO courses (course_code, course_title, credit_hours, level, semester, department)
+                                 VALUES (?, ?, 3, ?, ?, ?)");
+    if ($sync_stmt) {
+        foreach ($detected_catalog as $meta) {
+            $ccode = (string)$meta['course_code'];
+            $ctitle = (string)$meta['course_title'];
             $clevel = (int)($meta['level'] ?? $level);
-            $cdept = $meta['department'] ?: ($department ?: 'General');
-
-            if ($insert_stmt) {
-                $insert_stmt->bind_param('ssis', $ccode, $ctitle, $clevel, $cdept);
-                $insert_stmt->execute();
-                if ($insert_stmt->affected_rows > 0) {
-                    $inserted++;
-                }
-            }
-
-            if ($update_stmt) {
-                $update_stmt->bind_param('siss', $ctitle, $clevel, $cdept, $ccode);
-                $update_stmt->execute();
-                if ($update_stmt->affected_rows > 0) {
-                    $updated++;
-                }
-            }
+            $csemester = $semester;
+            $cdept = (string)($meta['department'] ?: ($department ?: 'General'));
+            $sync_stmt->bind_param('ssiss', $ccode, $ctitle, $clevel, $csemester, $cdept);
+            $sync_stmt->execute();
         }
-
-        $message = "Uploaded timetable courses to enroll catalog. Added: {$inserted}, Updated: {$updated}.";
-        $message_type = 'success';
     }
 }
 
@@ -402,22 +291,72 @@ if ($pool_stmt) {
     $pool_res = $pool_stmt->get_result();
 
     while ($row = $pool_res->fetch_assoc()) {
-        $code = strtoupper(trim($row['course_code'] ?? ''));
-        if (!empty($detected_codes) && !isset($detected_codes[$code])) {
-            continue;
-        }
         $course_pool[] = $row;
+    }
+}
+
+// Fallback pool when strict student metadata filters produce zero rows
+if (empty($course_pool)) {
+    $fallback_sql = "SELECT c.id, c.course_code, c.course_title, c.level, c.credit_hours, c.department,
+                            l.name AS lecturer_name
+                     FROM courses c
+                     LEFT JOIN lecturers l ON c.lecturer_id = l.id
+                     WHERE c.semester = ?
+                     ORDER BY c.level ASC, c.course_code ASC";
+    $fallback_stmt = $conn->prepare($fallback_sql);
+    if ($fallback_stmt) {
+        $fallback_stmt->bind_param('s', $semester);
+        $fallback_stmt->execute();
+        $fallback_res = $fallback_stmt->get_result();
+        while ($row = $fallback_res->fetch_assoc()) {
+            $course_pool[] = $row;
+        }
     }
 }
 
 // Handle actions (after schedule/slot maps & enrolled courses are known)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $is_ajax_request = strtolower((string)($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '')) === 'xmlhttprequest';
+
+    $redirect_with_message = static function (string $msg, string $type = 'success') use ($show_completed, $is_ajax_request): void {
+        if ($is_ajax_request) {
+            header('Content-Type: application/json');
+            echo json_encode([
+                'success' => true,
+                'message' => $msg,
+                'type' => $type
+            ]);
+            exit;
+        }
+
+        $_SESSION['my_courses_flash'] = [
+            'message' => $msg,
+            'type' => $type
+        ];
+
+        $params = [];
+        if ($show_completed) {
+            $params['show_completed'] = '1';
+        }
+        $target = 'my_courses.php';
+        if (!empty($params)) {
+            $target .= '?' . http_build_query($params);
+        }
+
+        if (!headers_sent()) {
+            header('Location: ' . $target);
+        } else {
+            echo '<script>window.location.href=' . json_encode($target) . ';</script>';
+            echo '<noscript><meta http-equiv="refresh" content="0;url=' . htmlspecialchars($target, ENT_QUOTES, 'UTF-8') . '"></noscript>';
+        }
+        exit;
+    };
+
     $action = $_POST['action'] ?? '';
     if (isset($_POST['enroll'])) $action = 'enroll';
     if (isset($_POST['unenroll'])) $action = 'unenroll';
     if (isset($_POST['mark_done'])) $action = 'mark_done';
     if (isset($_POST['unmark_done'])) $action = 'unmark_done';
-    if (isset($_POST['sync_detected'])) $action = 'sync_detected_courses';
 
     $course_id = (int)($_POST['course_id'] ?? 0);
 
@@ -447,7 +386,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $message_type = 'warning';
                 } else {
 
-                $target_section = $code_lookup !== '' ? ($course_section_map[$code_lookup] ?? null) : null;
+                $requested_section = strtoupper(trim((string)($_POST['selected_section'] ?? '')));
+                if ($requested_section === 'DEFAULT') {
+                    $requested_section = '';
+                }
+
+                $target_section = $requested_section !== ''
+                    ? $requested_section
+                    : ($code_lookup !== '' ? ($course_section_map[$code_lookup] ?? null) : null);
                 $target_slot = $code_lookup !== '' ? $get_slot_for_code_section($course_slot_map, $code_lookup, $target_section) : null;
                 $target_room = $target_slot['room'] ?? '';
                 $conflict_reason = '';
@@ -492,25 +438,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $message_type = 'warning';
                 } else {
                     if ($has_section_column) {
-                        $stmt = $conn->prepare("INSERT INTO student_enrollments (user_id, course_id, section, semester, academic_year) VALUES (?, ?, ?, ?, '2025/2026')");
+                        $stmt = $conn->prepare("INSERT INTO student_enrollments (user_id, course_id, section, semester) VALUES (?, ?, ?, ?)");
                         if ($stmt) {
                             $section_to_store = ($target_section && $target_section !== 'DEFAULT') ? $target_section : null;
                             $stmt->bind_param('iiss', $user_id, $course_id, $section_to_store, $semester);
                             if ($stmt->execute()) {
-                                $message = 'Successfully enrolled in course.';
-                                $message_type = 'success';
+                                $redirect_with_message('Successfully enrolled in course.', 'success');
                             } else {
                                 $message = 'Enrollment failed. Please try again.';
                                 $message_type = 'error';
                             }
                         }
                     } else {
-                        $stmt = $conn->prepare("INSERT INTO student_enrollments (user_id, course_id, semester, academic_year) VALUES (?, ?, ?, '2025/2026')");
+                        $stmt = $conn->prepare("INSERT INTO student_enrollments (user_id, course_id, semester) VALUES (?, ?, ?)");
                         if ($stmt) {
                             $stmt->bind_param('iis', $user_id, $course_id, $semester);
                             if ($stmt->execute()) {
-                                $message = 'Successfully enrolled in course.';
-                                $message_type = 'success';
+                                $redirect_with_message('Successfully enrolled in course.', 'success');
                             } else {
                                 $message = 'Enrollment failed. Please try again.';
                                 $message_type = 'error';
@@ -530,12 +474,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt = $conn->prepare("DELETE FROM student_enrollments WHERE user_id = ? AND course_id = ? AND semester = ?");
         if ($stmt) {
             $stmt->bind_param('iis', $user_id, $course_id, $semester);
-            if ($stmt->execute()) {
-                $message = 'Successfully unenrolled from course.';
-                $message_type = 'success';
+            if ($stmt->execute() && $stmt->affected_rows > 0) {
+                $redirect_with_message('Successfully unenrolled from course.', 'success');
             } else {
-                $message = 'Unenrollment failed. Please try again.';
-                $message_type = 'error';
+                $stmt2 = $conn->prepare("DELETE FROM student_enrollments WHERE user_id = ? AND course_id = ?");
+                if ($stmt2) {
+                    $stmt2->bind_param('ii', $user_id, $course_id);
+                    if ($stmt2->execute() && $stmt2->affected_rows > 0) {
+                        $redirect_with_message('Successfully unenrolled from course.', 'success');
+                    }
+                }
+                $message = 'Unenrollment failed. Course was not found in your current enrollments.';
+                $message_type = 'warning';
             }
         }
     }
@@ -550,8 +500,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $drop->bind_param('ii', $user_id, $course_id);
                     $drop->execute();
                 }
-                $message = 'Course marked as done. You can restore it anytime.';
-                $message_type = 'success';
+                $redirect_with_message('Course marked as done. You can restore it anytime.', 'success');
             }
         }
     }
@@ -561,10 +510,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($stmt) {
             $stmt->bind_param('ii', $user_id, $course_id);
             if ($stmt->execute()) {
-                $message = 'Course removed from done list.';
-                $message_type = 'success';
+                $redirect_with_message('Course removed from done list.', 'success');
             }
         }
+    }
+
+    if ($is_ajax_request) {
+        header('Content-Type: application/json');
+        $fallback_type = in_array($message_type, ['success', 'error', 'warning', 'info'], true) ? $message_type : 'error';
+        echo json_encode([
+            'success' => false,
+            'message' => $message !== '' ? $message : 'Action could not be completed.',
+            'type' => $fallback_type
+        ]);
+        exit;
     }
 }
 
@@ -615,14 +574,11 @@ $enrolled_count = count($enrolled_courses);
 $available_count = count($available_courses);
 $completed_count = count($completed_courses);
 $detected_count = count($detected_codes);
+
+include 'includes/header.php';
 ?>
 
 <style>
-.alert { padding: 1rem; border-radius: 0.5rem; border-left: 4px solid transparent; margin-bottom: 1rem; }
-.alert-success { background: rgba(16,185,129,0.12); border-left-color: #10b981; color: #10b981; }
-.alert-error { background: rgba(239,68,68,0.12); border-left-color: #ef4444; color: #ef4444; }
-.alert-warning { background: rgba(245,158,11,0.12); border-left-color: #f59e0b; color: #f59e0b; }
-
 .table-wrap { overflow-x: auto; }
 .table-modern { width: 100%; border-collapse: collapse; font-size: 0.93rem; }
 .table-modern th, .table-modern td { padding: 0.8rem; border-bottom: 1px solid rgba(255,255,255,0.08); vertical-align: top; }
@@ -649,31 +605,24 @@ $detected_count = count($detected_codes);
 </style>
 
 <?php if (!empty($message)): ?>
-    <div class="alert alert-<?php echo htmlspecialchars($message_type); ?>"><?php echo htmlspecialchars($message); ?></div>
+<script>
+window.addEventListener('load', () => {
+    const msg = <?php echo json_encode((string)$message); ?>;
+    const type = <?php echo json_encode(in_array($message_type, ['success', 'error', 'warning', 'info'], true) ? $message_type : 'info'); ?>;
+    let title = 'Notice';
+    if (type === 'success') title = 'Success';
+    if (type === 'error') title = 'Error';
+    if (type === 'warning') title = 'Warning';
+    showAlert(msg, title, type);
+});
+</script>
 <?php endif; ?>
 
 <div class="glass-panel" style="padding: 1.2rem; margin-bottom: 1rem; background: linear-gradient(135deg, rgba(79,70,229,0.12), rgba(236,72,153,0.08));">
-    <div style="display:flex; justify-content:space-between; gap:0.8rem; flex-wrap:wrap; align-items:center; margin-bottom:0.4rem;">
-        <h3 style="margin: 0;"><i class="fa-solid fa-robot"></i> Smart Course Detection</h3>
-        <form method="POST" style="margin:0;">
-            <input type="hidden" name="action" value="sync_detected_courses">
-            <button type="submit" name="sync_detected" class="glass-btn small">
-                <i class="fa-solid fa-upload"></i> Upload Detected Courses
-            </button>
-        </form>
-    </div>
     <p style="margin: 0; color: var(--text-muted);">
-        Detection source: <strong>Database (latest departmental + latest general timetable)</strong>.
-        Filtered for <strong><?php echo htmlspecialchars($department ?: 'Your Department'); ?></strong>, level <strong><?php echo (int)$level; ?></strong>,
-        and scored against your <strong>personal schedule engine</strong>.
+        Course availability is automatically loaded from your latest timetable snapshot for
+        <strong><?php echo htmlspecialchars($department ?: 'Your Department'); ?></strong>, level <strong><?php echo (int)$level; ?></strong>.
     </p>
-    <?php if (!empty($latest_schedule_labels)): ?>
-        <div style="margin-top: 0.55rem; font-size: 0.84rem; color: var(--text-muted);">
-            <?php foreach ($latest_schedule_labels as $lbl): ?>
-                <div><i class="fa-solid fa-database"></i> <?php echo htmlspecialchars($lbl); ?></div>
-            <?php endforeach; ?>
-        </div>
-    <?php endif; ?>
 </div>
 
 <div class="kpi-grid">
@@ -724,11 +673,13 @@ $detected_count = count($detected_codes);
                         <td><?php echo (int)($course['credit_hours'] ?? 0); ?></td>
                         <td>
                             <div class="action-row">
-                                <form method="POST" onsubmit="return confirm('Unenroll from this course?');">
+                                <form method="POST" onsubmit="event.preventDefault(); showConfirm('Unenroll from this course?', 'Unenroll Course').then(result => { if(result) this.submit(); });">
+                                    <input type="hidden" name="action" value="unenroll">
                                     <input type="hidden" name="course_id" value="<?php echo (int)$course['id']; ?>">
                                     <button type="submit" name="unenroll" class="small-btn btn-unenroll"><i class="fa-solid fa-user-minus"></i> Unenroll</button>
                                 </form>
-                                <form method="POST" onsubmit="return confirm('Mark this course as done? It will be removed from active enrollment.');">
+                                <form method="POST" onsubmit="event.preventDefault(); showConfirm('Mark this course as done? It will be removed from active enrollment.', 'Mark Complete').then(result => { if(result) this.submit(); });">
+                                    <input type="hidden" name="action" value="mark_done">
                                     <input type="hidden" name="course_id" value="<?php echo (int)$course['id']; ?>">
                                     <button type="submit" name="mark_done" class="small-btn btn-done"><i class="fa-solid fa-check"></i> Mark Done</button>
                                 </form>
@@ -770,11 +721,12 @@ $detected_count = count($detected_codes);
                         <th>Code</th>
                         <th>Title</th>
                         <th>Lecturer</th>
+                        <th>Section</th>
                         <th>Detected Slot</th>
-                        <th>Source</th>
+                        
                         <th>Personal Fit</th>
                         <th>AI Feasibility</th>
-                        <th>Fit Score</th>
+                        
                         <th>Action</th>
                     </tr>
                 </thead>
@@ -785,11 +737,30 @@ $detected_count = count($detected_codes);
                         <td><?php echo htmlspecialchars($course['course_title']); ?></td>
                         <td><?php echo htmlspecialchars($course['lecturer_name'] ?? 'TBA'); ?></td>
                         <td>
+                            <?php
+                            $code_key = strtoupper(trim((string)($course['course_code'] ?? '')));
+                            $section_options = [];
+                            if (isset($course_slot_map[$code_key]) && is_array($course_slot_map[$code_key])) {
+                                foreach ($course_slot_map[$code_key] as $secKey => $slotMeta) {
+                                    $secLabel = trim((string)($slotMeta['section'] ?? ''));
+                                    if ($secLabel === '') {
+                                        $secLabel = ($secKey !== 'DEFAULT') ? $secKey : 'DEFAULT';
+                                    }
+                                    $section_options[$secKey] = $secLabel;
+                                }
+                            }
+                            if (empty($section_options)) {
+                                $section_options = ['DEFAULT' => 'Default'];
+                            }
+                            ?>
+                            <span class="badge-pill badge-ai"><?php echo htmlspecialchars(implode(', ', array_values($section_options))); ?></span>
+                        </td>
+                        <td>
                             <span class="badge-pill badge-ai">
                                 <?php echo htmlspecialchars(($course['detected_day'] ?? '-') . ' ' . ($course['detected_time'] ?? '-')); ?>
                             </span>
                         </td>
-                        <td><?php echo htmlspecialchars(ucfirst($course['detected_source'] ?? 'fallback')); ?></td>
+                        
                         <td>
                             <?php if (!empty($course['personal_conflict'])): ?>
                                 <span style="color:#fca5a5; font-weight:600;"><i class="fa-solid fa-triangle-exclamation"></i> Conflict</span>
@@ -804,14 +775,20 @@ $detected_count = count($detected_codes);
                                 <?php echo number_format(((float)($course['feasibility_score'] ?? 0.5)) * 100, 0); ?>%
                             </div>
                         </td>
-                        <td><strong style="color:#22d3ee;"><?php echo number_format((float)($course['recommendation_score'] ?? 0), 0); ?></strong></td>
-                        <td>
+                      <td>
                             <div class="action-row">
-                                <form method="POST">
+                                <form method="POST" class="js-async-enroll-form">
+                                    <input type="hidden" name="action" value="enroll">
                                     <input type="hidden" name="course_id" value="<?php echo (int)$course['id']; ?>">
+                                    <select name="selected_section" class="glass-input" style="max-width:120px;">
+                                        <?php foreach ($section_options as $secKey => $secLabel): ?>
+                                            <option value="<?php echo htmlspecialchars($secKey); ?>"><?php echo htmlspecialchars($secLabel); ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
                                     <button type="submit" name="enroll" class="small-btn btn-enroll"><i class="fa-solid fa-user-plus"></i> Enroll</button>
                                 </form>
-                                <form method="POST" onsubmit="return confirm('Mark this as done/completed?');">
+                                <form method="POST" onsubmit="event.preventDefault(); showConfirm('Mark this as done/completed?', 'Mark Complete').then(result => { if(result) this.submit(); });">
+                                    <input type="hidden" name="action" value="mark_done">
                                     <input type="hidden" name="course_id" value="<?php echo (int)$course['id']; ?>">
                                     <button type="submit" name="mark_done" class="small-btn btn-done"><i class="fa-solid fa-check"></i> Done</button>
                                 </form>
@@ -859,6 +836,7 @@ $detected_count = count($detected_codes);
                         <td><span class="badge-pill badge-done">Done</span></td>
                         <td>
                             <form method="POST">
+                                <input type="hidden" name="action" value="unmark_done">
                                 <input type="hidden" name="course_id" value="<?php echo (int)$course['id']; ?>">
                                 <button type="submit" name="unmark_done" class="small-btn btn-undo"><i class="fa-solid fa-rotate-left"></i> Restore</button>
                             </form>
@@ -953,6 +931,54 @@ const initTableTools = () => {
 };
 
 document.addEventListener('DOMContentLoaded', initTableTools);
+
+const initAsyncEnroll = () => {
+    const forms = document.querySelectorAll('.js-async-enroll-form');
+    forms.forEach((form) => {
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+
+            const submitBtn = form.querySelector('button[name="enroll"]');
+            const originalHtml = submitBtn ? submitBtn.innerHTML : '';
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enrolling...';
+            }
+
+            try {
+                const response = await fetch('my_courses.php', {
+                    method: 'POST',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: new FormData(form)
+                });
+
+                const payload = await response.json();
+                if (payload && payload.success) {
+                    const type = payload.type || 'success';
+                    const msg = payload.message || 'Successfully enrolled in course.';
+                    await showAlert(msg, type === 'warning' ? 'Warning' : 'Success', type);
+                    window.location.reload();
+                    return;
+                }
+
+                const type = payload && payload.type ? payload.type : 'error';
+                const msg = payload && payload.message ? payload.message : 'Enrollment failed. Please try again.';
+                await showAlert(msg, type === 'warning' ? 'Warning' : 'Error', type);
+            } catch (error) {
+                await showAlert('Enrollment failed. Please try again.', 'Error', 'error');
+            } finally {
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalHtml;
+                }
+            }
+        });
+    });
+};
+
+document.addEventListener('DOMContentLoaded', initAsyncEnroll);
 </script>
 
 <?php include 'includes/footer.php'; ?>

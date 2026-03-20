@@ -25,10 +25,10 @@ abstract class AbstractMultipartDownloader implements PromisorInterface
     private const OBJECT_SIZE_REGEX = "/\/(\d+)$/";
     
     /** @var array */
-    protected readonly array $downloadRequestArgs;
+    protected array $downloadRequestArgs;
 
     /** @var array */
-    protected readonly array $config;
+    protected array $config;
 
     /** @var AbstractDownloadHandler */
     private AbstractDownloadHandler $downloadHandler;
@@ -46,7 +46,7 @@ abstract class AbstractMultipartDownloader implements PromisorInterface
     protected ?string $eTag;
 
     /** @var TransferListenerNotifier|null */
-    private readonly ?TransferListenerNotifier $listenerNotifier;
+    private ?TransferListenerNotifier $listenerNotifier;
 
     /** Tracking Members */
     private ?TransferProgressSnapshot $currentSnapshot;
@@ -64,7 +64,7 @@ abstract class AbstractMultipartDownloader implements PromisorInterface
      * @param TransferListenerNotifier|null $listenerNotifier
      */
     public function __construct(
-        protected readonly S3ClientInterface $s3Client,
+        protected S3ClientInterface $s3Client,
         array $downloadRequestArgs,
         array $config = [],
         ?AbstractDownloadHandler $downloadHandler = null,

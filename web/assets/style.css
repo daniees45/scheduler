@@ -1,13 +1,17 @@
 /* Modern Design System - Glassmorphism & Dark/Light Mode Theme */
 
 :root {
-    --primary-color: #4f46e5;
+    --primary-color: var(--site-primary, #4f46e5);
     /* Indigo 600 */
-    --primary-hover: #4338ca;
+    --primary: var(--primary-color);
+    --primary-hover: var(--site-primary-hover, #4338ca);
     /* Indigo 700 */
-    --secondary-color: #ec4899;
+    --secondary-color: var(--site-secondary, #ec4899);
+    --secondary: var(--secondary-color);
+    --primary-rgb: var(--site-primary-rgb, 79, 70, 229);
+    --secondary-rgb: var(--site-secondary-rgb, 236, 72, 153);
     /* Pink 500 */
-    --bg-dark: #0f172a;
+    --bg-dark: var(--site-bg, #0f172a);
     /* Slate 900 */
     --bg-card: rgba(30, 41, 59, 0.7);
     /* Slate 800 with opacity */
@@ -34,9 +38,9 @@ body {
     color: var(--text-main);
     min-height: 100vh;
     background-image:
-        radial-gradient(at 0% 0%, hsla(253, 16%, 7%, 1) 0, transparent 50%),
-        radial-gradient(at 50% 0%, hsla(225, 39%, 30%, 1) 0, transparent 50%),
-        radial-gradient(at 100% 0%, hsla(339, 49%, 30%, 1) 0, transparent 50%);
+        radial-gradient(at 0% 0%, rgba(var(--primary-rgb), 0.24) 0, transparent 52%),
+        radial-gradient(at 50% 0%, rgba(var(--primary-rgb), 0.12) 0, transparent 58%),
+        radial-gradient(at 100% 0%, rgba(var(--secondary-rgb), 0.18) 0, transparent 52%);
     overflow-x: hidden;
 }
 
@@ -48,6 +52,108 @@ body {
     border-radius: 16px;
     border: 1px solid var(--border-color);
     box-shadow: var(--glass-shadow);
+}
+
+/* Dashbord Control Grid */
+.responsive-control-grid {
+    display: grid;
+    grid-template-columns: 3fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.horizontal-card {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 1.5rem;
+}
+
+.horizontal-card-icon {
+    width: 60px;
+    height: 60px;
+    background: var(--primary-color);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 0 8px 16px rgba(var(--primary-rgb), 0.2);
+}
+
+.horizontal-card-content {
+    flex: 1;
+}
+
+.unified-control-card {
+    display: grid;
+    grid-template-columns: 1.5fr 1px 1fr;
+    gap: 2rem;
+    padding: 2rem;
+    align-items: start;
+}
+
+.vertical-divider {
+    background: var(--border-color);
+    width: 1px;
+    height: 100%;
+    min-height: 200px;
+}
+
+/* Schedule Table Responsive Cards */
+@media (max-width: 1024px) {
+    .unified-control-card {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+
+    .vertical-divider {
+        display: none;
+    }
+
+    .schedule-table thead {
+        display: none;
+    }
+
+    .schedule-table,
+    .schedule-table tbody,
+    .schedule-table tr,
+    .schedule-table td {
+        display: block;
+        width: 100%;
+    }
+
+    .schedule-table tr {
+        margin-bottom: 1.5rem;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 1rem;
+        position: relative;
+    }
+
+    .schedule-table td {
+        text-align: right;
+        padding: 0.8rem 0.5rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        position: relative;
+    }
+
+    .schedule-table td:last-child {
+        border-bottom: none;
+    }
+
+    .schedule-table td::before {
+        content: attr(data-label);
+        position: absolute;
+        left: 0.5rem;
+        width: 45%;
+        text-align: left;
+        font-weight: 600;
+        color: var(--text-muted);
+        font-size: 0.8rem;
+        text-transform: uppercase;
+    }
 }
 
 .glass-input {
@@ -63,7 +169,7 @@ body {
 .glass-input:focus {
     outline: none;
     border-color: var(--primary-color);
-    box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2);
+    box-shadow: 0 0 0 2px rgba(var(--primary-rgb), 0.2);
 }
 
 .glass-btn {
@@ -80,7 +186,7 @@ body {
 .glass-btn:hover {
     background: var(--primary-hover);
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+    box-shadow: 0 4px 12px rgba(var(--primary-rgb), 0.3);
 }
 
 .glass-btn.secondary {
@@ -110,7 +216,7 @@ body {
 
 .sidebar-brand h2 {
     font-size: 1.5rem;
-    background: linear-gradient(to right, #818cf8, #c084fc);
+    background: linear-gradient(to right, var(--primary-color), var(--secondary-color));
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -136,8 +242,17 @@ body {
 
 .nav-item a:hover,
 .nav-item a.active {
-    background: rgba(79, 70, 229, 0.1);
+    background: rgba(var(--primary-rgb), 0.1);
     color: var(--primary-color);
+}
+
+.nav-section-label {
+    padding: 1.5rem 1rem 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
 }
 
 .main-content {
@@ -272,6 +387,8 @@ tr:hover td {
     background: rgba(34, 197, 94, 0.2);
     color: #4ade80;
     border: 1px solid rgba(34, 197, 94, 0.3);
+    border-radius: 10px;
+    display: inline;
 }
 
 .status-badge.offline {
@@ -303,7 +420,7 @@ tr:hover td {
 }
 
 .edit-link {
-    color: #818cf8;
+    color: var(--primary-color);
     text-decoration: none;
     font-size: 0.8rem;
     font-weight: 600;
@@ -369,8 +486,8 @@ tr:hover td {
     align-items: center;
     min-height: 100vh;
     padding: 20px;
-    background: radial-gradient(circle at top right, rgba(99, 102, 241, 0.15), transparent),
-        radial-gradient(circle at bottom left, rgba(168, 85, 247, 0.15), transparent);
+    background: radial-gradient(circle at top right, rgba(var(--primary-rgb), 0.2), transparent),
+        radial-gradient(circle at bottom left, rgba(var(--secondary-rgb), 0.16), transparent);
 }
 
 .login-card {
@@ -389,7 +506,7 @@ tr:hover td {
 .logo-area h1 {
     font-size: 2rem;
     margin-bottom: 0.5rem;
-    background: linear-gradient(to right, #818cf8, #c084fc);
+    background: linear-gradient(to right, var(--primary-color), var(--secondary-color));
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -452,4 +569,554 @@ tr:hover td {
 
 #registerForm {
     display: none;
+}
+
+/* ============================================================================
+   COMPREHENSIVE MOBILE RESPONSIVE DESIGN (All Breakpoints)
+   ============================================================================ */
+
+/* Tablet & Landscape (max-width: 1024px) */
+@media (max-width: 1024px) {
+    .main-content {
+        padding: 1.5rem;
+    }
+
+    .page-title h1 {
+        font-size: 1.5rem;
+    }
+
+    .stats-grid {
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 1rem;
+    }
+
+    .stat-value {
+        font-size: 1.8rem;
+    }
+
+    .glass-btn {
+        padding: 10px 18px;
+        font-size: 0.9rem;
+    }
+
+    .glass-input {
+        padding: 10px 14px;
+        font-size: 0.9rem;
+    }
+
+    th, td {
+        padding: 0.75rem;
+        font-size: 0.9rem;
+    }
+
+    .responsive-control-grid {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+
+    .horizontal-card {
+        gap: 1rem;
+        padding: 1rem;
+    }
+
+    .horizontal-card-icon {
+        width: 50px;
+        height: 50px;
+    }
+}
+
+/* Mobile (max-width: 768px) */
+@media (max-width: 768px) {
+    * {
+        font-size: 14px;
+    }
+
+    body {
+        overflow-x: hidden;
+    }
+
+    .app-container {
+        flex-direction: column;
+    }
+
+    .sidebar {
+        width: 100%;
+        padding: 1rem;
+        gap: 1rem;
+        border-right: none;
+        border-bottom: 1px solid var(--border-color);
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        background: rgba(15, 23, 42, 0.95);
+        backdrop-filter: blur(10px);
+    }
+
+    .sidebar-brand h2 {
+        font-size: 1.2rem;
+        margin: 0;
+    }
+
+    .nav-links {
+        display: none;
+        flex-direction: column;
+        gap: 0.5rem;
+        position: absolute;
+        top: 60px;
+        left: 0;
+        right: 0;
+        background: rgba(15, 23, 42, 0.98);
+        padding: 1rem;
+        border-bottom: 1px solid var(--border-color);
+        width: 100%;
+    }
+
+    .nav-links.active {
+        display: flex;
+    }
+
+    .nav-item a {
+        padding: 10px 12px;
+        font-size: 0.9rem;
+    }
+
+    .main-content {
+        flex: 1;
+        padding: 1rem;
+        overflow-y: auto;
+    }
+
+    .header-bar {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: flex-start;
+        margin-bottom: 1rem;
+    }
+
+    .page-title h1 {
+        font-size: 1.3rem;
+    }
+
+    .stats-grid {
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 0.75rem;
+    }
+
+    .stat-card {
+        padding: 1rem;
+        gap: 0.3rem;
+    }
+
+    .stat-value {
+        font-size: 1.5rem;
+    }
+
+    .stat-label {
+        font-size: 0.75rem;
+    }
+
+    /* Form Layouts */
+    .form-group {
+        margin-bottom: 1rem;
+    }
+
+    .glass-input,
+    .glass-input.small,
+    select {
+        padding: 10px 12px;
+        font-size: 0.9rem;
+        width: 100%;
+    }
+
+    .glass-btn {
+        padding: 10px 16px;
+        font-size: 0.85rem;
+        width: 100%;
+    }
+
+    .glass-btn.small {
+        padding: 8px 12px !important;
+        font-size: 0.75rem !important;
+    }
+
+    /* Grid Layouts Stack */
+    .responsive-control-grid {
+        grid-template-columns: 1fr;
+    }
+
+    [style*="grid-template-columns: repeat"] {
+        grid-template-columns: 1fr !important;
+    }
+
+    [style*="grid-template-columns: 2fr"] {
+        grid-template-columns: 1fr !important;
+    }
+
+    [style*="grid-template-columns: 3fr"] {
+        grid-template-columns: 1fr !important;
+    }
+
+    [style*="display: grid;"] {
+        gap: 0.75rem !important;
+    }
+
+    /* Cards & Panels */
+    .glass-panel {
+        padding: 1rem;
+        border-radius: 12px;
+        margin-bottom: 1rem;
+    }
+
+    .horizontal-card {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+        padding: 1rem;
+    }
+
+    .horizontal-card-icon {
+        width: 45px;
+        height: 45px;
+        font-size: 1.3rem;
+    }
+
+    /* Tables - Convert to Card Layout */
+    .table-container {
+        overflow-x: auto;
+    }
+
+    table {
+        font-size: 0.85rem;
+    }
+
+    th, td {
+        padding: 0.6rem;
+        font-size: 0.8rem;
+    }
+
+    tbody tr {
+        margin-bottom: 1rem;
+        display: block;
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 0.75rem;
+    }
+
+    thead {
+        display: none;
+    }
+
+    td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    td::before {
+        content: attr(data-label);
+        font-weight: 600;
+        color: var(--text-muted);
+        font-size: 0.75rem;
+        text-transform: uppercase;
+    }
+
+    td:last-child {
+        border-bottom: none;
+    }
+
+    /* Buttons - Full Width on Mobile */
+    .glass-btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .glass-btn:not(.small) {
+        min-height: 44px;
+    }
+
+    /* Flexbox Adjustments */
+    [style*="display: flex"] {
+        flex-direction: column;
+        width: 100%;
+    }
+
+    [style*="flex: 1"] {
+        width: 100%;
+    }
+
+    /* Login Page */
+    .login-card {
+        max-width: 100%;
+        padding: 1.5rem;
+    }
+
+    .login-container {
+        padding: 1rem;
+    }
+
+    .logo-area h1 {
+        font-size: 1.5rem;
+    }
+
+    /* Student Dashboard */
+    .student-container {
+        padding: 1rem;
+    }
+
+    .header {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: flex-start;
+        margin-bottom: 1rem;
+    }
+
+    /* Modals & Dialogs */
+    [style*="max-width: 800px"],
+    [style*="max-width: 1200px"] {
+        width: 100% !important;
+        max-width: 100% !important;
+        padding: 0 1rem !important;
+    }
+
+    /* Text Adjustments */
+    h1 { font-size: 1.3rem }
+    h2 { font-size: 1.1rem }
+    h3 { font-size: 0.95rem }
+    p { font-size: 0.9rem }
+}
+
+/* Small Mobile (max-width: 480px) */
+@media (max-width: 480px) {
+    * {
+        font-size: 13px;
+    }
+
+    .sidebar {
+        padding: 0.75rem;
+        gap: 0.5rem;
+    }
+
+    .sidebar-brand h2 {
+        font-size: 1rem;
+    }
+
+    .main-content {
+        padding: 0.75rem;
+    }
+
+    .page-title h1 {
+        font-size: 1.1rem;
+    }
+
+    .stats-grid {
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+    }
+
+    .stat-card {
+        padding: 0.75rem;
+        gap: 0.2rem;
+    }
+
+    .stat-value {
+        font-size: 1.3rem;
+    }
+
+    .stat-label {
+        font-size: 0.65rem;
+    }
+
+    .glass-panel {
+        padding: 0.75rem;
+        border-radius: 8px;
+        margin-bottom: 0.75rem;
+    }
+
+    .glass-btn {
+        padding: 8px 12px;
+        font-size: 0.75rem;
+        min-height: 40px;
+    }
+
+    .glass-btn.small {
+        padding: 6px 10px !important;
+        font-size: 0.65rem !important;
+    }
+
+    .glass-input {
+        padding: 8px 10px;
+        font-size: 0.85rem;
+    }
+
+    th, td {
+        padding: 0.4rem;
+        font-size: 0.75rem;
+    }
+
+    .glass-input + .glass-input {
+        margin-top: 0.5rem;
+    }
+
+    /* Stack All Grids */
+    [style*="grid-template-columns"] {
+        grid-template-columns: 1fr !important;
+    }
+
+    [style*="display: grid"] {
+        gap: 0.5rem !important;
+    }
+
+    .horizontal-card {
+        padding: 0.75rem;
+        gap: 0.75rem;
+    }
+
+    .horizontal-card-icon {
+        width: 40px;
+        height: 40px;
+        font-size: 1rem;
+    }
+
+    /* Tables Full Stack */
+    tbody tr {
+        padding: 0.5rem;
+        margin-bottom: 0.75rem;
+    }
+
+    td {
+        padding: 0.35rem 0;
+        font-size: 0.7rem;
+    }
+
+    td::before {
+        font-size: 0.65rem;
+    }
+
+    /* Full Width Elements */
+    [style*="width: 100%;"],
+    .glass-btn,
+    .glass-input,
+    select {
+        width: 100%;
+    }
+
+    /* Reduce Margins & Padding */
+    .header {
+        margin-bottom: 0.75rem;
+        padding-bottom: 0.75rem;
+    }
+
+    h1 { font-size: 1rem; line-height: 1.2 }
+    h2 { font-size: 0.95rem; line-height: 1.2 }
+    h3 { font-size: 0.85rem; line-height: 1.2 }
+
+    /* Fixed Headers */
+    thead {
+        position: sticky;
+        top: 0;
+        background: var(--bg-dark);
+        z-index: 10;
+    }
+
+    /* Buttons - Icon Only on Very Small */
+    .glass-btn span:not([class]) {
+        display: none;
+    }
+}
+
+/* Ultra Small (max-width: 320px) */
+@media (max-width: 320px) {
+    * {
+        font-size: 12px;
+    }
+
+    .main-content {
+        padding: 0.5rem;
+    }
+
+    .glass-panel {
+        padding: 0.5rem;
+        border-radius: 6px;
+    }
+
+    .glass-btn {
+        padding: 6px 10px;
+        font-size: 0.7rem;
+        min-height: 36px;
+    }
+
+    .glass-input {
+        padding: 6px 8px;
+        font-size: 0.75rem;
+    }
+
+    .stat-value {
+        font-size: 1.1rem;
+    }
+
+    th, td {
+        padding: 0.3rem;
+        font-size: 0.65rem;
+    }
+
+    h1 { font-size: 0.95rem }
+    h2 { font-size: 0.85rem }
+    h3 { font-size: 0.75rem }
+
+    .horizontal-card-icon {
+        width: 36px;
+        height: 36px;
+        font-size: 0.9rem;
+    }
+
+    tbody tr {
+        padding: 0.4rem;
+        margin-bottom: 0.5rem;
+    }
+}
+
+/* Landscape Orientation (Height < 500px) */
+@media (max-height: 500px) and (orientation: landscape) {
+    .main-content {
+        padding: 0.75rem;
+    }
+
+    .stats-grid {
+        gap: 0.5rem;
+    }
+
+    .stat-card {
+        padding: 0.5rem;
+        gap: 0.2rem;
+    }
+
+    .glass-panel {
+        margin-bottom: 0.5rem;
+    }
+
+    h1 { font-size: 1.1rem }
+    p { font-size: 0.8rem }
+}
+
+/* Tablet Landscape (max-width: 1024px, min-width: 769px) */
+@media (max-width: 1024px) and (orientation: landscape) {
+    .sidebar {
+        width: 200px;
+        padding: 1.5rem 1rem;
+    }
+
+    .main-content {
+        padding: 1.5rem;
+    }
+
+    .header-bar {
+        flex-direction: row;
+    }
 }

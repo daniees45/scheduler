@@ -1,112 +1,34 @@
 <?php
 $page_title = 'Reminder Settings';
+$page_css = 'assets/reminder_settings.css';
 include 'includes/header.php';
 requireRole(['student', 'lecturer']);
 $user_id = $_SESSION['user_id'];
 ?>
 
-<div class="container" style="max-width: 800px; margin: 0 auto; padding: 20px;">
+<div class="container reminder-settings-container">
     <h1><i class="fas fa-clock"></i> Reminder Settings</h1>
-    <p style="color: var(--text-muted); margin-bottom: 2rem;">
+    <p class="reminder-settings-subtitle">
         Configure when and how you want to be reminded about your commitments
     </p>
     
-    <div class="glass-panel" style="padding: 1.5rem;">
+    <div class="glass-panel reminder-settings-panel">
         <div id="settingsList">
-            <div style="text-align: center; padding: 40px; color: var(--text-muted);">
+            <div class="reminder-settings-placeholder">
                 Loading settings...
             </div>
         </div>
         
-        <div style="margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid rgba(255,255,255,0.08);">
+        <div class="reminder-settings-actions">
             <button class="glass-btn" onclick="saveSettings()">
                 <i class="fas fa-save"></i> Save Settings
             </button>
-            <button class="glass-btn" onclick="generateReminders()" style="margin-left: 10px;">
+            <button class="glass-btn reminder-settings-generate-btn" onclick="generateReminders()">
                 <i class="fas fa-sync"></i> Generate Reminders Now
             </button>
         </div>
     </div>
 </div>
-
-<style>
-.setting-item {
-    padding: 1.2rem;
-    background: rgba(15, 23, 42, 0.55);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 0.75rem;
-    margin-bottom: 1rem;
-}
-
-.setting-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1rem;
-}
-
-.toggle-switch {
-    position: relative;
-    display: inline-block;
-    width: 50px;
-    height: 24px;
-}
-
-.toggle-switch input {
-    opacity: 0;
-    width: 0;
-    height: 0;
-}
-
-.toggle-slider {
-    position: absolute;
-    cursor: pointer;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: #374151;
-    transition: 0.4s;
-    border-radius: 24px;
-}
-
-.toggle-slider:before {
-    position: absolute;
-    content: "";
-    height: 18px;
-    width: 18px;
-    left: 3px;
-    bottom: 3px;
-    background-color: white;
-    transition: 0.4s;
-    border-radius: 50%;
-}
-
-input:checked + .toggle-slider {
-    background-color: #6366f1;
-}
-
-input:checked + .toggle-slider:before {
-    transform: translateX(26px);
-}
-
-.setting-controls {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
-}
-
-.input-group {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
-
-.input-group label {
-    font-size: 14px;
-    color: var(--text-muted);
-}
-</style>
 
 <script>
 let settings = [];
@@ -130,7 +52,7 @@ async function loadSettings() {
     } catch (error) {
         console.error('Failed to load settings:', error);
         document.getElementById('settingsList').innerHTML = 
-            '<div style="color: #ef4444; padding: 20px;">Failed to load settings</div>';
+            '<div class="reminder-settings-error">Failed to load settings</div>';
     }
 }
 
@@ -185,10 +107,10 @@ function renderSettings() {
             <div class="setting-item">
                 <div class="setting-header">
                     <div>
-                        <h3 style="margin: 0 0 0.3rem 0;">
+                        <h3 class="setting-title">
                             <i class="fas ${icon}"></i> ${name}
                         </h3>
-                        <p style="margin: 0; font-size: 14px; color: var(--text-muted);">
+                        <p class="setting-description">
                             ${description}
                         </p>
                     </div>
@@ -200,9 +122,9 @@ function renderSettings() {
                     </label>
                 </div>
                 
-                <div class="setting-controls" ${enabled ? '' : 'style="opacity: 0.5; pointer-events: none;"'}>
+                <div class="setting-controls ${enabled ? '' : 'setting-controls-disabled'}">
                     <div class="input-group">
-                        <label>Remind me</label>
+                        <label>Remind me (global lead time)</label>
                         <select class="glass-input" 
                                 onchange="updateSettingMinutes(${index}, this.value)">
                             <option value="5" ${setting.minutes_before == 5 ? 'selected' : ''}>5 minutes before</option>
@@ -217,7 +139,7 @@ function renderSettings() {
                     </div>
                     
                     <div class="input-group">
-                        <label>Delivery method</label>
+                        <label>Delivery method (global)</label>
                         <select class="glass-input" 
                                 onchange="updateSettingDelivery(${index}, this.value)">
                             <option value="in_app" ${setting.delivery_method === 'in_app' ? 'selected' : ''}>In-App</option>
@@ -239,11 +161,12 @@ function updateSettingEnabled(index, enabled) {
 }
 
 function updateSettingMinutes(index, minutes) {
-    settings[index].minutes_before = parseInt(minutes);
+    const val = parseInt(minutes);
+    settings.forEach(s => s.minutes_before = val);
 }
 
 function updateSettingDelivery(index, method) {
-    settings[index].delivery_method = method;
+    settings.forEach(s => s.delivery_method = method);
 }
 
 async function saveSettings() {
@@ -276,9 +199,9 @@ async function saveSettings() {
     }
     
     if (failed === 0) {
-        alert(`✅ All settings saved successfully!`);
+        await showAlert('All settings saved successfully!', 'Success');
     } else {
-        alert(`⚠️ Saved ${saved} settings, ${failed} failed`);
+        await showAlert(`Saved ${saved} settings, ${failed} failed`, 'Warning');
     }
 }
 
@@ -288,12 +211,12 @@ async function generateReminders() {
         const data = await response.json();
         
         if (data.success) {
-            alert(`✅ Generated ${data.count} reminder(s)!`);
+            await showAlert(`Generated ${data.count} reminder(s)!`, 'Success');
         } else {
-            alert('❌ Failed to generate reminders');
+            await showAlert('Failed to generate reminders', 'Error');
         }
     } catch (error) {
-        alert('❌ Error generating reminders');
+        await showAlert('Error generating reminders', 'Error');
     }
 }
 

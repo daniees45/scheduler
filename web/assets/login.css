@@ -1,0 +1,35 @@
+/* ============================================================
+   login.css — Login / Registration standalone page styles
+   ============================================================ */
+
+/* ----- Subtitle -------------------------------------------- */
+.login-subtitle {
+    color: var(--text-muted);
+}
+
+/* ----- Alert notifications --------------------------------- */
+.login-alert {
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+}
+
+/* Hidden by default, shown by JS */
+.login-alert--hidden {
+    display: none;
+}
+
+/* ----- Submit buttons -------------------------------------- */
+.login-submit-btn {
+    width: 100%;
+    margin-top: 1rem;
+}
+
+/* ----- Selects with dark bg -------------------------------- */
+.login-select {
+    background: rgba(15, 23, 42, 0.9);
+}
+
+/* ----- Register conditional field (hidden until JS toggled) */
+.login-reg-lecturer-field {
+    display: none;
+}

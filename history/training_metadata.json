@@ -1,0 +1,20 @@
+{
+  "created_date": "2026-02-22T09:42:39.820498",
+  "version": "1.0",
+  "total_instances": 12,
+  "total_patterns": 5,
+  "lecturers_profiled": 3,
+  "rooms_analyzed": 3,
+  "time_periods": 4,
+  "quality_baseline": 0.88,
+  "conflict_reduction_target": 0.95,
+  "usage_notes": "This historical data is used to train the AI system to:",
+  "ai_learning_objectives": [
+    "Predict optimal time slot based on course and lecturer patterns",
+    "Recommend best room based on course size and requirements",
+    "Identify and prevent common scheduling conflicts",
+    "Balance workload across lecturers and rooms",
+    "Suggest schedule improvements based on quality metrics",
+    "Learn lecturer and room utilization preferences"
+  ]
+}

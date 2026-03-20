@@ -1,0 +1,189 @@
+/* ============================================================
+   audit_trail.css — System Audit Trail page styles
+   ============================================================ */
+
+/* ----- Layout ------------------------------------------------ */
+.audit-trail-container {
+    padding: 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.audit-trail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.audit-trail-subtitle {
+    color: var(--text-muted);
+}
+
+.audit-trail-stats-btn {
+    margin-left: 10px;
+}
+
+/* ----- Filters ---------------------------------------------- */
+.audit-trail-filters {
+    margin-bottom: 2rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.audit-trail-filter-input {
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* ----- Summary / Stat cards --------------------------------- */
+.audit-trail-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.audit-stat-card {
+    padding: 1.5rem;
+}
+
+.audit-stat-total  { border-left: 4px solid #10b981; }
+.audit-stat-users  { border-left: 4px solid #818cf8; }
+.audit-stat-last   { border-left: 4px solid #a855f7; }
+.audit-stat-errors { border-left: 4px solid #f59e0b; }
+
+.audit-stat-label {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    margin: 0 0 0.5rem 0;
+}
+
+.audit-stat-value {
+    margin: 0;
+    font-size: 1.8rem;
+    font-weight: 700;
+}
+
+.audit-stat-value--green  { color: #10b981; }
+.audit-stat-value--purple { color: #818cf8; }
+.audit-stat-value--violet { color: #a855f7; font-size: 0.9rem; font-weight: normal; }
+.audit-stat-value--amber  { color: #f59e0b; }
+
+/* ----- Table panel ------------------------------------------ */
+.audit-trail-table-panel {
+    padding: 1.5rem;
+    overflow-x: auto;
+}
+
+.audit-trail-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.audit-trail-thead-row {
+    border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+}
+
+.audit-trail-th {
+    text-align: left;
+    padding: 1rem;
+    font-weight: 600;
+}
+
+.audit-trail-th--center {
+    text-align: center;
+}
+
+.audit-trail-loading-cell {
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-muted);
+}
+
+.audit-trail-error-cell {
+    text-align: center;
+    color: #ef4444;
+    padding: 2rem;
+}
+
+/* ----- Log rows (JS-generated) ------------------------------ */
+.audit-trail-log-row {
+    cursor: pointer;
+}
+
+.audit-trail-details-cell {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.audit-trail-ip-cell {
+    font-family: monospace;
+    font-size: 0.8rem;
+}
+
+.audit-trail-severity-cell {
+    text-align: center;
+}
+
+/* ----- Action / severity badges (moved from inline <style>) - */
+.action-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.audit-severity-badge {
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+.severity-critical {
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.2);
+}
+
+.severity-high {
+    color: #f59e0b;
+    background: rgba(245, 158, 11, 0.2);
+}
+
+.severity-medium {
+    color: #818cf8;
+    background: rgba(129, 140, 248, 0.2);
+}
+
+.severity-low {
+    color: #10b981;
+    background: rgba(16, 185, 129, 0.2);
+}
+
+#auditTable tbody tr {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    transition: background 0.2s;
+}
+
+#auditTable tbody tr:hover {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+#auditTable td {
+    padding: 1rem;
+}
+
+/* ----- Pagination ------------------------------------------- */
+.audit-trail-pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 2rem;
+    color: var(--text-muted);
+}

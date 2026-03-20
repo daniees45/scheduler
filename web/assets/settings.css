@@ -1,0 +1,261 @@
+/* Settings Specific CSS */
+.tab-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    padding: 0.75rem 1.25rem;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.2s;
+    border-radius: 8px;
+    white-space: nowrap;
+}
+
+.tab-btn:hover {
+    color: #fff;
+    background: rgba(255,255,255,0.05);
+}
+
+.tab-btn.active {
+    color: var(--primary-color);
+    background: rgba(var(--primary-rgb), 0.1);
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+}
+
+.form-group input,
+.form-group select {
+    width: 100%;
+    padding: 0.8rem;
+    background: rgba(0,0,0,0.2);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    color: #fff;
+}
+
+.toggle-group {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+/* Switches */
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 22px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #333;
+    transition: .4s;
+    border-radius: 34px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 16px;
+    width: 16px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+input:checked + .slider {
+    background-color: var(--primary-color);
+}
+
+input:checked + .slider:before {
+    transform: translateX(22px);
+}
+
+.settings-page-panel {
+    padding: 2rem;
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+.settings-page-header {
+    margin-bottom: 2rem;
+}
+
+.settings-page-subtitle {
+    color: var(--text-muted);
+}
+
+.settings-tabs-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 2rem;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    padding-bottom: 0.5rem;
+    overflow-x: auto;
+}
+
+.settings-grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+}
+
+.settings-grid-2-wide {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+}
+
+.settings-actions-row {
+    margin-top: 2rem;
+}
+
+.tab-content-hidden {
+    display: none;
+}
+
+.settings-max-500 {
+    max-width: 500px;
+}
+
+.settings-max-600 {
+    max-width: 600px;
+}
+
+.security-note-box {
+    margin-top: 2rem;
+    padding: 1rem;
+    background: rgba(16, 185, 129, 0.1);
+    border-radius: 8px;
+    border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.security-note-title {
+    margin: 0;
+    font-size: 0.9rem;
+    color: #10b981;
+}
+
+.security-note-desc {
+    margin: 0.5rem 0 0 0;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.security-note-btn {
+    margin-top: 1rem;
+    font-size: 0.8rem;
+}
+
+.settings-inline-row {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.settings-top-15 {
+    margin-top: 1.5rem;
+}
+
+.danger-zone-box {
+    margin-top: 2.5rem;
+    padding: 1.5rem;
+    background: rgba(255,255,255,0.05);
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+.danger-zone-title {
+    margin-top: 0;
+    color: var(--danger);
+}
+
+.danger-zone-desc {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+.danger-zone-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 1rem;
+}
+
+.settings-color-input {
+    height: 50px;
+}
+
+.branding-logo-note {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 5px;
+}
+
+.branding-preview-panel {
+    padding: 1.5rem;
+    background: rgba(255,255,255,0.05);
+}
+
+.branding-preview-title {
+    margin-top: 0;
+}
+
+.branding-preview-box {
+    padding: 1rem;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+}
+
+.branding-preview-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 1rem;
+}
+
+.branding-preview-logo {
+    width: 24px;
+    height: 24px;
+    background: var(--primary-color);
+    border-radius: 4px;
+}
+
+.branding-preview-text {
+    font-weight: 700;
+    color: #fff;
+}
+
+.branding-preview-btn {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.branding-preview-help {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 1rem;
+}

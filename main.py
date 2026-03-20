@@ -4,8 +4,9 @@ from constraints import make_constraints
 from csp import CSP
 from analyzer import train_model, load_trained_model, initialize_q_learner, record_schedule_batch, save_q_learner_model
 from export_data import export_solution
-from feasibility_classifier import FeasibilityClassifier
+from ensemble_models import FeasibilityEnsemble, QualityEnsemble
 from genetic_algorithm import solve_with_ga
+from timetable_engine.ai_unified_scheduler import AIUnifiedScheduler
 from exam_main_web import run_headless_exam
 from personal_scheduler import BusyBlock, build_personal_schedule, parse_time_safe
 import os
@@ -216,7 +217,7 @@ def validate_department_relevance(input_df: pd.DataFrame, selected_department: s
         return False
     return True
 
-def main(input_file=None, output_file=None, interactive=True, availability_mode=None):
+def main(input_file=None, output_file=None, interactive=True, availability_mode=None, model_choice=None):
     """
     Main scheduling workflow with optional command-line args for non-interactive mode.
     
@@ -228,10 +229,10 @@ def main(input_file=None, output_file=None, interactive=True, availability_mode=
     """
     
     
-    # B2 Context Handling
+    # B2 Context Handling with caching enabled
     try:
         from b2_handler import B2Handler
-        b2 = B2Handler()
+        b2 = B2Handler(enable_cache=True, cache_dir="temp/b2_cache")
     except:
         b2 = None
 
@@ -253,6 +254,28 @@ def main(input_file=None, output_file=None, interactive=True, availability_mode=
                  b2.download_file("q_model.pkl", q_model_file)
             if not os.path.exists("temp/feasibility_classifier.pkl"):
                  b2.download_file("feasibility_classifier.pkl", "temp/feasibility_classifier.pkl")
+            
+            # Download NN model if exists (try both .h5 and .pkl)
+            nn_model_dir = "models/nn"
+            os.makedirs(nn_model_dir, exist_ok=True)
+            if not os.path.exists(f"{nn_model_dir}/nn_scheduler.h5"):
+                try:
+                    b2.download_file("models/nn_scheduler.h5", f"{nn_model_dir}/nn_scheduler.h5")
+                    print(f"[B2] Downloaded NN model: nn_scheduler.h5")
+                except:
+                    pass  # Model might not exist yet or might be .pkl
+            if not os.path.exists(f"{nn_model_dir}/nn_scheduler.pkl"):
+                try:
+                    b2.download_file("models/nn_scheduler.pkl", f"{nn_model_dir}/nn_scheduler.pkl")
+                    print(f"[B2] Downloaded NN model: nn_scheduler.pkl")
+                except:
+                    pass
+            if not os.path.exists(f"{nn_model_dir}/nn_scheduler.json"):
+                try:
+                    b2.download_file("models/nn_scheduler.json", f"{nn_model_dir}/nn_scheduler.json")
+                    print(f"[B2] Downloaded NN metadata: nn_scheduler.json")
+                except:
+                    pass
     
     # Initialize Q-Learning agent for real-time preference learning
     print("[Q-LEARN] Initializing Q-Learning preference model...")
@@ -309,6 +332,11 @@ def main(input_file=None, output_file=None, interactive=True, availability_mode=
         availability_mode = "ai_automatic"  # Default to automatic in non-interactive
         print(f"[NON-INTERACTIVE] Using default availability mode: {availability_mode}")
 
+    if interactive and model_choice is None:
+        model_choice = select_model_interactive()
+    elif model_choice is None:
+        model_choice = "csp"
+
     # Semester selection (interactive mode only)
     if interactive:
         selected_semester = select_semester_interactive()
@@ -344,25 +372,8 @@ def main(input_file=None, output_file=None, interactive=True, availability_mode=
     print(f"[INFO] Detected departments: {', '.join(sorted(departments)) if departments else 'None (General courses only)'}")
     print(f"[INFO] Auto-loading department-specific room files...")
     
-    # Select rooms file based on department choice
-    dept_rooms_map = {
-        "General": "rooms.csv",
-        "CS/IT/BBIS": "computing_science_rooms.csv",
-        "Nursing": "nursing_rooms.csv",
-        "Theology": "theology_rooms.csv",
-        "Business": "business_rooms.csv",
-        "Education": "education_rooms.csv",
-        "BiomedicalEngineering": "biomedical_engineering_rooms.csv",
-        "DevelopmentStudies": "development_studies_rooms.csv",
-    }
-    
-    rooms_path = "rooms.csv"
-    if selected_department:
-        rooms_path = dept_rooms_map.get(selected_department, "rooms.csv")
-        if rooms_path != "rooms.csv" and not os.path.exists(rooms_path):
-            label = selected_department_label or selected_department
-            print(f"[WARNING] Department rooms file '{rooms_path}' not found for {label}. Falling back to rooms.csv")
-            rooms_path = "rooms.csv"
+    rooms_path = get_department_room_file(selected_department or "General")
+    print(f"[INFO] Using rooms file: {rooms_path}")
     
     # Auto-detect and load blocked blocks from General Schedule if it exists
     # IMPORTANT: Do NOT load general schedule when generating general timetable itself
@@ -463,29 +474,31 @@ def main(input_file=None, output_file=None, interactive=True, availability_mode=
             os.remove(filtered_input_file)
         return False
     
-    # Load or train ML feasibility classifier
-    classifier_path = "feasibility_classifier.pkl"
+    # Load or train ML feasibility ensemble
+    classifier_path = "feasibility_ensemble.pkl"
     classifier = None
     history_data = "historical_schedule.csv"
     
     if os.path.exists(classifier_path):
-        print("[ML] Loading feasibility classifier...")
-        classifier = FeasibilityClassifier(classifier_path)
+        print("[ML] Loading feasibility ensemble...")
+        classifier = FeasibilityEnsemble(classifier_path)
         classifier.load()
     elif os.path.exists(history_data):
-        print("[ML] Training new feasibility classifier from history...")
-        classifier = FeasibilityClassifier(classifier_path)
+        print("[ML] Training new feasibility ensemble from history...")
+        classifier = FeasibilityEnsemble(classifier_path)
         X, y = classifier.prepare_training_data(history_data)
         if X is not None:
             classifier.train(X, y)
             classifier.save()
             try:
-                classifier.explain_model(
-                    X,
-                    output_csv="shap_feature_importance.csv",
-                    output_plot="shap_summary.png",
-                    max_samples=200
-                )
+                # Safely check for explain_model attribute (removed in refactored ensemble)
+                if hasattr(classifier, 'explain_model'):
+                    classifier.explain_model(
+                        X,
+                        output_csv="shap_feature_importance.csv",
+                        output_plot="shap_summary.png",
+                        max_samples=200
+                    )
             except Exception as e:
                 print(f"[SHAP] Skipped explainability: {e}")
             print("[ML] Classifier ready for domain pruning")
@@ -498,42 +511,84 @@ def main(input_file=None, output_file=None, interactive=True, availability_mode=
                                    lecturers=data["lecturers"], enable_flexibility=True)
     
     #4 Solver execution
-    print("Initializing CSP solver...")
+    print("Initializing solver...")
     csp = CSP(variables=data["sections"], 
               domains=domain,
               constraints=constraints,
               lecturers=data["lecturers"],
-              rooms=data["rooms"], # Pass rooms for scoring
+              rooms=data["rooms"],
               preferences=preference_model,
               interactive=interactive,
               availability_decision_mode=availability_mode)
-    
-    print("Solving the scheduling problem...")
-    solution = csp.solve()
-    
-    # Fallback: Use Genetic Algorithm if CSP fails
-    if solution is None:
-        print("\n[INFO] CSP solver failed or timed out. Attempting Genetic Algorithm...")
+
+    solution = None
+    solver_mode = (model_choice or "csp").lower().strip()
+
+    if solver_mode == "csp":
+        print("Solving with CSP...")
+        solution = csp.solve()
+
+    if solution is None and solver_mode in ["csp", "ensemble", "hybrid", "ga", "rl", "nn"]:
+        if solver_mode == "csp":
+            print("\n[INFO] CSP solver failed or timed out. Attempting AI Ensemble fallback...")
+        else:
+            print(f"\n[INFO] Solving with AI model: {solver_mode.upper()}...")
+
         try:
-            solution = solve_with_ga(
-                data["sections"],
-                domain,
-                constraints,
-                data["lecturers"],
-                population_size=60,
-                generations=150,
-                timeout_seconds=30
+            course_dicts = []
+            for sec in data["sections"]:
+                course_dicts.append({
+                    "code": sec.course_code,
+                    "title": sec.section_title or sec.course_code,
+                    "department": sec.departmental_group,
+                    "departmental_group": sec.departmental_group,
+                    "credits": sec.credit_hours,
+                    "level": getattr(sec, 'course_level', '100'),
+                    "semester": getattr(sec, 'semester', '1'),
+                    "lecturer": data["lecturers"].get(sec.lecturer_id).name if data["lecturers"].get(sec.lecturer_id) else "TBD"
+                })
+
+            room_dicts = [{"name": r.name, "capacity": r.capacity, "department": getattr(r, 'department', 'General')} for r in data["rooms"].values()]
+
+            ai_solver = AIUnifiedScheduler(
+                data_path=".",
+                courses=course_dicts,
+                lecturers=[l.name for l in data["lecturers"].values()],
+                rooms=room_dicts,
+                time_slots=["07:00 AM - 09:30 AM", "10:00 AM - 12:30 PM", "02:00 PM - 04:30 PM", "05:00 PM - 06:00 PM"],
+                days=["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+                enable_ga=solver_mode in ["ga", "hybrid"],
+                enable_rl=solver_mode in ["rl", "hybrid"],
+                enable_nn=solver_mode in ["nn", "hybrid"],
+                enable_ensemble=solver_mode in ["ensemble", "hybrid", "csp"],
+                strict_departmental=data.get('config', {}).get('strict_departmental', True),
+                is_general_session=data.get('config', {}).get('is_general_session', False),
+                verbose=True
             )
-            if solution is not None:
-                print("[GA] ✓ Genetic Algorithm found a feasible schedule!")
+
+            if solver_mode == "ga":
+                ai_solution, _, _ = ai_solver.schedule_with_ga()
+            elif solver_mode == "rl":
+                ai_solution, _, _ = ai_solver.schedule_with_rl(num_episodes=100)
+            elif solver_mode == "nn":
+                ai_solution, _, _ = ai_solver.schedule_with_nn()
+            elif solver_mode == "hybrid":
+                results = ai_solver.schedule_all(use_rl_episodes=50)
+                ai_solution = results.get('best_schedule')
             else:
-                print("[GA] ✗ Genetic Algorithm also failed to find a solution")
+                ai_solution, _, _ = ai_solver.schedule_with_ensemble()
+
+            if ai_solution:
+                solution = ai_solver._finalize_and_enrich_schedule(ai_solution)
+                print(f"[AI] ✓ {solver_mode.upper()} solver found a feasible schedule!")
+            else:
+                print(f"[AI] ✗ {solver_mode.upper()} solver failed to find a solution")
         except Exception as e:
-            print(f"[ERROR] Genetic Algorithm error: {e}")
+            print(f"[ERROR] AI solver error ({solver_mode.upper()}): {e}")
             solution = None
     
     if solution is None:
-        print("\n[Failed] No valid timetable found (both CSP and GA failed)")
+        print("\n[Failed] No valid timetable found with selected model")
         # Clean up filtered file
         if os.path.exists(filtered_input_file):
             os.remove(filtered_input_file)
@@ -544,7 +599,10 @@ def main(input_file=None, output_file=None, interactive=True, availability_mode=
     export_solution(solution, data, out_path=output_file)
 
     #6. Calculate and display accuracy
-    accuracy = csp.calculate_accuracy(solution)
+    if isinstance(solution, dict):
+        accuracy = csp.calculate_accuracy(solution)
+    else:
+        accuracy = _calculate_list_solution_accuracy(solution, data)
     print(f"\n[AI Evaluation] Schedule Accuracy: {accuracy:.2f}% (Lecturer Preference Match)")
     
     print("Self-Learning: Archiving this success into history...")
@@ -575,21 +633,22 @@ def main(input_file=None, output_file=None, interactive=True, availability_mode=
     #Retrain the model with the new data
     train_model(history_data=history_data, model_save_path=model_file)
     
-    # Retrain ML classifier with new data
-    classifier_path = "feasibility_classifier.pkl"
-    print("[ML] Retraining feasibility classifier with new schedule...")
-    classifier = FeasibilityClassifier(classifier_path)
+    # Retrain ML ensemble with new data
+    classifier_path = "feasibility_ensemble.pkl"
+    print("[ML] Retraining feasibility ensemble with new schedule...")
+    classifier = FeasibilityEnsemble(classifier_path)
     X, y = classifier.prepare_training_data(history_data)
     if X is not None and len(X) > 10:  # Need enough samples
         classifier.train(X, y)
         classifier.save()
         try:
-            classifier.explain_model(
-                X,
-                output_csv="shap_feature_importance.csv",
-                output_plot="shap_summary.png",
-                max_samples=200
-            )
+            if hasattr(classifier, 'explain_model'):
+                classifier.explain_model(
+                    X,
+                    output_csv="shap_feature_importance.csv",
+                    output_plot="shap_summary.png",
+                    max_samples=200
+                )
         except Exception as e:
             print(f"[SHAP] Skipped explainability: {e}")
         print("[ML] Classifier improved and saved.")
@@ -617,6 +676,20 @@ def main(input_file=None, output_file=None, interactive=True, availability_mode=
         b2.upload_file(q_model_file, "q_model.pkl")
         if os.path.exists("temp/feasibility_classifier.pkl"):
              b2.upload_file("temp/feasibility_classifier.pkl", "feasibility_classifier.pkl")
+        
+        # Upload NN model if it exists (fixed filename)
+        nn_model_h5 = "models/nn/nn_scheduler.h5"
+        nn_model_pkl = "models/nn/nn_scheduler.pkl"
+        nn_model_meta = "models/nn/nn_scheduler.json"
+        if os.path.exists(nn_model_h5):
+            b2.upload_file(nn_model_h5, "models/nn_scheduler.h5")
+            print(f"[B2] Uploaded NN model: models/nn_scheduler.h5")
+        elif os.path.exists(nn_model_pkl):
+            b2.upload_file(nn_model_pkl, "models/nn_scheduler.pkl")
+            print(f"[B2] Uploaded NN model: models/nn_scheduler.pkl")
+        if os.path.exists(nn_model_meta):
+            b2.upload_file(nn_model_meta, "models/nn_scheduler.json")
+            print(f"[B2] Uploaded NN metadata: models/nn_scheduler.json")
              
         print(f"[SUCCESS] Results synced to B2: {b2_output_key}")
     
@@ -638,6 +711,66 @@ def _prompt_choice(prompt: str, options: dict) -> str:
         if choice in options:
             return options[choice]
         print(f"[ERROR] Invalid choice. Options: {', '.join(options.keys())}")
+
+
+def select_model_interactive() -> str:
+    print("\n" + "=" * 70)
+    print("MODEL SELECTION")
+    print("=" * 70)
+    print("Choose scheduling model:")
+    print("1. CSP (constraint solver + ensemble fallback)")
+    print("2. Ensemble (AI only)")
+    print("3. Hybrid (GA + RL + NN + Ensemble winner)")
+    print("4. GA")
+    print("5. RL")
+    print("6. NN")
+    print("=" * 70)
+
+    choice_map = {
+        "1": "csp",
+        "2": "ensemble",
+        "3": "hybrid",
+        "4": "ga",
+        "5": "rl",
+        "6": "nn",
+    }
+    return _prompt_choice("Select model (1-6): ", choice_map)
+
+
+def _calculate_list_solution_accuracy(solution: list, data: dict) -> float:
+    if not isinstance(solution, list) or len(solution) == 0:
+        return 0.0
+
+    matches = 0
+    total = 0
+    day_to_idx = {"Monday": 0, "Tuesday": 1, "Wednesday": 2, "Thursday": 3, "Friday": 4}
+    slot_to_idx = {
+        "07:00 AM - 09:30 AM": 0,
+        "10:00 AM - 12:30 PM": 1,
+        "02:00 PM - 04:30 PM": 2,
+        "05:00 PM - 06:00 PM": 3,
+    }
+
+    lecturer_by_name = {l.name: l for l in data.get("lecturers", {}).values()}
+    for item in solution:
+        lecturer_name = str(item.get("lecturer", item.get("lecturer_name", ""))).strip()
+        day = str(item.get("day", "")).strip()
+        time_slot = str(item.get("time_slot", item.get("time", ""))).strip()
+
+        if not lecturer_name or day not in day_to_idx or time_slot not in slot_to_idx:
+            continue
+
+        lecturer = lecturer_by_name.get(lecturer_name)
+        if not lecturer:
+            continue
+
+        total += 1
+        if (day_to_idx[day], slot_to_idx[time_slot]) in lecturer.available_time_slots:
+            matches += 1
+
+    if total == 0:
+        return 0.0
+    return (matches / total) * 100.0
 
 
 def _load_personal_events_from_csv(csv_path: str):
@@ -973,6 +1106,7 @@ if __name__ == "__main__":
     timetable_parser = subparsers.add_parser("timetable", help="Run timetable engine")
     timetable_parser.add_argument("--input", dest="input_file")
     timetable_parser.add_argument("--output", dest="output_file")
+    timetable_parser.add_argument("--model", dest="model", choices=["csp", "ensemble", "hybrid", "ga", "rl", "nn"])
 
     exam_parser = subparsers.add_parser("exam", help="Run exam engine")
     exam_parser.add_argument("--input", dest="input_file", required=False)
@@ -1000,9 +1134,9 @@ if __name__ == "__main__":
 
     if args.engine == "timetable":
         if args.input_file or args.output_file:
-            success = main(input_file=args.input_file, output_file=args.output_file, interactive=False)
+            success = main(input_file=args.input_file, output_file=args.output_file, interactive=False, model_choice=args.model)
         else:
-            success = main(interactive=True)
+            success = main(interactive=True, model_choice=args.model)
         sys.exit(0 if success else 1)
 
     if args.engine == "exam":

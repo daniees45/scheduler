@@ -1,0 +1,130 @@
+erDiagram
+    USER {
+        int id PK
+        varchar username UK
+        varchar password_hash
+        enum role
+        varchar email UK
+        varchar department
+        int level
+        int lecturer_id FK
+        timestamp created_at
+    }
+    
+    COURSE {
+        int id PK
+        varchar course_code UK
+        varchar course_title
+        int level
+        enum semester
+        varchar program
+        varchar lecturer_name
+        varchar day
+        varchar room_name
+    }
+    
+    LECTURER {
+        int id PK
+        varchar name UK
+        varchar email
+        json availability_json
+        varchar department
+    }
+    
+    ROOM {
+        int id PK
+        varchar room_name UK
+        int capacity
+        varchar type
+        boolean is_lab
+    }
+    
+    SECTION {
+        int id PK
+        int course_id FK
+        int lecturer_id FK
+        int room_id FK
+        varchar assigned_day
+        varchar assigned_time
+    }
+    
+    PERSONAL_EVENT {
+        int id PK
+        int user_id FK
+        varchar title
+        varchar day
+        time start_time
+        time end_time
+        varchar event_type
+        int priority_id FK
+        int goal_id FK
+    }
+    
+    USER_PRIORITY {
+        int id PK
+        int user_id FK
+        varchar priority_name
+        enum priority_level
+        decimal target_hours_per_week
+        boolean is_active
+    }
+    
+    USER_GOAL {
+        int id PK
+        int user_id FK
+        varchar goal_title
+        date target_completion_date
+        enum status
+        int progress_percentage
+    }
+    
+    GENERATED_SCHEDULE {
+        int id PK
+        varchar schedule_name
+        varchar semester
+        longtext schedule_data
+        int generated_by FK
+    }
+    
+    STUDENT_ENROLLMENT {
+        int id PK
+        int user_id FK
+        int course_id FK
+        enum semester
+    }
+    
+    NOTIFICATION {
+        int id PK
+        int user_id FK
+        varchar notification_type
+        varchar title
+        datetime scheduled_time
+        boolean is_sent
+        boolean is_read
+    }
+    
+    AUDIT_LOG {
+        int id PK
+        int user_id FK
+        varchar action
+        varchar resource
+        timestamp log_time
+    }
+    
+    USER ||--o{ PERSONAL_EVENT : "has"
+    USER ||--o{ USER_PRIORITY : "defines"
+    USER ||--o{ USER_GOAL : "sets"
+    USER ||--o{ NOTIFICATION : "receives"
+    USER ||--o{ STUDENT_ENROLLMENT : "enrolled"
+    USER ||--o{ GENERATED_SCHEDULE : "creates"
+    USER ||--o{ AUDIT_LOG : "performs"
+    USER }o--o| LECTURER : "is"
+    
+    COURSE ||--o{ SECTION : "has"
+    COURSE ||--o{ STUDENT_ENROLLMENT : "enrolled_in"
+    
+    LECTURER ||--o{ SECTION : "teaches"
+    ROOM ||--o{ SECTION : "used_by"
+    
+    PERSONAL_EVENT }o--o| USER_PRIORITY : "linked"
+    PERSONAL_EVENT }o--o| USER_GOAL : "contributes"

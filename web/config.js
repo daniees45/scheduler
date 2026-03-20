@@ -10,10 +10,11 @@
  */
 
 const API_CONFIG = {
-    // Auto-detect environment based on hostname
-    baseURL: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-        ? 'http://localhost:5000'
-        : 'https://my-ai-service-yj44.onrender.com',
+    baseURL: window.SCHEDULER_CONFIG?.AI_BASE_URL || (
+        window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+            ? 'http://localhost:5000'
+            : 'https://my-ai-service-yj44.onrender.com'
+    ),
     
     // Default timeout for all requests (30 seconds)
     timeout: 30000,
@@ -25,7 +26,7 @@ const API_CONFIG = {
     retryDelay: 1000, // milliseconds, will use exponential backoff
 
     // Same-origin PHP proxy fallback (helps Safari/CORS/mixed-content constraints)
-    proxyURL: 'api/ai_proxy.php',
+    proxyURL: window.SCHEDULER_CONFIG?.AI_PROXY_URL || 'api/ai_proxy.php',
 };
 
 function createTimeoutController(timeoutMs) {
@@ -137,7 +138,7 @@ async function checkAPIStatus() {
             method: 'GET' 
         });
         const data = await response.json();
-        return data.status === 'healthy';
+        return ['healthy', 'ok', 'online', 'success'].includes(String(data.status || '').toLowerCase());
     } catch (error) {
         console.error('[API] Health check failed:', error.message);
         return false;
@@ -175,7 +176,7 @@ async function apiGet(endpoint) {
 // Display current configuration on load
 console.log('[API Config] Initialized with:', {
     baseURL: API_CONFIG.baseURL,
-    environment: window.location.hostname === 'localhost' ? 'local' : 'production',
+    environment: window.SCHEDULER_CONFIG?.ENVIRONMENT || (window.location.hostname === 'localhost' ? 'local' : 'production'),
     timeout: `${API_CONFIG.timeout}ms`,
     maxRetries: API_CONFIG.maxRetries
 });

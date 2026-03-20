@@ -1,0 +1,222 @@
+Warning: TensorFlow not installed. Install with: pip install tensorflow
+[START] Parameters: course_type='Departmental', department='1'
+[AI] Loading Intelligence from scheduling_model.pkl...
+Model loaded from scheduling_model.pkl
+[ML] Loaded feasibility ensemble for domain pruning
+[INFO] Inferred Department: CS/IT/BBIS
+[INFO] Using rooms file: temp/csv/department/computing_science_rooms.csv
+[INFO] Auto-detected recent schedule from B2 for blocking: csv/final/schedule_vb.csv
+[WARNING] Could not load general schedule: Error tokenizing data. C error: Expected 1 fields in line 4, saw 2
+
+[INFO] Loaded general schedule blocks from: temp/latest_general_schedule.csv
+[DATA] Processing csv/department/cs.csv...
+[INFO] Using special rooms file: csv/general/special_rooms.csv
+[INFO] B2 Handler initialized for bucket: vvu-scheduler
+[INFO] B2 enabled. Downloading CSVs from cloud...
+[ERROR] B2 Download error for csv/department/biomedical_engineering_rooms.csv: An error occurred (403) when calling the HeadObject operation: Forbidden
+[ERROR] B2 Download error for csv/department/business_rooms.csv: An error occurred (403) when calling the HeadObject operation: Forbidden
+[ERROR] B2 Download error for csv/department/computing_science_rooms.csv: An error occurred (403) when calling the HeadObject operation: Forbidden
+[ERROR] B2 Download error for csv/department/coo.csv: An error occurred (403) when calling the HeadObject operation: Forbidden
+[ERROR] B2 Download error for csv/department/cs.csv: An error occurred (403) when calling the HeadObject operation: Forbidden
+[ERROR] B2 Download error for csv/department/departmental_courses.csv: An error occurred (403) when calling the HeadObject operation: Forbidden
+[ERROR] B2 Download error for csv/department/development_studies_rooms.csv: An error occurred (403) when calling the HeadObject operation: Forbidden
+[ERROR] B2 Download error for csv/department/education_rooms.csv: An error occurred (403) when calling the HeadObject operation: Forbidden
+[ERROR] B2 Download error for csv/department/nursing_rooms.csv: An error occurred (403) when calling the HeadObject operation: Forbidden
+[ERROR] B2 Download error for csv/department/theology_rooms.csv: An error occurred (403) when calling the HeadObject operation: Forbidden
+[ERROR] B2 Download error for csv/final/schedule_cc.csv: An error occurred (403) when calling the HeadObject operation: Forbidden
+[ERROR] B2 Download error for csv/final/schedule_en.csv: An error occurred (403) when calling the HeadObject operation: Forbidden
+[ERROR] B2 Download error for csv/final/schedule_gg.csv: An error occurred (403) when calling the HeadObject operation: Forbidden
+[ERROR] B2 Download error for csv/final/schedule_vb.csv: An error occurred (403) when calling the HeadObject operation: Forbidden
+[ERROR] B2 Download error for csv/general/comp.csv: An error occurred (403) when calling the HeadObject operation: Forbidden
+[ERROR] B2 Download error for csv/general/comp_clean.csv: An error occurred (403) when calling the HeadObject operation: Forbidden
+[ERROR] B2 Download error for csv/general/comp_final.csv: An error occurred (403) when calling the HeadObject operation: Forbidden
+[ERROR] B2 Download error for csv/general/courses_input.csv: An error occurred (403) when calling the HeadObject operation: Forbidden
+[ERROR] B2 Download error for csv/general/curriculum.backup.csv: An error occurred (403) when calling the HeadObject operation: Forbidden
+[ERROR] B2 Download error for csv/general/curriculum.csv: An error occurred (403) when calling the HeadObject operation: Forbidden
+[ERROR] B2 Download error for csv/general/fac_comp.csv: An error occurred (403) when calling the HeadObject operation: Forbidden
+[ERROR] B2 Download error for csv/general/final_web_schedule.csv: An error occurred (403) when calling the HeadObject operation: Forbidden
+[ERROR] B2 Download error for csv/general/general.csv: An error occurred (403) when calling the HeadObject operation: Forbidden
+[ERROR] B2 Download error for csv/general/general_courses.csv: An error occurred (403) when calling the HeadObject operation: Forbidden
+[ERROR] B2 Download error for csv/general/historical_exam_schedule.csv: An error occurred (403) when calling the HeadObject operation: Forbidden
+[ERROR] B2 Download error for csv/general/historical_schedule.csv: An error occurred (403) when calling the HeadObject operation: Forbidden
+[ERROR] B2 Download error for csv/general/lecturer_availability.csv: An error occurred (403) when calling the HeadObject operation: Forbidden
+[ERROR] B2 Download error for csv/general/level_100.csv: An error occurred (403) when calling the HeadObject operation: Forbidden
+[ERROR] B2 Download error for csv/general/level_200.csv: An error occurred (403) when calling the HeadObject operation: Forbidden
+[ERROR] B2 Download error for csv/general/level_300.csv: An error occurred (403) when calling the HeadObject operation: Forbidden
+[ERROR] B2 Download error for csv/general/level_400.csv: An error occurred (403) when calling the HeadObject operation: Forbidden
+[ERROR] B2 Download error for csv/general/raw_extracted.csv: An error occurred (403) when calling the HeadObject operation: Forbidden
+[ERROR] B2 Download error for csv/general/rooms.csv: An error occurred (403) when calling the HeadObject operation: Forbidden
+[ERROR] B2 Download error for csv/general/shared_course_aliases.csv: An error occurred (403) when calling the HeadObject operation: Forbidden
+[ERROR] B2 Download error for csv/general/shared_courses.csv: An error occurred (403) when calling the HeadObject operation: Forbidden
+[ERROR] B2 Download error for csv/general/special_rooms.csv: An error occurred (403) when calling the HeadObject operation: Forbidden
+[ERROR] B2 Download error for csv/general/vvu_clean.csv: An error occurred (403) when calling the HeadObject operation: Forbidden
+[ERROR] B2 Download error for csv/general/vvu_general_schedule.csv: An error occurred (403) when calling the HeadObject operation: Forbidden
+[ERROR] B2 Download error for csv/general/vvu_raw.csv: An error occurred (403) when calling the HeadObject operation: Forbidden
+[ERROR] B2 Download error for csv/history/exam_historical_exam_schedule_20260221_142039.csv: An error occurred (403) when calling the HeadObject operation: Forbidden
+[ERROR] B2 Download error for csv/history/exam_historical_exam_schedule_20260221_145155.csv: An error occurred (403) when calling the HeadObject operation: Forbidden
+[ERROR] B2 Download error for csv/history/exam_historical_exam_schedule_20260221_150603.csv: An error occurred (403) when calling the HeadObject operation: Forbidden
+[ERROR] B2 Download error for csv/history/exam_historical_exam_schedule_20260221_185520.csv: An error occurred (403) when calling the HeadObject operation: Forbidden
+[ERROR] B2 Download error for csv/history/exam_historical_exam_schedule_20260228_054741.csv: An error occurred (403) when calling the HeadObject operation: Forbidden
+[INFO] Downloaded 44 files from B2 prefix 'csv/'
+[ERROR] B2 Download error for csv/general/historical_schedule.csv: An error occurred (403) when calling the HeadObject operation: Forbidden
+[ERROR] B2 Download error for user_feedback.csv: An error occurred (403) when calling the HeadObject operation: Forbidden
+[INFO] B2 CSV paths in use: rooms=temp/csv/department/computing_science_rooms.csv, special=temp/csv/general/special_rooms.csv, availability=temp/csv/general/lecturer_availability.csv
+[INFO] B2 Sync complete. Using temp files.
+[INFO] Using department-specific room pool. Skipping auto-load of additional department rooms.
+[AI] Solving CSP Constraints...
+[INFO] AI enforcing STRICT room-to-department assignments (General Session: False)
+[INFO] Strict Capacity Check: DISABLED
+[INFO] ML Classifier enabled - pruning domains below 25% success probability
+[WARNING] Strict mode on but no room pool found for CS/IT/BBIS. Using all rooms.
+[WARNING] Strict mode on but no room pool found for General. Using all rooms.
+[WARNING] Strict mode on but no room pool found for General. Using all rooms.
+[WARNING] Strict mode on but no room pool found for CS/IT/BBIS. Using all rooms.
+[WARNING] Strict mode on but no room pool found for CS/IT/BBIS. Using all rooms./Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/sklearn/base.py:463: InconsistentVersionWarning: Trying to unpickle estimator DecisionTreeClassifier from version 1.7.2 when using version 1.8.0. This might lead to breaking code or invalid results. Use at your own risk. For more info please refer to:
+https://scikit-learn.org/stable/model_persistence.html#security-maintainability-limitations
+  warnings.warn(
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/sklearn/base.py:463: InconsistentVersionWarning: Trying to unpickle estimator RandomForestClassifier from version 1.7.2 when using version 1.8.0. This might lead to breaking code or invalid results. Use at your own risk. For more info please refer to:
+https://scikit-learn.org/stable/model_persistence.html#security-maintainability-limitations
+  warnings.warn(
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/sklearn/base.py:463: InconsistentVersionWarning: Trying to unpickle estimator DummyClassifier from version 1.7.2 when using version 1.8.0. This might lead to breaking code or invalid results. Use at your own risk. For more info please refer to:
+https://scikit-learn.org/stable/model_persistence.html#security-maintainability-limitations
+  warnings.warn(
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/sklearn/base.py:463: InconsistentVersionWarning: Trying to unpickle estimator DecisionTreeRegressor from version 1.7.2 when using version 1.8.0. This might lead to breaking code or invalid results. Use at your own risk. For more info please refer to:
+https://scikit-learn.org/stable/model_persistence.html#security-maintainability-limitations
+  warnings.warn(
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/sklearn/base.py:463: InconsistentVersionWarning: Trying to unpickle estimator GradientBoostingClassifier from version 1.7.2 when using version 1.8.0. This might lead to breaking code or invalid results. Use at your own risk. For more info please refer to:
+https://scikit-learn.org/stable/model_persistence.html#security-maintainability-limitations
+  warnings.warn(
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/sklearn/base.py:463: InconsistentVersionWarning: Trying to unpickle estimator LabelBinarizer from version 1.7.2 when using version 1.8.0. This might lead to breaking code or invalid results. Use at your own risk. For more info please refer to:
+https://scikit-learn.org/stable/model_persistence.html#security-maintainability-limitations
+  warnings.warn(
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/sklearn/base.py:463: InconsistentVersionWarning: Trying to unpickle estimator MLPClassifier from version 1.7.2 when using version 1.8.0. This might lead to breaking code or invalid results. Use at your own risk. For more info please refer to:
+https://scikit-learn.org/stable/model_persistence.html#security-maintainability-limitations
+  warnings.warn(
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/sklearn/base.py:463: InconsistentVersionWarning: Trying to unpickle estimator LabelEncoder from version 1.7.2 when using version 1.8.0. This might lead to breaking code or invalid results. Use at your own risk. For more info please refer to:
+https://scikit-learn.org/stable/model_persistence.html#security-maintainability-limitations
+  warnings.warn(
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/sklearn/base.py:463: InconsistentVersionWarning: Trying to unpickle estimator VotingClassifier from version 1.7.2 when using version 1.8.0. This might lead to breaking code or invalid results. Use at your own risk. For more info please refer to:
+https://scikit-learn.org/stable/model_persistence.html#security-maintainability-limitations
+  warnings.warn(
+/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages/sklearn/base.py:463: InconsistentVersionWarning: Trying to unpickle estimator StandardScaler from version 1.7.2 when using version 1.8.0. This might lead to breaking code or invalid results. Use at your own risk. For more info please refer to:
+https://scikit-learn.org/stable/model_persistence.html#security-maintainability-limitations
+  warnings.warn(
+2026-03-01 20:40:25,986 - timetable_engine.ai_unified_scheduler - INFO - Ensemble ML Predictor initialized
+
+[WARNING] Strict mode on but no room pool found for CS/IT/BBIS. Using all rooms.
+[WARNING] Strict mode on but no room pool found for CS/IT/BBIS. Using all rooms.
+[WARNING] Strict mode on but no room pool found for CS/IT/BBIS. Using all rooms.
+[WARNING] Strict mode on but no room pool found for CS/IT/BBIS. Using all rooms.
+[WARNING] Strict mode on but no room pool found for CS/IT/BBIS. Using all rooms.
+[WARNING] Strict mode on but no room pool found for General. Using all rooms.
+[WARNING] Strict mode on but no room pool found for CS/IT/BBIS. Using all rooms.
+[WARNING] Strict mode on but no room pool found for CS/IT/BBIS. Using all rooms.
+[WARNING] Strict mode on but no room pool found for CS/IT/BBIS. Using all rooms.
+[WARNING] Strict mode on but no room pool found for CS/IT/BBIS. Using all rooms.
+[WARNING] Strict mode on but no room pool found for General. Using all rooms.
+[WARNING] Strict mode on but no room pool found for General. Using all rooms.
+[WARNING] Strict mode on but no room pool found for General. Using all rooms.
+[WARNING] Strict mode on but no room pool found for General. Using all rooms.
+[WARNING] Strict mode on but no room pool found for General. Using all rooms.
+[WARNING] Strict mode on but no room pool found for CS/IT/BBIS. Using all rooms.
+[WARNING] Strict mode on but no room pool found for CS/IT/BBIS. Using all rooms.
+[WARNING] Strict mode on but no room pool found for CS/IT/BBIS. Using all rooms.
+[WARNING] Strict mode on but no room pool found for CS/IT/BBIS. Using all rooms.
+[WARNING] Strict mode on but no room pool found for General. Using all rooms.
+[WARNING] Strict mode on but no room pool found for General. Using all rooms.
+[WARNING] Strict mode on but no room pool found for CS/IT/BBIS. Using all rooms.
+[WARNING] Strict mode on but no room pool found for CS/IT/BBIS. Using all rooms.
+[WARNING] Strict mode on but no room pool found for Nursing. Using all rooms.
+[WARNING] Strict mode on but no room pool found for CS/IT/BBIS. Using all rooms.
+[WARNING] Strict mode on but no room pool found for CS/IT/BBIS. Using all rooms.
+[WARNING] Strict mode on but no room pool found for CS/IT/BBIS. Using all rooms.
+[WARNING] Strict mode on but no room pool found for CS/IT/BBIS. Using all rooms.
+[WARNING] Strict mode on but no room pool found for CS/IT/BBIS. Using all rooms.
+[WARNING] Strict mode on but no room pool found for CS/IT/BBIS. Using all rooms.
+[WARNING] Strict mode on but no room pool found for CS/IT/BBIS. Using all rooms.
+[WARNING] Strict mode on but no room pool found for CS/IT/BBIS. Using all rooms.
+[WARNING] Strict mode on but no room pool found for CS/IT/BBIS. Using all rooms.
+[WARNING] Strict mode on but no room pool found for CS/IT/BBIS. Using all rooms.
+[WARNING] Strict mode on but no room pool found for CS/IT/BBIS. Using all rooms.
+[WARNING] Strict mode on but no room pool found for General. Using all rooms.
+[CRITICAL] Pre-filtering eliminated ALL possible slots for STAT 384. Schedule is impossible.
+[CRITICAL] Pre-filtering eliminated ALL possible slots for INFT 420. Schedule is impossible.
+[CRITICAL] Pre-filtering eliminated ALL possible slots for BBIS 432. Schedule is impossible.
+[CRITICAL] Pre-filtering eliminated ALL possible slots for COSC 346 / INFT 346. Schedule is impossible.
+[CRITICAL] Pre-filtering eliminated ALL possible slots for COSC 272 / INFT 372. Schedule is impossible.
+[CRITICAL] Pre-filtering eliminated ALL possible slots for MATH 171. Schedule is impossible.
+[CRITICAL] Pre-filtering eliminated ALL possible slots for INFT 340. Schedule is impossible.
+[CRITICAL] Pre-filtering eliminated ALL possible slots for COSC 240 / INFT 346. Schedule is impossible.
+[CRITICAL] Pre-filtering eliminated ALL possible slots for COSC 117. Schedule is impossible.
+[CRITICAL] Pre-filtering eliminated ALL possible slots for BBIS 488. Schedule is impossible.
+[CRITICAL] Pre-filtering eliminated ALL possible slots for MATH 172. Schedule is impossible.
+[CRITICAL] Pre-filtering eliminated ALL possible slots for BBIS 226. Schedule is impossible.
+[CRITICAL] Pre-filtering eliminated ALL possible slots for COSC 224. Schedule is impossible.
+[CRITICAL] Pre-filtering eliminated ALL possible slots for COCS 364 / INFT 364. Schedule is impossible.
+[CRITICAL] Pre-filtering eliminated ALL possible slots for BBIS 338. Schedule is impossible.
+[CRITICAL] Pre-filtering eliminated ALL possible slots for COSC 370 / INFT 370. Schedule is impossible.
+[CRITICAL] Pre-filtering eliminated ALL possible slots for INFT 446. Schedule is impossible.
+[CRITICAL] Pre-filtering eliminated ALL possible slots for MATH 121. Schedule is impossible.
+[CRITICAL] Pre-filtering eliminated ALL possible slots for MATH 112. Schedule is impossible.
+[CRITICAL] Pre-filtering eliminated ALL possible slots for STAT 202. Schedule is impossible.
+[CRITICAL] Pre-filtering eliminated ALL possible slots for INFT 281 / COSC 280 / BBIS 110. Schedule is impossible.
+[CRITICAL] Pre-filtering eliminated ALL possible slots for COSC 250 / BBIS 203. Schedule is impossible.
+[CRITICAL] Pre-filtering eliminated ALL possible slots for COSC 124. Schedule is impossible.
+[CRITICAL] Pre-filtering eliminated ALL possible slots for COSC 480. Schedule is impossible.
+[CRITICAL] Pre-filtering eliminated ALL possible slots for BBIS 213. Schedule is impossible.
+[CRITICAL] Pre-filtering eliminated ALL possible slots for COSC 470. Schedule is impossible.
+[CRITICAL] Pre-filtering eliminated ALL possible slots for RNSG 101. Schedule is impossible.
+[CRITICAL] Pre-filtering eliminated ALL possible slots for INFT 410. Schedule is impossible.
+[CRITICAL] Pre-filtering eliminated ALL possible slots for CSCD 119. Schedule is impossible.
+[CRITICAL] Pre-filtering eliminated ALL possible slots for BBIS 260. Schedule is impossible.
+[CRITICAL] Pre-filtering eliminated ALL possible slots for COSC 130. Schedule is impossible.
+[CRITICAL] Pre-filtering eliminated ALL possible slots for STAT 202. Schedule is impossible.
+[CRITICAL] Pre-filtering eliminated ALL possible slots for INFT 480 / BBIS 304. Schedule is impossible.
+[CRITICAL] Pre-filtering eliminated ALL possible slots for MATH 101. Schedule is impossible.
+[CRITICAL] Pre-filtering eliminated ALL possible slots for INFT 459 / COSC 352. Schedule is impossible.
+[CRITICAL] Pre-filtering eliminated ALL possible slots for COSC 113. Schedule is impossible.
+[CRITICAL] Pre-filtering eliminated ALL possible slots for PHYS 103. Schedule is impossible.
+[CRITICAL] Pre-filtering eliminated ALL possible slots for STAT 202. Schedule is impossible.
+[CRITICAL] Pre-filtering eliminated ALL possible slots for INFT 115. Schedule is impossible.
+[CRITICAL] Pre-filtering eliminated ALL possible slots for COSC 117. Schedule is impossible.
+[CRITICAL] Pre-filtering eliminated ALL possible slots for MATH 214. Schedule is impossible.
+
+============================================================
+DIAGNOSTIC REPORT: SCHEDULING FAILURE ANALYSIS
+============================================================
+
+------------------------------------------------------------
+PROACTIVE BOTTLENECK ANALYSIS (HEATMAP)
+------------------------------------------------------------
+DAY        | SLOT   | DEMAND (Sections)  | STATUS
+------------------------------------------------------------
+------------------------------------------------------------
+[Tip] If a slot has high demand, consider moving some lecturers' availability.
+
+[Analysis] Total Sections to Schedule: 41
+
+[CRITICAL FAILURE] Could not schedule: Operations Research [Sec A] / Management Science [Sec A] (COSC 370 / INFT 370)
+  Lecturer: Dr. A. Adu-Sackey
+  Total possible slots allowed by domain: 0
+
+  REASON FOR BLOCKAGE:
+
+  [INFO] Lecturer Dr. A. Adu-Sackey has 20 available slots total.
+============================================================
+
+[FAILURE] CSP found no valid schedule within constraints.
+✓ Loaded existing ensemble model
+======================================================================
+AI UNIFIED SCHEDULER INITIALIZED
+======================================================================
+GA Scheduler: ✗
+RL Scheduler: ✗
+NN Scheduler: ✗
+Ensemble ML: ✓
+======================================================================
+
+======================================================================
+GREEDY ENSEMBLE SCHEDULING
+======================================================================
+[CRITICAL] AI Ensemble fallback crashed: Cannot choose from an empty sequence
+Final Result: FAILED - Accuracy: 0.0%

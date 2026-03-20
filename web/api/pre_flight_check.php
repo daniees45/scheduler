@@ -12,6 +12,9 @@ header('Content-Type: application/json');
 require_once 'db.php';
 require_once 'error_handler.php';
 require_once 'validate_csv.php';
+require_once dirname(__DIR__) . '/lib/B2Storage.php';
+
+$b2 = new B2Storage();
 
 ensure_error_log_table();
 
@@ -46,7 +49,46 @@ function run_pre_flight_checks($input_csv, $availability_csv, $rooms_csv) {
         ];
     }
     
-    // 2. CSV validation
+    // 2a. Check CSV headers ONLY (before data validation)
+    // This ensures the input data has the required column structure
+    $courses_headers = check_csv_headers_only($input_csv, ['course_code', 'course_title', 'lecturer_name', 'semester', 'day', 'start_time', 'end_time', 'room_name']);
+    $availability_headers = check_csv_headers_only($availability_csv, ['lecturer_name', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri']);
+    $rooms_headers = check_csv_headers_only($rooms_csv, ['room_name', 'capacity']);
+    
+    $checks['header_validation'] = [
+        'courses' => ['valid' => $courses_headers['valid'], 'found' => $courses_headers['found'] ?? []],
+        'availability' => ['valid' => $availability_headers['valid'], 'found' => $availability_headers['found'] ?? []],
+        'rooms' => ['valid' => $rooms_headers['valid'], 'found' => $rooms_headers['found'] ?? []]
+    ];
+    
+    // If any required headers are missing, fail immediately
+    if (!$courses_headers['valid']) {
+        $errors[] = "Courses CSV missing required headers: " . ($courses_headers['error'] ?? 'Unknown error');
+        $score -= 30;
+    }
+    
+    if (!$availability_headers['valid']) {
+        $errors[] = "Lecturer availability CSV missing required headers: " . ($availability_headers['error'] ?? 'Unknown error');
+        $score -= 20;
+    }
+    
+    if (!$rooms_headers['valid']) {
+        $errors[] = "Rooms CSV missing required headers: " . ($rooms_headers['error'] ?? 'Unknown error');
+        $score -= 20;
+    }
+    
+    // If critical headers are missing, stop here
+    if (!$courses_headers['valid'] || !$availability_headers['valid'] || !$rooms_headers['valid']) {
+        return [
+            'feasible' => false,
+            'score' => max(0, $score),
+            'errors' => $errors,
+            'warnings' => $warnings,
+            'checks' => $checks
+        ];
+    }
+    
+    // 2b. CSV validation (data content validation)
     $courses_valid = validate_courses_csv($input_csv);
     $availability_valid = validate_lecturer_availability_csv($availability_csv);
     $rooms_valid = validate_rooms_csv($rooms_csv);
@@ -509,6 +551,33 @@ function get_feasibility_recommendation($score, $errors, $warnings) {
 }
 
 /**
+ * Downloads a file from B2 to a temporary local path for validation
+ * 
+ * @param B2Storage $b2
+ * @param string $key B2 key
+ * @return string|null Local path to staged file or null on failure
+ */
+function stage_b2_file($b2, $key) {
+    $temp_dir = realpath(__DIR__ . '/../temp/staging');
+    if (!$temp_dir) {
+        $temp_dir = __DIR__ . '/../temp/staging';
+        if (!is_dir($temp_dir)) {
+            @mkdir($temp_dir, 0755, true);
+        }
+    }
+    
+    $safe_name = preg_replace('/[^a-zA-Z0-9_\-.]/', '_', basename($key));
+    $temp_path = $temp_dir . '/' . uniqid('stage_', true) . '_' . $safe_name;
+    
+    $result = $b2->download($key, $temp_path);
+    if ($result['success'] && file_exists($temp_path)) {
+        return $temp_path;
+    }
+    
+    return null;
+}
+
+/**
  * API Endpoint
  */
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -519,37 +588,53 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $exam_mode = isset($_POST['exam_mode']) ? (bool)$_POST['exam_mode'] : (bool)($json['exam_mode'] ?? false);
 
     if ($action === 'exam_check' || $exam_mode) {
-        $csv_content = $json['csv_content'] ?? null;
-        $csv_filename = $json['csv_filename'] ?? 'exam_input.csv';
+        $csv_content = $json['csv_content'] ?? ($_POST['csv_content'] ?? null);
+        $temp_path = $_POST['temp_path'] ?? '';
+        $rooms_csv = $_POST['rooms_csv'] ?? 'csv/general/rooms.csv';
 
-        $temp_dir = realpath(__DIR__ . '/../temp');
-        if (!$temp_dir) {
+        // If content is provided, save it to a temp file first
+        if ($csv_content) {
             $temp_dir = __DIR__ . '/../temp';
-            if (!is_dir($temp_dir)) {
-                mkdir($temp_dir, 0755, true);
-            }
-        }
-
-        $safe_name = preg_replace('/[^a-zA-Z0-9_\-.]/', '_', basename($csv_filename));
-        $temp_path = rtrim($temp_dir, '/\\') . '/' . uniqid('exam_input_', true) . '_' . $safe_name;
-
-        if (is_array($csv_content)) {
-            $handle = fopen($temp_path, 'w');
-            foreach ($csv_content as $row) {
-                if (is_array($row)) {
-                    fputcsv($handle, $row);
+            if (!is_dir($temp_dir)) @mkdir($temp_dir, 0755, true);
+            $temp_path = $temp_dir . '/' . uniqid('exam_input_', true) . '.csv';
+            
+            if (is_array($csv_content)) {
+                $handle = fopen($temp_path, 'w');
+                foreach ($csv_content as $row) {
+                    if (is_array($row)) fputcsv($handle, $row);
                 }
+                fclose($handle);
+            } else {
+                file_put_contents($temp_path, $csv_content);
             }
-            fclose($handle);
-        } elseif (is_string($csv_content) && $csv_content !== '') {
-            file_put_contents($temp_path, $csv_content);
         }
 
-        $rooms_csv = file_exists(__DIR__ . '/../csv/general/exam_rooms.csv')
-            ? __DIR__ . '/../csv/general/exam_rooms.csv'
-            : __DIR__ . '/../csv/general/rooms.csv';
+        if (!$temp_path || !file_exists($temp_path)) {
+            echo json_encode(['feasible' => false, 'error' => 'No exam schedule data provided for validation.']);
+            exit;
+        }
+        
+        // Stage rooms from B2
+        $r_key = (strpos($rooms_csv, 'csv/') === 0) ? $rooms_csv : 'csv/general/' . basename($rooms_csv);
+        $staged_rooms = stage_b2_file($b2, $r_key);
 
-        $result = run_exam_pre_flight_checks($temp_path, $rooms_csv);
+        if (!$staged_rooms) {
+            echo json_encode([
+                'feasible' => false,
+                'score' => 0,
+                'errors' => ['Failed to download rooms file from B2 for exam validation.'],
+                'warnings' => [],
+                'checks' => []
+            ]);
+            exit;
+        }
+
+        $result = run_exam_pre_flight_checks($temp_path, $staged_rooms);
+        
+        // Cleanup
+        @unlink($staged_rooms);
+        if ($csv_content) @unlink($temp_path); // Only cleanup if we created it here
+        
         echo json_encode($result);
         exit;
     }
@@ -559,25 +644,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $availability_csv = $_POST['availability_csv'] ?? 'csv/general/lecturer_availability.csv';
         $rooms_csv = $_POST['rooms_csv'] ?? 'csv/general/rooms.csv';
 
-        // Resolve paths
-        $base_path = realpath('../../');
-        $courses_path = $base_path . '/' . $courses_csv;
-        $availability_path = $base_path . '/' . $availability_csv;
-        $rooms_path = $base_path . '/' . $rooms_csv;
+        // Source keys from B2 (assumed same as provided paths if they start with csv/)
+        $c_key = (strpos($courses_csv, 'csv/') === 0) ? $courses_csv : 'csv/department/' . basename($courses_csv);
+        $a_key = (strpos($availability_csv, 'csv/') === 0) ? $availability_csv : 'csv/general/' . basename($availability_csv);
+        $r_key = (strpos($rooms_csv, 'csv/') === 0) ? $rooms_csv : 'csv/general/' . basename($rooms_csv);
 
-        // Security check
-        foreach ([$courses_path, $availability_path, $rooms_path] as $path) {
-            if (!$path || strpos($path, $base_path) !== 0 || !file_exists($path)) {
-                http_response_code(403);
-                echo json_encode(['error' => 'Invalid file path']);
-                exit;
-            }
+        // Stage files from B2
+        $staged_courses = stage_b2_file($b2, $c_key);
+        $staged_avail = stage_b2_file($b2, $a_key);
+        $staged_rooms = stage_b2_file($b2, $r_key);
+
+        if (!$staged_courses || !$staged_avail || !$staged_rooms) {
+            echo json_encode([
+                'feasible' => false,
+                'score' => 0,
+                'errors' => ['Failed to download one or more source files from B2 for validation.'],
+                'warnings' => [],
+                'checks' => []
+            ]);
+            exit;
         }
 
-        $result = run_pre_flight_checks($courses_path, $availability_path, $rooms_path);
+        $result = run_pre_flight_checks($staged_courses, $staged_avail, $staged_rooms);
+
+        // Cleanup staged files
+        @unlink($staged_courses);
+        @unlink($staged_avail);
+        @unlink($staged_rooms);
 
         // Log the check
-        log_error('INFO', 'Pre-flight check completed', __FILE__, __LINE__, 
+        log_error('INFO', 'Pre-flight check completed (B2 source)', __FILE__, __LINE__, 
                  'score=' . $result['score'] . ', feasible=' . ($result['feasible'] ? 'true' : 'false'));
 
         echo json_encode($result);

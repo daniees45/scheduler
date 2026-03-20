@@ -1,0 +1,153 @@
+.student-view-branding {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.student-view-brand-icon-wrap {
+    width: 50px;
+    height: 50px;
+    background: linear-gradient(135deg, #6366f1, #a855f7);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.student-view-brand-icon {
+    font-size: 1.5rem;
+    color: white;
+}
+
+.student-view-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.student-view-subtitle {
+    color: #94a3b8;
+    margin: 0;
+    font-size: 0.9rem;
+}
+
+.student-view-filter-panel {
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.student-view-filter-form {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    gap: 1rem;
+}
+
+.student-view-filter-label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: #94a3b8;
+}
+
+.student-view-filter-select {
+    background: rgba(15, 23, 42, 0.8);
+    color: white;
+    width: 100%;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.student-view-filter-action {
+    display: flex;
+    align-items: flex-end;
+}
+
+.student-view-filter-button {
+    padding: 10px 20px;
+    background: #6366f1;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.student-view-table-panel {
+    padding: 0;
+}
+
+.student-view-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.student-view-table-head-row {
+    background: rgba(255, 255, 255, 0.05);
+    text-align: left;
+}
+
+.student-view-cell-pad {
+    padding: 1rem;
+}
+
+.student-view-empty-state {
+    text-align: center;
+    padding: 2rem;
+    color: #94a3b8;
+}
+
+.student-view-table-row {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.student-view-day {
+    font-weight: 600;
+    color: #818cf8;
+}
+
+.student-view-time {
+    font-size: 0.9rem;
+    color: #fbbf24;
+    font-family: monospace;
+}
+
+.student-view-course-code {
+    font-weight: 600;
+}
+
+.student-view-course-title {
+    font-size: 0.9rem;
+    color: #94a3b8;
+}
+
+.student-view-room-badge {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+
+.student-view-lecturer {
+    color: #cbd5e1;
+}
+
+.student-view-footer-note {
+    text-align: center;
+    margin-top: 2rem;
+    color: #64748b;
+    font-size: 0.9rem;
+}
+
+@media (max-width: 768px) {
+    .student-view-filter-form {
+        grid-template-columns: 1fr;
+    }
+
+    .student-view-filter-action {
+        align-items: stretch;
+    }
+
+    .student-view-branding {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+}

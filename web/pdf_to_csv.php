@@ -99,14 +99,14 @@ if (autoEtlForm) {
                 log.innerHTML += '<span style="color: #10b981;">[AUTO]</span> Extraction Output: ' + (data.extract_log || 'OK').replace(/\n/g, '<br>') + '<br>';
                 log.innerHTML += '<span style="color: #10b981;">[AUTO]</span> Cleanup Output: ' + (data.cleanup_log || 'OK').replace(/\n/g, '<br>') + '<br>';
                 log.innerHTML += '<span style="color: #10b981;">[AUTO]</span> <b>SUCCESS:</b> ' + data.message + '<br>';
-                showNotice('success', data.message);
+                await showNotice('success', data.message);
             } else {
                 log.innerHTML += '<span style="color: #ef4444;">[ERROR]</span> ' + (data.message || 'ETL Failed') + '<br>';
-                showNotice('error', data.message || 'Automated ETL failed');
+                await showNotice('error', data.message || 'Automated ETL failed');
             }
         } catch (err) {
             log.innerHTML += '<span style="color: #ef4444;">[ERROR]</span> ' + err.message + '<br>';
-            showNotice('error', err.message);
+            await showNotice('error', err.message);
         } finally {
             btn.disabled = false;
             btn.innerHTML = originalText;
@@ -179,10 +179,10 @@ async function runCleanup() {
     }
 }
 
-function showNotice(type, message) {
+async function showNotice(type, message) {
     if (typeof customAlert === 'function') {
         const title = type === 'success' ? 'Success' : type === 'warning' ? 'Warning' : 'Error';
-        customAlert(title, message, type === 'warning' ? 'warning' : type);
+        await customAlert(title, message, type === 'warning' ? 'warning' : type);
         return;
     }
     const log = document.getElementById('wizardLog');

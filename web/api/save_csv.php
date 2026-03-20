@@ -3,6 +3,7 @@
 // Saves JSON data to a CSV file and triggers DB sync
 
 require_once 'db.php';
+require_once 'room_sync_helper.php';
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -22,6 +23,13 @@ $data = $input['data'] ?? [];
 $normalized_filename = ltrim(str_replace('\\', '/', str_replace('../', '', $filename)), '/');
 $base_filename = basename($normalized_filename);
 $synced_table = null;
+
+function getHandleFromContent($content) {
+    $h = fopen('php://memory', 'r+');
+    fwrite($h, $content);
+    rewind($h);
+    return $h;
+}
 
 // Validate Filename Security
 if (!$filename || preg_match('/\.\./', $filename) || pathinfo($filename, PATHINFO_EXTENSION) !== 'csv') {
@@ -63,6 +71,11 @@ try {
     // Clean key: remove leading ../ or /
     $key = $normalized_filename;
     
+    // Strip any leading 'temp/' from the key to map to B2's flat 'csv/' directory structure correctly
+    if (strpos($key, 'temp/') === 0) {
+        $key = substr($key, 5);
+    }
+    
     // If key doesn't start with csv/, map it to csv/general/ for safety/legacy
     if (strpos($key, 'csv/') !== 0) {
        $key = 'csv/general/' . $key;
@@ -78,30 +91,9 @@ try {
     // Note: We are NO LONGER saving to csv_storage table (blobs).
     // We'll mimic the logic in import_data.php but specifically for the file that was updated
     
-    // Helper to get handle from content
-    function getHandleFromContent($content) {
-        $h = fopen('php://memory', 'r+');
-        fwrite($h, $content);
-        rewind($h);
-        return $h;
-    }
-
-    if ($base_filename === 'rooms.csv') {
+    if ($base_filename === 'rooms.csv' || preg_match('/_rooms\.csv$/', $base_filename)) {
         $synced_table = 'rooms';
-        $conn->query("SET FOREIGN_KEY_CHECKS = 0");
-        $conn->query("TRUNCATE TABLE rooms");
-        $conn->query("SET FOREIGN_KEY_CHECKS = 1");
-        
-        $handle = getHandleFromContent($csv_content);
-        fgetcsv($handle); // Skip header
-        $stmt = $conn->prepare("INSERT INTO rooms (room_name, capacity) VALUES (?, ?)");
-        while (($row = fgetcsv($handle, 1000, ",")) !== FALSE) {
-            $name = $row[0] ?? 'Unknown';
-            $cap = $row[1] ?? 50;
-            $stmt->bind_param("si", $name, $cap);
-            $stmt->execute();
-        }
-        fclose($handle);
+        sync_all_room_files_to_db($conn, $b2, false);
     } 
     elseif ($base_filename === 'lecturer_availability.csv') {
         $synced_table = 'lecturers';

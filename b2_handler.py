@@ -5,8 +5,25 @@ import json
 from botocore.exceptions import ClientError
 
 class B2Handler:
-    def __init__(self, config_path='config/b2_config_python.json'):
+    def __init__(self, config_path='config/b2_config_python.json', enable_cache=False, cache_dir='temp/b2_cache'):
         self.config = {}
+        self.enable_cache = enable_cache
+        self.cache_handler = None
+        
+        # If caching is enabled, use the cache handler instead
+        if enable_cache:
+            try:
+                from b2_cache_handler import B2CacheHandler
+                self.cache_handler = B2CacheHandler(config_path, cache_dir)
+                # Copy references for compatibility
+                self.s3 = self.cache_handler.s3
+                self.bucket_name = self.cache_handler.bucket_name
+                print("[INFO] B2 Caching enabled")
+                return
+            except Exception as e:
+                print(f"[WARNING] Failed to enable B2 caching, falling back to direct mode: {e}")
+                self.enable_cache = False
+        
         # Try loading from JSON config
         if os.path.exists(config_path):
             with open(config_path, 'r') as f:
@@ -37,8 +54,20 @@ class B2Handler:
             print(f"[ERROR] Failed to initialize B2 client: {e}")
             self.s3 = None
 
-    def download_file(self, key, download_path):
+    def download_file(self, key, download_path, force=False):
+        # Use cache handler if enabled - passes through force parameter
+        if self.cache_handler:
+            try:
+                success, from_cache = self.cache_handler.download_file(key, download_path, force)
+                if force and from_cache:
+                    print(f"[WARNING] force=True but cache was used for {key}")
+                return success
+            except Exception as e:
+                print(f"[ERROR] B2CacheHandler error for {key}: {type(e).__name__}: {e}")
+                # Fall through to direct download
+        
         if not self.s3:
+            print(f"[ERROR] B2 client not initialized, cannot download {key}")
             return False
         try:
             # Create parent dirs if needed
@@ -63,12 +92,28 @@ class B2Handler:
             print(f"[INFO] Uploaded {local_path} to {key}")
             return True
         except Exception as e:
-             print(f"[ERROR] B2 Upload error for {key}: {e}")
-             return False
+            print(f"[ERROR] B2 Upload error for {key}: {e}")
+            return False
 
-    def download_folder(self, prefix, local_dir):
+    def download_folder(self, prefix, local_dir, force=False):
         """Downloads all files with a prefix to a local directory, preserving structure."""
+        # Use cache handler if enabled
+        if self.cache_handler:
+            try:
+                stats = self.cache_handler.download_folder(prefix, local_dir, force)
+                if isinstance(stats, dict):
+                    success = stats.get('success', False)
+                    count = stats.get('count', 0)
+                    if success:
+                        print(f"[INFO] Cache handler: Downloaded {count} files from B2 prefix '{prefix}' (force={force})")
+                    return success
+                return False
+            except Exception as e:
+                print(f"[ERROR] B2CacheHandler folder download failed for '{prefix}': {type(e).__name__}: {e}")
+                # Fall through to direct download
+        
         if not self.s3:
+            print(f"[ERROR] B2 client not initialized, cannot download folder {prefix}")
             return False
         try:
             paginator = self.s3.get_paginator('list_objects_v2')
@@ -90,10 +135,11 @@ class B2Handler:
                         relative_path = key
                         local_file_path = os.path.join(local_dir, relative_path)
                         
-                        self.download_file(key, local_file_path)
+                        self.download_file(key, local_file_path, force)
                         count += 1
             print(f"[INFO] Downloaded {count} files from B2 prefix '{prefix}'")
             return True
         except Exception as e:
             print(f"[ERROR] B2 Download Folder error: {e}")
             return False
+            

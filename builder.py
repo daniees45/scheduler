@@ -27,6 +27,9 @@ def build_domain(data: dict, classifier=None, confidence_threshold=0.3) -> Domai
     
     # Check if strict capacity is enabled in config
     strict_capacity = config.get('strict_capacity', False)
+    strict_dept = config.get('strict_departmental', False)
+    is_general_session = config.get('is_general_session', False)
+    
     print(f"[INFO] Strict Capacity Check: {'ENABLED' if strict_capacity else 'DISABLED'}")
     
     # Use classifier for domain pruning if available
@@ -101,28 +104,41 @@ def build_domain(data: dict, classifier=None, confidence_threshold=0.3) -> Domai
             
             # 1. Start with all non-reserved rooms
             all_available = [r for r in rooms.values() if r.id not in reserved_room_ids]
-            
-            # 2. Filter by Departmental Priority
-            grp = sec.departmental_group
-            dept_priority_rooms = []
-            
-            if grp == "CS/IT/BBIS":
-                dept_priority_rooms = [r for r in all_available if "CS" in r.id.upper() or "LAB" in r.id.upper()]
-            elif grp == "Nursing":
-                dept_priority_rooms = [r for r in all_available if "CH" in r.id.upper()]
-            elif grp == "Theology":
-                dept_priority_rooms = [r for r in all_available if "BULLEY" in r.id.upper()]
-            
-            # 3. If prioritized rooms exist, use them as primary domain. 
-            # Otherwise (or if empty), use the general pool.
-            if dept_priority_rooms:
-                candidate_rooms = dept_priority_rooms
-                # We add the general pool as secondary options to ensure we don't fail if dept rooms are full
-                # Optimization: CSP explores domains in order.
-                other_rooms = [r for r in all_available if r.id not in [dr.id for dr in dept_priority_rooms]]
-                candidate_rooms += other_rooms
-            else:
+
+            if is_general_session:
                 candidate_rooms = all_available
+            else:
+                # --- NEW: Strict Departmental Enforcement ---
+                grp = sec.departmental_group
+                
+                # Define specific room pools for strict mode
+                def is_room_match(r_dept, c_grp):
+                    rd = str(r_dept).strip().lower().replace("/", " ").replace("-", " ")
+                    cg = str(c_grp).strip().lower().replace("/", " ").replace("-", " ")
+                    if rd in ("", "nan", "none", "null"):
+                        rd = "general"
+                    if cg in ("", "nan", "none", "null"):
+                        cg = "general"
+                    return (rd == cg) or (rd in cg) or (cg in rd)
+            
+                dept_priority_rooms = [r for r in all_available if is_room_match(r.department, grp)]
+                
+                if strict_dept:
+                    if dept_priority_rooms:
+                        # Departmental/General courses MUST use their matched rooms in strict mode
+                        candidate_rooms = dept_priority_rooms
+                    else:
+                        # If no specific pool found, fall back to all available (safety) but warn
+                        candidate_rooms = all_available
+                        print(f"[WARNING] Strict mode on but no room pool found for {grp}. Using all rooms.")
+                else:
+                    # Original logic: Prioritize but allow fallback
+                    if dept_priority_rooms:
+                        candidate_rooms = dept_priority_rooms
+                        other_rooms = [r for r in all_available if r.id not in [dr.id for dr in dept_priority_rooms]]
+                        candidate_rooms += other_rooms
+                    else:
+                        candidate_rooms = all_available
 
             # --- Handle Requested Room overrides ---
             if sec.requested_room:
@@ -131,7 +147,7 @@ def build_domain(data: dict, classifier=None, confidence_threshold=0.3) -> Domai
                       # Put requested room at the very front of the candidate list
                       candidate_rooms = [rooms[r_id]] + [r for r in candidate_rooms if r.id != r_id]
             
-            # --- NEW: Optional Capacity Check ---
+            # --- Optional Capacity Check ---
             if strict_capacity:
                 original_count = len(candidate_rooms)
                 candidate_rooms = [r for r in candidate_rooms if r.capacity >= sec.enrollment]
@@ -148,7 +164,14 @@ def build_domain(data: dict, classifier=None, confidence_threshold=0.3) -> Domai
                 #This allows the solver or AI to use  'unavailable' slots as a last resort if no other options exist.
         for day, _ in enumerate(days):
             for slot_start in range(slots_per_day):
-                if is_valid_config_slot(day,slot_start, days, slots_per_day):
+                # Rule 3: 5pm Slot Constraints (General Sessions Only)
+                if is_general_session and slot_start == 3:
+                    # Slot 3 (5pm) is strictly for NC or 1.0 credit hour courses in general sessions
+                    cred = str(sec.credit_hours).strip().upper()
+                    if cred not in ["NC", "1.0", "1"]:
+                        continue  # Exclude 2.0/3.0/etc. from 5pm in general sessions
+                
+                if is_valid_config_slot(day, slot_start, days, slots_per_day):
                     for room in candidate_rooms:
                         values.append((day, slot_start, room.id))
         
@@ -157,24 +180,22 @@ def build_domain(data: dict, classifier=None, confidence_threshold=0.3) -> Domai
             original_count = len(values)
             filtered_values = []
             
-            for day_idx, slot_idx, room_id in values:
-                # Get day name and time slot
-                day_name = days[day_idx]
-                slot_name = config.get('slot_times', {}).get(slot_idx, ('Unknown', ''))
-                if isinstance(slot_name, tuple):
-                    slot_name = slot_name[0]  # Get start time
-                
-                # Predict feasibility
-                prob = classifier.predict_feasibility(
-                    sec.course_code,
-                    day_name,
-                    slot_name,
-                    enrollment=sec.enrollment
-                )
-                
-                # Keep assignment if probability meets threshold
-                if prob >= confidence_threshold:
-                    filtered_values.append((day_idx, slot_idx, room_id))
+            # Batch prediction
+            if hasattr(classifier, 'predict_feasibility_batch'):
+                probs = classifier.predict_feasibility_batch(sec.course_code, values, days, config, sec.enrollment)
+                for val, prob in zip(values, probs):
+                    if prob >= confidence_threshold:
+                        filtered_values.append(val)
+            else:
+                # Fallback to sequential
+                for day_idx, slot_idx, room_id in values:
+                    day_name = days[day_idx]
+                    slot_name = config.get('slot_times', {}).get(slot_idx, ('Unknown', ''))
+                    if isinstance(slot_name, tuple):
+                        slot_name = slot_name[0]
+                    prob = classifier.predict_feasibility(sec.course_code, day_name, slot_name, sec.enrollment)
+                    if prob >= confidence_threshold:
+                        filtered_values.append((day_idx, slot_idx, room_id))
             
             # Safety: if all values filtered out, keep at least top 10%
             if not filtered_values and original_count > 0:
@@ -184,6 +205,8 @@ def build_domain(data: dict, classifier=None, confidence_threshold=0.3) -> Domai
             domains[sec.id] = filtered_values
         else:
             domains[sec.id] = values
+            
+    domains['all_rooms'] = list(rooms.keys())
     return domains
 
 def is_valid_config_slot(day, slot_start, total_days,slots_per_day):

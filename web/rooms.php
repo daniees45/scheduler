@@ -1,251 +1,301 @@
 <?php
 $page_title = 'Manage Rooms';
+$page_css = 'assets/rooms.css';
 include 'includes/header.php';
 require_once 'api/db.php';
+require_once __DIR__ . '/../lib/B2Storage.php';
 
-// Access Control - Admin Only
 requireAdmin();
 
-// Pagination
-$per_page = 10;
-$page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
-$offset = ($page - 1) * $per_page;
+$b2 = new B2Storage();
 
-// Handlers
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['delete_id'])) {
-        $stmt = $conn->prepare("DELETE FROM rooms WHERE id = ?");
-        $stmt->bind_param("i", $_POST['delete_id']);
-        $stmt->execute();
-        
-        // Update CSV after deletion
-        syncRoomsToCSV($conn);
-        
-        header("Location: rooms.php?msg=deleted");
-        exit;
+$room_sources = [
+    ['key' => 'csv/general/rooms.csv', 'label' => 'General Rooms'],
+    ['key' => 'csv/department/computing_science_rooms.csv', 'label' => 'Computing Science Rooms'],
+    ['key' => 'csv/department/nursing_rooms.csv', 'label' => 'Nursing Rooms'],
+    ['key' => 'csv/department/theology_rooms.csv', 'label' => 'Theology Rooms'],
+    ['key' => 'csv/department/business_rooms.csv', 'label' => 'Business Rooms'],
+    ['key' => 'csv/department/education_rooms.csv', 'label' => 'Education Rooms'],
+    ['key' => 'csv/department/biomedical_engineering_rooms.csv', 'label' => 'Biomedical Engineering Rooms'],
+    ['key' => 'csv/department/development_studies_rooms.csv', 'label' => 'Development Studies Rooms'],
+];
+
+function parse_rooms_csv($csv_content)
+{
+    $rows = [];
+    $handle = fopen('php://memory', 'r+');
+    fwrite($handle, $csv_content);
+    rewind($handle);
+
+    $headers = fgetcsv($handle);
+    if (!$headers) {
+        fclose($handle);
+        return [];
     }
-    
-    if (isset($_POST['add_room'])) {
-        $name = $_POST['name'];
-        $capacity = $_POST['capacity'];
-        $type = $_POST['type'];
-        
-        $equipment = $_POST['equipment'] ?? '';
-        $access = isset($_POST['accessibility']) ? 1 : 0;
-        $dept = $_POST['primary_dept'] ?? '';
 
-        try {
-            $stmt = $conn->prepare("INSERT INTO rooms (room_name, capacity, type, equipment, accessibility, primary_dept) VALUES (?, ?, ?, ?, ?, ?)");
-            $stmt->bind_param("sissss", $name, $capacity, $type, $equipment, $access, $dept);
-            $stmt->execute();
-            
-            // Sync to CSV
-            syncRoomsToCSV($conn);
-            
-            header("Location: rooms.php?msg=added");
-            exit;
-        } catch (Exception $e) {
-            $error = "Error adding room: " . $e->getMessage();
+    $header_map = array_flip(array_map('trim', array_map('strtolower', $headers)));
+    $name_idx = $header_map['room_name'] ?? -1;
+    $cap_idx = $header_map['capacity'] ?? -1;
+
+    // Fallback if headers are not found or named differently
+    if ($name_idx === -1) $name_idx = 0;
+    if ($cap_idx === -1) $cap_idx = 1;
+
+    while (($line = fgetcsv($handle, 1000, ',')) !== false) {
+        $room_name = trim($line[$name_idx] ?? '');
+        if ($room_name === '') {
+            continue;
         }
+        $capacity = (int) ($line[$cap_idx] ?? 50);
+        if ($capacity <= 0) {
+            $capacity = 50;
+        }
+        $rows[] = [
+            'room_name' => $room_name,
+            'capacity' => $capacity,
+        ];
     }
+
+    fclose($handle);
+    return $rows;
 }
 
-function syncRoomsToCSV($conn) {
-    $csv_path = '../rooms.csv';
-    $res = $conn->query("SELECT room_name, capacity FROM rooms ORDER BY room_name ASC");
-    $rooms = $res->fetch_all(MYSQLI_ASSOC);
-    
-    $file_handle = fopen($csv_path, 'w');
-    if ($file_handle) {
-        fputcsv($file_handle, ['Room Name', 'Capacity']);
-        foreach ($rooms as $room) {
-            fputcsv($file_handle, [$room['room_name'], $room['capacity']]);
-        }
-        fclose($file_handle);
+$source_data = [];
+foreach ($room_sources as $source) {
+    $result = $b2->download($source['key']);
+    if ($result['success']) {
+        $source_data[] = [
+            'key' => $source['key'],
+            'label' => $source['label'],
+            'rows' => parse_rooms_csv($result['content']),
+            'load_error' => null,
+        ];
+    } else {
+        $source_data[] = [
+            'key' => $source['key'],
+            'label' => $source['label'],
+            'rows' => [],
+            'load_error' => $result['error'] ?? 'Failed to load from B2',
+        ];
     }
 }
-
-// Get total count
-$count_res = $conn->query("SELECT COUNT(*) as total FROM rooms");
-$count_row = $count_res->fetch_assoc();
-$total_rooms = $count_row['total'];
-$total_pages = ceil($total_rooms / $per_page);
-
-// Get paginated results
-$res = $conn->query("SELECT * FROM rooms ORDER BY room_name ASC LIMIT $offset, $per_page");
-$rooms = $res->fetch_all(MYSQLI_ASSOC) ?? [];
-
-// CSV Stats logic moved to dashboard.php
 ?>
 
-<div class="glass-panel" style="padding: 2rem;">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
-        <h2 style="margin: 0; font-size: 1.5rem;">Rooms Management</h2>
-        <button onclick="document.getElementById('addModal').style.display='flex'" class="glass-btn"><i class="fa-solid fa-plus"></i> Add Room</button>
+<div class="glass-panel rooms-panel">
+    <div class="rooms-header-row">
+        <div>
+            <h2 class="rooms-title"><i class="fa-solid fa-building"></i> Department Rooms Management</h2>
+            <p class="rooms-subtitle">Manage room name and capacity per department file from B2.</p>
+        </div>
+        <button class="glass-btn" onclick="saveCurrentSource()"><i class="fa-solid fa-floppy-disk"></i> Save to B2 + DB</button>
     </div>
-    
-    <?php if (isset($_GET['msg'])): ?>
-        <div class="alert alert-success" style="margin-bottom: 1.5rem;">
-            <i class="fa-solid fa-check-circle"></i> Action completed successfully.
-        </div>
-    <?php endif; ?>
 
-    <?php if (empty($rooms)): ?>
-        <div style="text-align: center; color: var(--text-muted); padding: 3rem;">
-            <i class="fa-solid fa-inbox" style="font-size: 3rem; opacity: 0.5; margin-bottom: 1rem; display: block;"></i>
-            <p>No rooms available. Add your first room to get started.</p>
-        </div>
-    <?php else: ?>
-    <!-- Table Container -->
-    <div style="overflow-x: auto; margin-bottom: 2rem;">
-        <table style="width: 100%; border-collapse: collapse;">
+    <div class="rooms-toolbar">
+        <select id="sourceSelect" class="glass-input" onchange="changeSource()"></select>
+        <button class="glass-btn secondary" onclick="addRoomRow()"><i class="fa-solid fa-plus"></i> Add Room</button>
+        <button class="glass-btn secondary" onclick="reloadSource()"><i class="fa-solid fa-rotate"></i> Reload</button>
+    </div>
+
+    <div id="sourceStatus" class="rooms-source-status"></div>
+
+    <div class="rooms-table-wrap">
+        <table class="rooms-table">
             <thead>
-                <tr style="border-bottom: 2px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.02);">
-                    <th style="padding: 1rem; text-align: left; color: var(--text-muted); font-weight: 600; font-size: 0.9rem;">Room Name</th>
-                    <th style="padding: 1rem; text-align: center; color: var(--text-muted); font-weight: 600; font-size: 0.9rem;">Capacity</th>
-                    <th style="padding: 1rem; text-align: center; color: var(--text-muted); font-weight: 600; font-size: 0.9rem;">Type</th>
-                    <th style="padding: 1rem; text-align: left; color: var(--text-muted); font-weight: 600; font-size: 0.9rem;">Department</th>
-                    <th style="padding: 1rem; text-align: center; color: var(--text-muted); font-weight: 600; font-size: 0.9rem;">Features</th>
-                    <th style="padding: 1rem; text-align: center; color: var(--text-muted); font-weight: 600; font-size: 0.9rem;">Actions</th>
+                <tr class="rooms-table-head-row">
+                    <th class="rooms-head-cell">Room Name</th>
+                    <th class="rooms-head-cell rooms-capacity-col">Capacity</th>
+                    <th class="rooms-head-cell rooms-action-col">Action</th>
                 </tr>
             </thead>
-            <tbody>
-                <?php foreach ($rooms as $room): ?>
-                <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background='transparent'">
-                    <td style="padding: 1rem; font-weight: 500;">
-                        <div><?php echo htmlspecialchars($room['room_name']); ?></div>
-                        <?php if ($room['equipment']): ?>
-                            <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem;"><i class="fa-solid fa-plug"></i> <?php echo htmlspecialchars(substr($room['equipment'], 0, 25)) . (strlen($room['equipment'])>25?'...':''); ?></div>
-                        <?php endif; ?>
-                    </td>
-                    <td style="padding: 1rem; text-align: center;">
-                        <span style="background: rgba(99, 102, 241, 0.2); color: var(--primary); padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.85rem; font-weight: 600;"><?php echo $room['capacity']; ?></span>
-                    </td>
-                    <td style="padding: 1rem; text-align: center;">
-                        <span style="background: rgba(168, 85, 247, 0.2); color: #a855f7; padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.85rem;"><?php echo $room['type']; ?></span>
-                    </td>
-                    <td style="padding: 1rem;">
-                        <?php if ($room['primary_dept']): ?>
-                            <span style="background: rgba(245, 158, 11, 0.2); color: var(--warning); padding: 0.25rem 0.75rem; border-radius: 12px; font-size: 0.85rem;"><i class="fa-solid fa-star" style="margin-right: 0.25rem;"></i><?php echo htmlspecialchars($room['primary_dept']); ?></span>
-                        <?php else: ?>
-                            <span style="color: var(--text-muted); font-size: 0.9rem;">—</span>
-                        <?php endif; ?>
-                    </td>
-                    <td style="padding: 1rem; text-align: center;">
-                        <?php if ($room['accessibility']): ?>
-                            <span title="Wheelchair Accessible" style="background: rgba(16, 185, 129, 0.2); color: #10b981; padding: 0.4rem 0.6rem; border-radius: 6px; display: inline-block;"><i class="fa-solid fa-wheelchair"></i></span>
-                        <?php endif; ?>
-                    </td>
-                    <td style="padding: 1rem; text-align: center;">
-                        <div style="display: flex; gap: 0.5rem; justify-content: center;">
-                            <a href="edit_room.php?id=<?php echo $room['id']; ?>" class="glass-btn" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; text-decoration: none; display: inline-flex; align-items: center; gap: 0.25rem;">
-                                <i class="fa-solid fa-pen"></i> Edit
-                            </a>
-                            <form method="POST" style="display: inline;" onsubmit="confirmAction(event, 'Delete Room', 'Are you sure you want to delete <?php echo htmlspecialchars(preg_replace("/'/", "\\\\", $room['room_name'])); ?>?')">
-                                <input type="hidden" name="delete_id" value="<?php echo $room['id']; ?>">
-                                <button type="submit" class="glass-btn" style="padding: 0.4rem 0.8rem; font-size: 0.85rem; color: var(--danger); background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3);">
-                                    <i class="fa-solid fa-trash"></i> Delete
-                                </button>
-                            </form>
-                        </div>
-                    </td>
-                </tr>
-                <?php endforeach; ?>
-            </tbody>
+            <tbody id="roomsBody"></tbody>
         </table>
     </div>
-
-    <!-- Pagination -->
-    <?php if ($total_pages > 1): ?>
-    <div style="display: flex; justify-content: center; align-items: center; gap: 0.5rem; margin-top: 2rem; flex-wrap: wrap;">
-        <?php if ($page > 1): ?>
-            <a href="rooms.php?page=1" class="glass-btn secondary" style="padding: 0.5rem 0.75rem; font-size: 0.85rem; text-decoration: none;">
-                <i class="fa-solid fa-angles-left"></i>
-            </a>
-            <a href="rooms.php?page=<?php echo $page - 1; ?>" class="glass-btn secondary" style="padding: 0.5rem 0.75rem; font-size: 0.85rem; text-decoration: none;">
-                <i class="fa-solid fa-angle-left"></i> Prev
-            </a>
-        <?php endif; ?>
-        
-        <div style="display: flex; gap: 0.25rem;">
-            <?php 
-            $start = max(1, $page - 2);
-            $end = min($total_pages, $page + 2);
-            
-            if ($start > 1) echo '<span style="padding: 0 0.5rem; color: var(--text-muted);">...</span>';
-            
-            for ($i = $start; $i <= $end; $i++): ?>
-                <?php if ($i == $page): ?>
-                    <span style="padding: 0.5rem 0.75rem; background: var(--primary); border-radius: 4px; font-weight: 600; font-size: 0.85rem;"><?php echo $i; ?></span>
-                <?php else: ?>
-                    <a href="rooms.php?page=<?php echo $i; ?>" class="glass-btn secondary" style="padding: 0.5rem 0.75rem; font-size: 0.85rem; text-decoration: none;"><?php echo $i; ?></a>
-                <?php endif; ?>
-            <?php endfor;
-            
-            if ($end < $total_pages) echo '<span style="padding: 0 0.5rem; color: var(--text-muted);">...</span>';
-            ?>
-        </div>
-        
-        <?php if ($page < $total_pages): ?>
-            <a href="rooms.php?page=<?php echo $page + 1; ?>" class="glass-btn secondary" style="padding: 0.5rem 0.75rem; font-size: 0.85rem; text-decoration: none;">
-                Next <i class="fa-solid fa-angle-right"></i>
-            </a>
-            <a href="rooms.php?page=<?php echo $total_pages; ?>" class="glass-btn secondary" style="padding: 0.5rem 0.75rem; font-size: 0.85rem; text-decoration: none;">
-                <i class="fa-solid fa-angles-right"></i>
-            </a>
-        <?php endif; ?>
-    </div>
-    <div style="text-align: center; color: var(--text-muted); font-size: 0.85rem; margin-top: 1rem;">
-        Showing <?php echo $offset + 1; ?> to <?php echo min($offset + $per_page, $total_rooms); ?> of <?php echo $total_rooms; ?> rooms
-    </div>
-    <?php endif; ?>
-    <?php endif; ?>
 </div>
 
-<!-- Add Modal -->
-<div id="addModal" style="display: none; position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.8); z-index: 1000; justify-content: center; align-items: center;">
-    <div class="glass-panel" style="width: 100%; max-width: 400px; padding: 2rem;">
-        <h3 style="margin-bottom: 1.5rem;">Add Room</h3>
-        <form method="POST">
-            <input type="hidden" name="add_room" value="1">
-            <div style="display: grid; gap: 1rem;">
-                <div>
-                    <label style="font-size: 0.9rem; color: var(--text-muted);">Room Name</label>
-                    <input type="text" name="name" class="glass-input" required placeholder="e.g. CS Lab 1">
-                </div>
-                <div>
-                    <label style="font-size: 0.9rem; color: var(--text-muted);">Capacity</label>
-                    <input type="number" name="capacity" class="glass-input" required value="50">
-                </div>
-                <div>
-                    <label style="font-size: 0.9rem; color: var(--text-muted);">Type</label>
-                    <select name="type" class="glass-input" style="background: rgba(15,23,42,0.9);">
-                        <option value="Lecture">Lecture Hall</option>
-                        <option value="Lab">Laboratory</option>
-                        <option value="Auditorium">Auditorium</option>
-                    </select>
-                </div>
-                <div>
-                     <label style="font-size: 0.9rem; color: var(--text-muted);">Primary Department (Optional)</label>
-                     <input type="text" name="primary_dept" class="glass-input" placeholder="e.g. Nursing">
-                </div>
-                <div>
-                     <label style="font-size: 0.9rem; color: var(--text-muted);">Equipment (comma separated)</label>
-                     <textarea name="equipment" class="glass-input" rows="2" placeholder="Projector, Smartboard..."></textarea>
-                </div>
-                <div>
-                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                        <input type="checkbox" name="accessibility" value="1">
-                        <span style="font-size: 0.9rem; color: var(--text-muted);">Wheelchair Accessible</span>
-                    </label>
-                </div>
-                <div style="display: flex; gap: 10px; margin-top: 1rem;">
-                    <button type="submit" class="glass-btn" style="flex: 1;">Save</button>
-                    <button type="button" onclick="document.getElementById('addModal').style.display='none'" class="glass-btn secondary">Cancel</button>
-                </div>
-            </div>
-        </form>
-    </div>
-</div>
+<script>
+const roomSources = <?php echo json_encode($source_data, JSON_UNESCAPED_UNICODE); ?>;
+let selectedKey = roomSources.length ? roomSources[0].key : null;
+let workingRows = [];
+
+function sourceByKey(key) {
+    return roomSources.find(source => source.key === key) || null;
+}
+
+function renderSourceSelect() {
+    const select = document.getElementById('sourceSelect');
+    select.innerHTML = '';
+
+    roomSources.forEach(source => {
+        const opt = document.createElement('option');
+        opt.value = source.key;
+        opt.textContent = `${source.label} (${source.rows.length})`;
+        if (source.key === selectedKey) {
+            opt.selected = true;
+        }
+        select.appendChild(opt);
+    });
+}
+
+function renderRows() {
+    const tbody = document.getElementById('roomsBody');
+    tbody.innerHTML = '';
+
+    workingRows.forEach((row, index) => {
+        const tr = document.createElement('tr');
+        tr.className = 'rooms-table-row';
+        tr.innerHTML = `
+            <td class="rooms-body-cell">
+                <input class="glass-input rooms-input" value="${escapeHtml(row.room_name)}" onchange="updateRoomName(${index}, this.value)">
+            </td>
+            <td class="rooms-body-cell">
+                <input type="number" min="1" class="glass-input rooms-input" value="${parseInt(row.capacity || 50, 10)}" onchange="updateCapacity(${index}, this.value)">
+            </td>
+            <td class="rooms-body-cell rooms-action-cell">
+                <button class="glass-btn secondary small" onclick="removeRow(${index})"><i class="fa-solid fa-trash"></i></button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function renderStatus() {
+    const source = sourceByKey(selectedKey);
+    const status = document.getElementById('sourceStatus');
+    if (!source) {
+        status.textContent = 'No room source available.';
+        return;
+    }
+
+    if (source.load_error) {
+        status.innerHTML = `<span class="rooms-status-warning">Loaded with warning: ${escapeHtml(source.load_error)}</span>`;
+        return;
+    }
+
+    status.textContent = `${source.label} · ${workingRows.length} room(s)`;
+}
+
+async function fetchSourceFromServer(key) {
+    try {
+        const res = await fetch(`api/get_room_source.php?source_key=${encodeURIComponent(key)}`);
+        const payload = await res.json();
+        if (payload && payload.status === 'success' && Array.isArray(payload.rooms)) {
+            const source = sourceByKey(key);
+            if (source) {
+                source.rows = payload.rooms.map(r => ({
+                    room_name: String(r.room_name || '').trim(),
+                    capacity: parseInt(r.capacity, 10) || 50
+                }));
+                source.load_error = null;
+            }
+            return true;
+        }
+    } catch (error) {
+        console.error('Failed to fetch source from server:', error);
+    }
+    return false;
+}
+
+function changeSource() {
+    selectedKey = document.getElementById('sourceSelect').value;
+    const source = sourceByKey(selectedKey);
+    workingRows = source ? source.rows.map(room => ({ ...room })) : [];
+    renderRows();
+    renderStatus();
+}
+
+function addRoomRow() {
+    workingRows.push({ room_name: '', capacity: 50 });
+    renderRows();
+    renderStatus();
+}
+
+function removeRow(index) {
+    workingRows.splice(index, 1);
+    renderRows();
+    renderStatus();
+}
+
+function updateRoomName(index, value) {
+    workingRows[index].room_name = value;
+}
+
+function updateCapacity(index, value) {
+    const parsed = parseInt(value, 10);
+    workingRows[index].capacity = Number.isFinite(parsed) && parsed > 0 ? parsed : 50;
+}
+
+async function reloadSource() {
+    if (!selectedKey) return;
+    await fetchSourceFromServer(selectedKey);
+    changeSource();
+}
+
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+async function saveCurrentSource() {
+    if (!selectedKey) {
+        await showAlert('No room source selected.', 'Save Error');
+        return;
+    }
+
+    const cleanRows = workingRows
+        .map(row => ({
+            room_name: String(row.room_name || '').trim(),
+            capacity: parseInt(row.capacity, 10) || 50
+        }))
+        .filter(row => row.room_name.length > 0)
+        .map(row => [row.room_name, row.capacity]);
+
+    if (cleanRows.length === 0) {
+        await showAlert('Add at least one room before saving.', 'Validation');
+        return;
+    }
+
+    const payload = {
+        file: selectedKey,
+        data: [['room_name', 'capacity'], ...cleanRows]
+    };
+
+    try {
+        const res = await fetch('api/save_csv.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+
+        if (data.status !== 'success') {
+            await showAlert(data.message || 'Failed to save room file.', 'Save Error');
+            return;
+        }
+
+        const source = sourceByKey(selectedKey);
+        if (source) {
+            source.rows = cleanRows.map(row => ({ room_name: row[0], capacity: row[1] }));
+            source.load_error = null;
+        }
+
+        await fetchSourceFromServer(selectedKey);
+
+        workingRows = cleanRows.map(row => ({ room_name: row[0], capacity: row[1] }));
+        renderSourceSelect();
+        renderRows();
+        renderStatus();
+        await showAlert('Saved to B2 and synced to database successfully.', 'Success');
+    } catch (error) {
+        await showAlert('Save failed: ' + error.message, 'Save Error');
+    }
+}
+
+renderSourceSelect();
+changeSource();
+</script>
 
 <?php include 'includes/footer.php'; ?>

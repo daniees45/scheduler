@@ -1,0 +1,217 @@
+{
+  "Akua K. Amponsah": {
+    "avg_courses_per_semester": 3,
+    "preferred_days": [
+      "Monday",
+      "Wednesday"
+    ],
+    "preferred_times": [
+      "7:00am - 9:30am",
+      "10:00am - 12:30pm"
+    ],
+    "max_consecutive_classes": 2,
+    "quality_score": 0.95,
+    "total_assignments": 2,
+    "unique_days_taught": 1,
+    "assignment_history": [
+      {
+        "timestamp": "2026-02-22T09:50:00.733355",
+        "courses": 1
+      },
+      {
+        "timestamp": "2026-02-25T18:44:22.430699",
+        "courses": 1
+      }
+    ]
+  },
+  "Dr. F. Tenortey": {
+    "avg_courses_per_semester": 4,
+    "preferred_days": [
+      "Tuesday",
+      "Thursday",
+      "Friday"
+    ],
+    "preferred_times": [
+      "7:00am - 9:30am"
+    ],
+    "max_consecutive_classes": 3,
+    "quality_score": 0.92,
+    "total_assignments": 3,
+    "unique_days_taught": 1,
+    "assignment_history": [
+      {
+        "timestamp": "2026-02-22T09:50:00.733355",
+        "courses": 2
+      },
+      {
+        "timestamp": "2026-02-25T18:44:22.430699",
+        "courses": 1
+      }
+    ]
+  },
+  "Dr. A. Oye": {
+    "avg_courses_per_semester": 2,
+    "preferred_days": [
+      "Monday",
+      "Wednesday"
+    ],
+    "preferred_times": [
+      "10:00am - 12:30pm",
+      "2:00pm - 4:30pm"
+    ],
+    "max_consecutive_classes": 1,
+    "quality_score": 0.88,
+    "total_assignments": 3,
+    "unique_days_taught": 1,
+    "assignment_history": [
+      {
+        "timestamp": "2026-02-22T09:50:00.733355",
+        "courses": 2
+      },
+      {
+        "timestamp": "2026-02-25T18:44:22.430699",
+        "courses": 1
+      }
+    ]
+  },
+  "Ama O. Karikari": {
+    "total_assignments": 3,
+    "unique_days_taught": 1,
+    "assignment_history": [
+      {
+        "timestamp": "2026-02-22T09:50:00.733355",
+        "courses": 2
+      },
+      {
+        "timestamp": "2026-02-25T18:44:22.430699",
+        "courses": 1
+      }
+    ]
+  },
+  "C. Pokuaa": {
+    "total_assignments": 2,
+    "unique_days_taught": 1,
+    "assignment_history": [
+      {
+        "timestamp": "2026-02-22T09:50:00.733355",
+        "courses": 1
+      },
+      {
+        "timestamp": "2026-02-25T18:44:22.430699",
+        "courses": 1
+      }
+    ]
+  },
+  "Dr. D. Dovie": {
+    "total_assignments": 2,
+    "unique_days_taught": 1,
+    "assignment_history": [
+      {
+        "timestamp": "2026-02-22T09:50:00.733355",
+        "courses": 1
+      },
+      {
+        "timestamp": "2026-02-25T18:44:22.430699",
+        "courses": 1
+      }
+    ]
+  },
+  "Dr. J. Andor": {
+    "total_assignments": 2,
+    "unique_days_taught": 1,
+    "assignment_history": [
+      {
+        "timestamp": "2026-02-22T09:50:00.733355",
+        "courses": 1
+      },
+      {
+        "timestamp": "2026-02-25T18:44:22.430699",
+        "courses": 1
+      }
+    ]
+  },
+  "Dr. S. Adjei-Mensah": {
+    "total_assignments": 4,
+    "unique_days_taught": 1,
+    "assignment_history": [
+      {
+        "timestamp": "2026-02-22T09:50:00.733355",
+        "courses": 3
+      },
+      {
+        "timestamp": "2026-02-25T18:44:22.430699",
+        "courses": 1
+      }
+    ]
+  },
+  "E. Boahen": {
+    "total_assignments": 2,
+    "unique_days_taught": 1,
+    "assignment_history": [
+      {
+        "timestamp": "2026-02-22T09:50:00.733355",
+        "courses": 1
+      },
+      {
+        "timestamp": "2026-02-25T18:44:22.430699",
+        "courses": 1
+      }
+    ]
+  },
+  "F. Opoku": {
+    "total_assignments": 2,
+    "unique_days_taught": 1,
+    "assignment_history": [
+      {
+        "timestamp": "2026-02-22T09:50:00.733355",
+        "courses": 1
+      },
+      {
+        "timestamp": "2026-02-25T18:44:22.430699",
+        "courses": 1
+      }
+    ]
+  },
+  "K. Oheneba Nti": {
+    "total_assignments": 2,
+    "unique_days_taught": 1,
+    "assignment_history": [
+      {
+        "timestamp": "2026-02-22T09:50:00.733355",
+        "courses": 1
+      },
+      {
+        "timestamp": "2026-02-25T18:44:22.430699",
+        "courses": 1
+      }
+    ]
+  },
+  "O. Osei-Tutu": {
+    "total_assignments": 2,
+    "unique_days_taught": 1,
+    "assignment_history": [
+      {
+        "timestamp": "2026-02-22T09:50:00.733355",
+        "courses": 1
+      },
+      {
+        "timestamp": "2026-02-25T18:44:22.430699",
+        "courses": 1
+      }
+    ]
+  },
+  "Ps. I. Kyere": {
+    "total_assignments": 2,
+    "unique_days_taught": 1,
+    "assignment_history": [
+      {
+        "timestamp": "2026-02-22T09:50:00.733355",
+        "courses": 1
+      },
+      {
+        "timestamp": "2026-02-25T18:44:22.430699",
+        "courses": 1
+      }
+    ]
+  }
+}

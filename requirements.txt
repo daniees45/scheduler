@@ -15,3 +15,4 @@ scikit-learn
 # shap - For model explainability (may have build issues on some systems)
 # Try: pip install shap or use conda: conda install -c conda-forge shap
 boto3
+gunicorn

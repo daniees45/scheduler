@@ -81,3 +81,162 @@ async function confirmAction(event, title, message) {
     }
     return false;
 }
+/* ============================================================================
+   MOBILE-SPECIFIC ENHANCEMENTS
+   ============================================================================ */
+
+/**
+ * Detect if device is mobile
+ */
+function isMobileDevice() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+           window.innerWidth <= 768;
+}
+
+/**
+ * Detect if device is touchscreen
+ */
+function isTouchDevice() {
+    return (('ontouchstart' in window) ||
+            (navigator.maxTouchPoints > 0) ||
+            (navigator.msMaxTouchPoints > 0));
+}
+
+/**
+ * Mobile menu utility
+ */
+const MobileMenu = {
+    init: function() {
+        const toggle = document.getElementById('mobileMenuToggle');
+        const close = document.getElementById('mobileMenuClose');
+        const nav = document.getElementById('navigation');
+        const navLinks = document.getElementById('navLinks');
+        
+        if (!toggle || !nav) return;
+        
+        // Prevent double touch on mobile
+        if (isTouchDevice()) {
+            ['button', 'a'].forEach(selector => {
+                document.querySelectorAll(selector).forEach(el => {
+                    el.addEventListener('touchstart', function() {
+                        this.style.backgroundColor = 'rgba(255,255,255,0.1)';
+                    });
+                    el.addEventListener('touchend', function() {
+                        this.style.backgroundColor = '';
+                    });
+                });
+            });
+        }
+    }
+};
+
+/**
+ * Responsive table enhancements
+ */
+const ResponsiveTable = {
+    convertToCards: function(table) {
+        if (window.innerWidth > 768) return;
+        
+        // Add data-label attributes if they don't exist
+        const headers = Array.from(table.querySelectorAll('thead th')).map(th => th.textContent.trim());
+        
+        table.querySelectorAll('tbody tr').forEach(row => {
+            row.querySelectorAll('td').forEach((cell, index) => {
+                if (!cell.dataset.label && headers[index]) {
+                    cell.dataset.label = headers[index];
+                }
+            });
+        });
+    },
+    
+    init: function() {
+        document.querySelectorAll('table').forEach(table => {
+            this.convertToCards(table);
+        });
+    }
+};
+
+/**
+ * Optimized inputs for mobile
+ */
+const MobileInputs = {
+    init: function() {
+        if (!isMobileDevice()) return;
+        
+        // Add proper input types for mobile keyboards
+        document.querySelectorAll('input[type="text"]').forEach(input => {
+            const name = input.name || input.placeholder || '';
+            if (name.toLowerCase().includes('email')) input.type = 'email';
+            if (name.toLowerCase().includes('phone')) input.type = 'tel';
+            if (name.toLowerCase().includes('number')) input.type = 'number';
+            if (name.toLowerCase().includes('date')) input.type = 'date';
+            if (name.toLowerCase().includes('time')) input.type = 'time';
+        });
+        
+        // Increase input height for easier tapping
+        document.querySelectorAll('.glass-input, input[type="text"], input[type="email"], input[type="tel"], select, textarea').forEach(el => {
+            const minHeight = el.tagName === 'TEXTAREA' ? '80px' : '44px';
+            if (!el.style.minHeight) {
+                el.style.minHeight = minHeight;
+            }
+        });
+    }
+};
+
+/**
+ * Viewport height fix for mobile browsers with address bars
+ */
+const ViewportFix = {
+    init: function() {
+        if (!isMobileDevice()) return;
+        
+        const vh = window.innerHeight * 0.01;
+        document.documentElement.style.setProperty('--vh', `${vh}px`);
+        
+        window.addEventListener('resize', () => {
+            const vh = window.innerHeight * 0.01;
+            document.documentElement.style.setProperty('--vh', `${vh}px`);
+        });
+    }
+};
+
+/**
+ * Initialize all mobile enhancements on page load
+ */
+document.addEventListener('DOMContentLoaded', function() {
+    if (isMobileDevice() || isTouchDevice()) {
+        MobileMenu.init();
+        ResponsiveTable.init();
+        MobileInputs.init();
+        ViewportFix.init();
+        
+        // Add mobile class to body
+        document.body.classList.add('is-mobile');
+    }
+});
+
+/**
+ * Handle orientation changes
+ */
+window.addEventListener('orientationchange', function() {
+    // Reflow responsive elements
+    ResponsiveTable.init();
+    
+    // Update viewport height on orientation change
+    if (isMobileDevice()) {
+        const vh = window.innerHeight * 0.01;
+        document.documentElement.style.setProperty('--vh', `${vh}px`);
+    }
+});
+
+/**
+ * Prevent zoom on double-tap (for better mobile UX)
+ */
+let lastTouchEnd = 0;
+document.addEventListener('touchend', function(event) {
+    const now = Date.now();
+    if (now - lastTouchEnd <= 300) {
+        event.preventDefault();
+    }
+    lastTouchEnd = now;
+}, false);

@@ -1,0 +1,184 @@
+/* ============================================================
+   schedules.css — Generated Schedules page styles
+   ============================================================ */
+
+/* ----- Main container --------------------------------------- */
+.schedules-container {
+    padding: 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+/* ----- Hero header ----------------------------------------- */
+.schedules-hero {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.schedules-icon-wrap {
+    width: 80px;
+    height: 80px;
+    background: linear-gradient(135deg, #10b981, #3b82f6);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1rem;
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.5);
+}
+
+.schedules-icon {
+    font-size: 2rem;
+    color: white;
+}
+
+.schedules-subtitle {
+    color: var(--text-muted);
+}
+
+/* ----- Filters --------------------------------------------- */
+.schedules-filters {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.schedules-filter-select {
+    flex: 1;
+    min-width: 200px;
+}
+
+.schedules-refresh-btn {
+    min-width: 120px;
+}
+
+/* ----- Loading / empty states (JS-generated) --------------- */
+.schedules-loading {
+    text-align: center;
+    padding: 3rem;
+    color: var(--text-muted);
+}
+
+.schedules-loading-icon {
+    font-size: 2rem;
+    margin-bottom: 1rem;
+}
+
+.schedules-empty {
+    text-align: center;
+    padding: 3rem;
+    color: var(--text-muted);
+}
+
+.schedules-empty-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+/* ----- Schedules table ------------------------------------- */
+.schedules-table-wrap {
+    overflow-x: auto;
+    border: 1px solid rgba(99, 102, 241, 0.25);
+    border-radius: 12px;
+    background: rgba(15, 23, 42, 0.45);
+}
+
+.schedules-table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 980px;
+}
+
+.schedules-table th,
+.schedules-table td {
+    padding: 0.8rem 0.9rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    text-align: left;
+    vertical-align: middle;
+}
+
+.schedules-table th {
+    color: var(--text-muted);
+    font-size: 0.83rem;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+.schedules-table tbody tr:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+/* ----- Schedule cards (from embedded <style>) -------------- */
+.schedule-card {
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    transition: all 0.3s ease;
+}
+
+.schedule-card:hover {
+    border-color: rgba(99, 102, 241, 0.6);
+    box-shadow: 0 4px 20px rgba(99, 102, 241, 0.3);
+    transform: translateY(-2px);
+}
+
+.schedule-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.schedule-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: white;
+    margin: 0;
+}
+
+.schedule-meta {
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 1rem;
+}
+
+.meta-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+}
+
+.schedule-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.badge {
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.badge-saved {
+    background: rgba(16, 185, 129, 0.2);
+    color: #10b981;
+}
+
+.badge-unsaved {
+    background: rgba(251, 146, 60, 0.2);
+    color: #fb923c;
+}
+
+/* ----- Save-to-DB button ----------------------------------- */
+.schedules-save-btn {
+    background: linear-gradient(135deg, #10b981, #059669);
+}

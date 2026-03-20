@@ -10,7 +10,7 @@
  * - Uniqueness constraints
  */
 
-header('Content-Type: application/json');
+// Header set by calling endpoint, not here (this is a utility library)
 require_once 'db.php';
 
 /**
@@ -51,6 +51,51 @@ function validate_csv_structure($file_path, $expected_headers) {
 }
 
 /**
+ * Check ONLY the CSV headers (column names)
+ * Returns error details if headers are missing or invalid
+ */
+function check_csv_headers_only($file_path, $expected_headers) {
+    if (!file_exists($file_path)) {
+        return ['valid' => false, 'error' => 'File not found: ' . $file_path];
+    }
+    
+    $handle = fopen($file_path, 'r');
+    if (!$handle) {
+        return ['valid' => false, 'error' => 'Cannot open file for reading'];
+    }
+    
+    $headers = fgetcsv($handle);
+    fclose($handle);
+    
+    if (!$headers || count($headers) === 0) {
+        return ['valid' => false, 'error' => 'CSV file is empty or has no headers'];
+    }
+    
+    // Normalize headers (trim whitespace for comparison)
+    $headers_trimmed = array_map('trim', $headers);
+    $expected_trimmed = array_map('strtolower', $expected_headers);
+    $actual_trimmed = array_map('strtolower', $headers_trimmed);
+    
+    // Check for missing required columns
+    $missing = array_diff($expected_trimmed, $actual_trimmed);
+    if (!empty($missing)) {
+        return [
+            'valid' => false, 
+            'error' => 'Missing required columns: ' . implode(', ', $missing),
+            'expected' => $expected_headers,
+            'found' => $headers_trimmed,
+            'missing' => $missing
+        ];
+    }
+    
+    return [
+        'valid' => true, 
+        'headers' => $headers_trimmed,
+        'count' => count($headers_trimmed)
+    ];
+}
+
+/**
  * Validate CSV data (courses)
  */
 function validate_courses_csv($file_path) {
@@ -76,6 +121,13 @@ function validate_courses_csv($file_path) {
     
     while (($row = fgetcsv($handle)) !== FALSE) {
         $row_num++;
+        // Robustness: Skip empty rows or mismatched columns
+        if (empty($row) || (count($row) === 1 && $row[0] === null)) continue;
+        if (count($headers) !== count($row)) {
+            $warnings[] = "Row $row_num: Skip due to column count mismatch";
+            continue;
+        }
+        
         $data = array_combine($headers, $row);
         
         // Validate course_code (not empty)
@@ -175,6 +227,13 @@ function validate_lecturer_availability_csv($file_path) {
     
     while (($row = fgetcsv($handle)) !== FALSE) {
         $row_num++;
+        // Robustness: Skip empty rows or mismatched columns
+        if (empty($row) || (count($row) === 1 && $row[0] === null)) continue;
+        if (count($headers) !== count($row)) {
+            $errors[] = "Row $row_num: Column count mismatch";
+            continue;
+        }
+        
         $data = array_combine($headers, $row);
         
         // Validate lecturer exists
@@ -227,65 +286,7 @@ function validate_rooms_csv($file_path) {
     if (!$struct_check['valid']) {
         return $struct_check;
     }
-    function validate_exam_csv($file_path) {
-        if (!file_exists($file_path)) {
-            return ['valid' => false, 'error' => 'File not found: ' . $file_path];
-        }
 
-        $handle = fopen($file_path, 'r');
-        if (!$handle) {
-            return ['valid' => false, 'error' => 'Cannot open file for reading'];
-        }
-
-        $headers = fgetcsv($handle);
-        if (!$headers) {
-            fclose($handle);
-            return ['valid' => false, 'error' => 'CSV file is empty or unreadable'];
-        }
-
-        $normalize = static function ($h) {
-            $h = strtolower(trim((string)$h));
-            $h = str_replace(' ', '_', $h);
-            return $h;
-        };
-
-        $normalized = array_map($normalize, $headers);
-        $required = ['course_code', 'course_title'];
-        $missing = array_diff($required, $normalized);
-        if (!empty($missing)) {
-            fclose($handle);
-            return ['valid' => false, 'error' => 'Missing required columns: ' . implode(', ', $missing)];
-        }
-
-        $errors = [];
-        $row_num = 1;
-        while (($row = fgetcsv($handle)) !== false) {
-            $row_num++;
-            $data = array_combine($normalized, $row);
-            if (empty(trim($data['course_code'] ?? ''))) {
-                $errors[] = "Row $row_num: course_code is empty";
-            }
-            if (empty(trim($data['course_title'] ?? ''))) {
-                $errors[] = "Row $row_num: course_title is empty";
-            }
-            if (count($errors) > 50) {
-                $errors[] = "... (stopped after 50 errors)";
-                break;
-            }
-        }
-        fclose($handle);
-
-        if (!empty($errors)) {
-            return [
-                'valid' => false,
-                'errors' => $errors,
-                'error_count' => count($errors)
-            ];
-        }
-
-        return ['valid' => true, 'message' => 'Exam CSV validation passed'];
-    }
-    
     $errors = [];
     $row_num = 1;
     
@@ -296,6 +297,13 @@ function validate_rooms_csv($file_path) {
     
     while (($row = fgetcsv($handle)) !== FALSE) {
         $row_num++;
+        // Robustness: Skip empty rows or mismatched columns
+        if (empty($row) || (count($row) === 1 && $row[0] === null)) continue;
+        if (count($headers) !== count($row)) {
+            $errors[] = "Row $row_num: Column count mismatch (expected " . count($headers) . ", got " . count($row) . ")";
+            continue;
+        }
+        
         $data = array_combine($headers, $row);
         
         // Validate room_name
@@ -337,6 +345,72 @@ function validate_rooms_csv($file_path) {
     }
     
     return ['valid' => true, 'message' => 'Rooms CSV validation passed'];
+}
+
+function validate_exam_csv($file_path) {
+    if (!file_exists($file_path)) {
+        return ['valid' => false, 'error' => 'File not found: ' . $file_path];
+    }
+
+    $handle = fopen($file_path, 'r');
+    if (!$handle) {
+        return ['valid' => false, 'error' => 'Cannot open file for reading'];
+    }
+
+    $headers = fgetcsv($handle);
+    if (!$headers) {
+        fclose($handle);
+        return ['valid' => false, 'error' => 'CSV file is empty or unreadable'];
+    }
+
+    $normalize = static function ($h) {
+        $h = strtolower(trim((string)$h));
+        $h = str_replace(' ', '_', $h);
+        return $h;
+    };
+
+    $normalized = array_map($normalize, $headers);
+    $required = ['course_code', 'course_title'];
+    $missing = array_diff($required, $normalized);
+    if (!empty($missing)) {
+        fclose($handle);
+        return ['valid' => false, 'error' => 'Missing required columns: ' . implode(', ', $missing)];
+    }
+
+    $errors = [];
+    $row_num = 1;
+    while (($row = fgetcsv($handle)) !== false) {
+        $row_num++;
+        // Robustness: Skip empty rows or mismatched columns
+        if (empty($row) || (count($row) === 1 && $row[0] === null)) continue;
+        if (count($normalized) !== count($row)) {
+            $errors[] = "Row $row_num: Column count mismatch (expected " . count($normalized) . ", got " . count($row) . ")";
+            continue;
+        }
+        
+        $data = array_combine($normalized, $row);
+        if (empty(trim($data['course_code'] ?? ''))) {
+            $errors[] = "Row $row_num: course_code is empty";
+        }
+        if (empty(trim($data['course_title'] ?? ''))) {
+            $errors[] = "Row $row_num: course_title is empty";
+        }
+        if (count($errors) > 50) {
+            $errors[] = "... (stopped after 50 errors)";
+            break;
+        }
+    }
+    fclose($handle);
+
+    if (!empty($errors)) {
+        return [
+            'valid' => false,
+            'errors' => $errors,
+            'error_count' => count($errors)
+        ];
+    }
+
+    return ['valid' => true, 'message' => 'Exam CSV validation passed'];
 }
 
 /**

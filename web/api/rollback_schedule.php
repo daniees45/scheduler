@@ -13,11 +13,29 @@
  */
 
 header('Content-Type: application/json');
+
+// Start output buffering to prevent stray output from corrupting JSON response
+ob_start();
+
 require_once 'db.php';
 require_once 'error_handler.php';
 
-// Ensure admin only
-if (($_SESSION['user_role'] ?? null) !== 'super_admin') {
+// Clean any stray output from includes
+ob_end_clean();
+ob_start();
+
+// Check if database connection failed
+if (!empty($GLOBALS['db_connection_error']) || !isset($conn) || $conn->connect_error) {
+    ob_end_clean();
+    http_response_code(500);
+    $error_msg = $GLOBALS['db_connection_error'] ?? ($conn->connect_error ?? 'Database not initialized');
+    echo json_encode(['error' => 'Database connection failed: ' . $error_msg]);
+    exit;
+}
+
+// Ensure admin only (Super Admin or Faculty Admin)
+if (!isset($_SESSION['role']) || !in_array($_SESSION['role'], ['super_admin', 'faculty_admin'])) {
+    ob_end_clean();
     http_response_code(403);
     echo json_encode(['error' => 'Access denied - admin only']);
     exit;
@@ -288,43 +306,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $name = $_POST['name'] ?? '';
         $description = $_POST['description'] ?? '';
         $result = create_schedule_backup($name, $description);
+        ob_end_clean();
         echo json_encode($result);
         
     } elseif ($action === 'restore') {
         $backup_id = (int)($_POST['backup_id'] ?? 0);
         if ($backup_id <= 0) {
+            ob_end_clean();
             echo json_encode(['success' => false, 'error' => 'Invalid backup ID']);
             exit;
         }
         $result = restore_schedule_from_backup($backup_id);
+        ob_end_clean();
         echo json_encode($result);
         
     } elseif ($action === 'get_history') {
         $limit = (int)($_POST['limit'] ?? 20);
         $result = get_backup_history($limit);
+        ob_end_clean();
         echo json_encode($result);
         
     } elseif ($action === 'cleanup') {
         $days = (int)($_POST['days_to_keep'] ?? 30);
         $result = cleanup_old_backups($days);
+        ob_end_clean();
         echo json_encode($result);
         
     } elseif ($action === 'compare') {
         $backup_id_1 = (int)($_POST['backup_id_1'] ?? 0);
         $backup_id_2 = (int)($_POST['backup_id_2'] ?? 0);
         if ($backup_id_1 <= 0) {
+            ob_end_clean();
             echo json_encode(['success' => false, 'error' => 'Invalid backup ID']);
             exit;
         }
         $result = compare_schedules($backup_id_1, $backup_id_2 > 0 ? $backup_id_2 : null);
+        ob_end_clean();
         echo json_encode($result);
         
     } else {
         http_response_code(400);
+        ob_end_clean();
         echo json_encode(['error' => 'Unknown action']);
     }
 } else {
     http_response_code(405);
+    ob_end_clean();
     echo json_encode(['error' => 'Method not allowed']);
 }
 ?>

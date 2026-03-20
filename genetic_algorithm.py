@@ -37,11 +37,12 @@ class ScheduleIndividual:
             if section.id in domains and domains[section.id]:
                 self.chromosome[section.id] = random.choice(domains[section.id])
             else:
-                # Fallback: create a random assignment
+                # Fallback: create a random assignment using real room IDs if possible
+                room_pool = self.domains.get('all_rooms', [])
                 self.chromosome[section.id] = (
                     random.randint(0, 4),  # day 0-4
                     random.randint(0, 3),  # slot 0-3
-                    f"Room_{random.randint(1, 10)}"
+                    random.choice(room_pool) if room_pool else "No_Rooms_Defined"
                 )
     
     @staticmethod

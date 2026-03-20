@@ -60,11 +60,10 @@ function export_to_csv_b2($filename, $headers, $data, $b2) {
 }
 
 try {
-    // 1. Export Rooms
-    $rooms_res = $conn->query("SELECT room_name, capacity FROM rooms");
-    if (!$rooms_res) throw new Exception("Error fetching rooms: " . $conn->error);
-    $rooms = $rooms_res->fetch_all(MYSQLI_NUM);
-    export_to_csv_b2('csv/general/rooms.csv', ['room_name', 'capacity'], $rooms, $b2);
+    // NOTE: Room CSVs are NOT exported here. Each department's room CSV (csv/general/rooms.csv,
+    // csv/department/*_rooms.csv) is managed directly via the Rooms Management UI and B2.
+    // Exporting the merged DB rooms table back to csv/general/rooms.csv would pollute it
+    // with all department rooms, breaking the per-source isolation.
 
     // 2. Export Lecturers
     $res = $conn->query("SELECT name, availability_json FROM lecturers");

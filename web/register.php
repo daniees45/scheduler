@@ -1,11 +1,12 @@
 <?php
 $page_title = 'Register New User';
+$page_css = 'assets/register.css';
 include 'includes/header.php';
 require_once 'api/db.php';
 
 // Only admins
 if ($_SESSION['role'] != 'super_admin' && $_SESSION['role'] != 'faculty_admin') {
-    echo "<div class='glass-panel' style='padding: 2rem; margin: 2rem; text-align: center; color: var(--danger);'>Access Denied</div>";
+    echo "<div class='glass-panel register-access-denied'>Access Denied</div>";
     include 'includes/footer.php';
     exit;
 }
@@ -61,8 +62,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 ?>
 
-<div class="glass-panel" style="padding: 2rem; max-width: 500px; margin: 0 auto;">
-    <h2 style="margin-bottom: 2rem;">Add New User</h2>
+    <div class="glass-panel register-container">
+    <h2 class="register-title">Add New User</h2>
     
     <?php if (isset($error)): ?>
         <div class="alert alert-danger"><?php echo htmlspecialchars($error); ?></div>
@@ -71,7 +72,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <form method="POST" action="register.php">
         <!-- Role Selection -->
         <div class="form-group">
-            <label style="display:block; margin-bottom: 0.5rem; color: var(--text-muted);">Role</label>
+            <label class="register-form-label">Role</label>
             <select name="role" id="roleSelect" class="glass-input" onchange="toggleFields()" required>
                 <option value="student">Student</option>
                 <option value="lecturer">Lecturer</option>
@@ -83,11 +84,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
 
         <!-- Conditional Fields -->
-        <div class="form-group" id="deptField" style="display: none;">
-            <label style="display:block; margin-bottom: 0.5rem; color: var(--text-muted);">Department</label>
+        <div class="form-group register-dept-field" id="deptField">
+            <label class="register-form-label">Department</label>
             <?php if ($_SESSION['role'] === 'faculty_admin'): ?>
                  <input type="hidden" name="department" value="<?php echo htmlspecialchars($_SESSION['department']); ?>">
-                 <div class="glass-input" style="background: rgba(255, 255, 255, 0.1); color: var(--text-muted); cursor: not-allowed;">
+                 <div class="glass-input register-dept-locked">
                     <i class="fa-solid fa-lock"></i> <?php echo htmlspecialchars($_SESSION['department']); ?> (Locked)
                 </div>
             <?php else: ?>
@@ -103,35 +104,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <?php endif; ?>
         </div>
 
-        <div class="form-group" id="lecturerField" style="margin-top: 1rem; display: none;">
-            <label style="display:block; margin-bottom: 0.5rem; color: var(--text-muted);">Link to Lecturer Profile</label>
-            <div style="position: relative;">
-                <input type="text" id="lecturerSearch" class="glass-input" placeholder="Search lecturer by name..." autocomplete="off" style="background: rgba(15,23,42,0.9);">
+        <div class="form-group register-lecturer-field" id="lecturerField">
+            <label class="register-form-label">Link to Lecturer Profile</label>
+            <div class="register-lecturer-search-wrap">
+                <input type="text" id="lecturerSearch" class="glass-input register-lecturer-search" placeholder="Search lecturer by name..." autocomplete="off">
                 <input type="hidden" name="lecturer_id" id="lecturerIdInput">
-                <div id="lecturerDropdown" style="display: none; position: absolute; top: 100%; left: 0; right: 0; max-height: 200px; overflow-y: auto; background: rgba(15,23,42,0.95); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; margin-top: 4px; z-index: 1000;">
+                <div id="lecturerDropdown" class="register-lecturer-dropdown">
                     <div id="lecturerOptions">
-                        <div class="lecturer-option" style="padding: 0.75rem; color: var(--text-muted); text-align: center;">Start typing to search...</div>
+                        <div class="register-lecturer-placeholder">Start typing to search...</div>
                     </div>
                 </div>
             </div>
         </div>
 
         <div class="form-group" id="nameField">
-            <label style="display:block; margin-bottom: 0.5rem; color: var(--text-muted);">Full Name</label>
+            <label class="register-form-label">Full Name</label>
             <input type="text" name="fullname" class="glass-input">
         </div>
         
         <div class="form-group" style="margin-top: 1rem;">
-            <label style="display:block; margin-bottom: 0.5rem; color: var(--text-muted);">Username</label>
+            <label class="register-form-label">Username</label>
             <input type="text" name="username" class="glass-input" required>
         </div>
         
         <div class="form-group" style="margin-top: 1rem;">
-            <label style="display:block; margin-bottom: 0.5rem; color: var(--text-muted);">Password</label>
+            <label class="register-form-label">Password</label>
             <input type="password" name="password" class="glass-input" required>
         </div>
         
-        <button type="submit" class="glass-btn" style="width: 100%; margin-top: 2rem;">Create Account</button>
+        <button type="submit" class="glass-btn register-submit-btn">Create Account</button>
     </form>
 </div>
 
@@ -198,24 +199,24 @@ searchInput.addEventListener('input', function() {
 
 function renderOptions(lecturerList) {
     if (lecturerList.length === 0) {
-        optionsContainer.innerHTML = '<div style="padding: 0.75rem; color: var(--text-muted); text-align: center;">No lecturers found</div>';
+        optionsContainer.innerHTML = '<div class="register-no-results">No lecturers found</div>';
         return;
     }
     
     optionsContainer.innerHTML = lecturerList.map(l => `
-        <div class="lecturer-option" data-id="${l.id}" data-name="${l.name}" style="padding: 0.75rem; cursor: pointer; border-bottom: 1px solid rgba(255,255,255,0.05); transition: background 0.2s;">
-            <div style="font-weight: 500; color: var(--text-primary);">${l.name}</div>
-            ${l.department ? `<div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;">${l.department}</div>` : ''}
+        <div class="lecturer-option" data-id="${l.id}" data-name="${l.name}">
+            <div class="lecturer-option-name">${l.name}</div>
+            ${l.department ? `<div class="lecturer-option-dept">${l.department}</div>` : ''}
         </div>
     `).join('');
     
     // Add click handlers
     document.querySelectorAll('.lecturer-option').forEach(option => {
         option.addEventListener('mouseenter', function() {
-            this.style.background = 'rgba(255,255,255,0.1)';
+            this.classList.add('lecturer-option--hover');
         });
         option.addEventListener('mouseleave', function() {
-            this.style.background = 'transparent';
+            this.classList.remove('lecturer-option--hover');
         });
         option.addEventListener('click', function() {
             const id = this.getAttribute('data-id');
