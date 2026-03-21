@@ -88,13 +88,13 @@ def make_exam_constraints(sections: list,
                            max_students_per_hall: int = 0):
     sections_by_id = {sec.id: sec for sec in sections}
 
-    def cohort_conflict_wrapper(assignment, var_id, value):
+    def cohort_conflict_wrapper(assignment, var_id, value, csp_instance=None):
         return no_student_cohort_conflict(assignment, var_id, value, sections_by_id)
 
-    def same_day_wrapper(assignment, var_id, value):
+    def same_day_wrapper(assignment, var_id, value, csp_instance=None):
         return no_multiple_exams_same_day(assignment, var_id, value, sections_by_id, max_exams_per_day)
 
-    def hall_capacity_wrapper(assignment, var_id, value):
+    def hall_capacity_wrapper(assignment, var_id, value, csp_instance=None):
         return no_room_capacity_overflow(
             assignment,
             var_id,
