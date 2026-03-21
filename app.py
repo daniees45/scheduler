@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file, after_this_request
 import subprocess
 import os
 import sys
@@ -191,6 +191,84 @@ def _collect_recent_generated_files(limit=30):
     files = [p for p in glob.glob(os.path.join(final_dir, '*.csv')) if os.path.isfile(p)]
     files.sort(key=lambda p: os.path.getmtime(p), reverse=True)
     return files[:max(1, int(limit))]
+
+
+@app.route('/tools/csv-to-pdf', methods=['POST'])
+def csv_to_pdf_tool():
+    """Generate a PDF from CSV content and return the PDF bytes."""
+    data = request.get_json(silent=True) or {}
+    csv_content = data.get('csv_content')
+
+    if not isinstance(csv_content, str) or not csv_content.strip():
+        return jsonify({"status": "error", "message": "csv_content is required"}), 400
+
+    h1 = str(data.get('h1', ''))
+    h2 = str(data.get('h2', ''))
+    h3 = str(data.get('h3', ''))
+    h4 = str(data.get('h4', ''))
+
+    csv_temp_path = None
+    pdf_temp_path = None
+
+    try:
+        csv_tmp = tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.csv', encoding='utf-8', newline='')
+        csv_tmp.write(csv_content)
+        csv_tmp.flush()
+        csv_tmp.close()
+        csv_temp_path = csv_tmp.name
+
+        pdf_tmp = tempfile.NamedTemporaryFile(mode='wb', delete=False, suffix='.pdf')
+        pdf_tmp.close()
+        pdf_temp_path = pdf_tmp.name
+
+        script_path = os.path.join(PROJECT_ROOT, 'csv_to_pdf.py')
+        if not os.path.isfile(script_path):
+            return jsonify({"status": "error", "message": "PDF generator script not found on Render service"}), 500
+
+        command = [
+            sys.executable,
+            script_path,
+            '--input', csv_temp_path,
+            '--output', pdf_temp_path,
+            '--h1', h1,
+            '--h2', h2,
+            '--h3', h3,
+            '--h4', h4,
+        ]
+
+        result = subprocess.run(command, capture_output=True, text=True)
+        if result.returncode != 0:
+            return jsonify({
+                "status": "error",
+                "message": "PDF generation failed",
+                "details": (result.stderr or result.stdout or "Unknown process failure").strip(),
+            }), 500
+
+        if not os.path.isfile(pdf_temp_path) or os.path.getsize(pdf_temp_path) == 0:
+            return jsonify({"status": "error", "message": "Generated PDF is empty"}), 500
+
+        @after_this_request
+        def cleanup_temp_files(response):
+            try:
+                if csv_temp_path and os.path.exists(csv_temp_path):
+                    os.remove(csv_temp_path)
+                if pdf_temp_path and os.path.exists(pdf_temp_path):
+                    os.remove(pdf_temp_path)
+            except Exception:
+                pass
+            return response
+
+        return send_file(pdf_temp_path, mimetype='application/pdf', as_attachment=False)
+
+    except Exception as e:
+        try:
+            if csv_temp_path and os.path.exists(csv_temp_path):
+                os.remove(csv_temp_path)
+            if pdf_temp_path and os.path.exists(pdf_temp_path):
+                os.remove(pdf_temp_path)
+        except Exception:
+            pass
+        return jsonify({"status": "error", "message": f"CSV to PDF tool failed: {e}"}), 500
 
 # ============================================================================
 # HEALTH & STATUS ENDPOINTS
