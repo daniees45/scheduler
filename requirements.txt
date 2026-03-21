@@ -8,7 +8,7 @@ flask-login
 flask-bcrypt
 flask-wtf
 email_validator
-fpdf
+fpdf2
 ics
 scikit-learn
 
