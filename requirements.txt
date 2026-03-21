@@ -11,6 +11,7 @@ email_validator
 fpdf2
 ics
 scikit-learn
+tensorflow
 
 # Optional packages (install separately if needed)
 # shap - For model explainability (may have build issues on some systems)
