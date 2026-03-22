@@ -89,6 +89,29 @@ def _get_public_web_base_url():
     return base_url.rstrip("/")
 
 
+def _build_log_callback_urls():
+    explicit_url = (os.environ.get("LOG_CALLBACK_URL") or "").strip()
+    if explicit_url:
+        return [explicit_url.rstrip("/")]
+
+    base_url = _get_public_web_base_url()
+    if not base_url:
+        return []
+
+    candidates = [f"{base_url}/api/log.php"]
+    if not base_url.endswith("/web"):
+        candidates.append(f"{base_url}/web/api/log.php")
+
+    # Preserve order and uniqueness
+    deduped = []
+    seen = set()
+    for url in candidates:
+        if url not in seen:
+            seen.add(url)
+            deduped.append(url)
+    return deduped
+
+
 def _json_safe(value):
     """Convert values into JSON-serializable primitives recursively."""
     if isinstance(value, (str, int, float, bool)) or value is None:
@@ -1458,11 +1481,10 @@ def remote_log(action, message, status="info", metadata=None):
     Log an event back to the PHP environment's audit_log table.
     """
     try:
-        public_web_base_url = _get_public_web_base_url()
-        if not public_web_base_url:
+        callback_urls = _build_log_callback_urls()
+        if not callback_urls:
             return
 
-        log_url = f"{public_web_base_url}/api/log.php"
         payload = {
             "action": action,
             "details": message,
@@ -1471,10 +1493,16 @@ def remote_log(action, message, status="info", metadata=None):
             "source": "AI_ENGINE"
         }
         import requests
-        requests.post(log_url, json=payload, timeout=2)
-    except:
-        # Fail silently to avoid blocking local execution
-        pass
+        for log_url in callback_urls:
+            try:
+                response = requests.post(log_url, json=payload, timeout=8)
+                if 200 <= response.status_code < 300:
+                    return
+            except Exception:
+                continue
+    except Exception:
+        # Fail silently to avoid blocking schedule execution.
+        return
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', '5000'))
