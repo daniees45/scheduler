@@ -535,7 +535,7 @@ def generate():
                 import subprocess
                 php_script = os.path.join(PROJECT_ROOT, 'web', 'api', 'upload_generated_to_b2.php')
                 result = subprocess.run(
-                    ['php', php_script, output_path],
+                    ['csv/final/', php_script, output_path],
                     capture_output=True,
                     text=True,
                     timeout=30
@@ -723,7 +723,7 @@ def generate_exam():
                 import subprocess
                 php_script = os.path.join(PROJECT_ROOT, 'web', 'api', 'upload_generated_to_b2.php')
                 result = subprocess.run(
-                    ['php', php_script, output_path],
+                    ['csv/final/', php_script, output_path],
                     capture_output=True,
                     text=True,
                     timeout=30
@@ -733,7 +733,7 @@ def generate_exam():
                 else:
                     print(f"[B2] Warning: Upload failed: {result.stderr}")
             except Exception as e:
-                print(f"[B2] Warning: Could not upload to B2: {e}")
+                print(f"[B2] Warning: to B2: {e}")
             
             return jsonify({
                 "status": "success",
