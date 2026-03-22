@@ -686,9 +686,17 @@ def generate_exam():
     
     # Support both output_file and output_filename for consistency
     custom_filename = data.get('output_filename') or data.get('output_file', 'exam_schedule')
-    if not custom_filename.endswith('.csv'):
-        custom_filename = f"{custom_filename}.csv"
-    output_path = os.path.join(PROJECT_ROOT, 'csv', 'final', custom_filename)
+    custom_filename = os.path.basename(str(custom_filename))
+    custom_filename = ''.join(c for c in custom_filename if c.isalnum() or c in '-_')
+    if not custom_filename:
+        custom_filename = f"exam_schedule_{job_id}"
+    if not custom_filename.startswith('exam_schedule_'):
+        custom_filename = f"exam_schedule_{custom_filename}"
+    custom_filename = f"{custom_filename}.csv"
+
+    final_dir = os.path.join(PROJECT_ROOT, 'csv', 'final')
+    os.makedirs(final_dir, exist_ok=True)
+    output_path = os.path.join(final_dir, custom_filename)
     print(f"[EXAM] Custom filename from request: {data.get('output_filename')}")
     print(f"[EXAM] Using output path: {output_path}")
     if not output_path:
@@ -699,6 +707,7 @@ def generate_exam():
 
     try:
         save_progress(job_id, "running", 0, 0, "Generating exam schedule...")
+        remote_log("EXAM_GEN_START", f"Started exam schedule generation for {department or 'General'}", "info", {"params": data})
         department = data.get('department')
         hall_name = data.get('exam_hall_name')
         hall_capacity = data.get('exam_hall_capacity')
@@ -728,6 +737,10 @@ def generate_exam():
         
         if success:
             save_progress(job_id, "success", 100, 0, "Exam schedule generated")
+
+            if not os.path.exists(output_path):
+                remote_log("EXAM_GEN_ERROR", f"Exam generation reported success but output missing: {output_path}", "error")
+                return jsonify({"status": "error", "message": "Exam schedule file was not created"}), 500
             
             # Calculate accuracy for exam schedules (% of exams successfully scheduled)
             accuracy = 100.0  # Default if can't calculate
@@ -744,8 +757,10 @@ def generate_exam():
                 print(f"[WARNING] Could not calculate exam accuracy: {e}")
             
             # Upload exam schedule to B2
+            b2_upload = {"success": False, "message": "Upload not attempted"}
             try:
                 import subprocess
+                import json
                 php_script = os.path.join(PROJECT_ROOT, 'web', 'api', 'upload_generated_to_b2.php')
                 php_bin = os.environ.get('PHP_BIN', 'php')
                 result = subprocess.run(
@@ -757,22 +772,54 @@ def generate_exam():
                 )
                 if result.returncode == 0:
                     print(f"[B2] Uploaded exam schedule to B2")
+                    try:
+                        parsed = json.loads((result.stdout or "").strip() or "{}")
+                        b2_upload = {
+                            "success": True,
+                            "message": parsed.get("message", "Uploaded to B2"),
+                            "b2_path": parsed.get("b2_path", f"csv/final/{os.path.basename(output_path)}")
+                        }
+                    except Exception:
+                        b2_upload = {
+                            "success": True,
+                            "message": "Uploaded to B2",
+                            "b2_path": f"csv/final/{os.path.basename(output_path)}"
+                        }
                 else:
                     print(f"[B2] Warning: Upload failed: {result.stderr}")
+                    b2_upload = {
+                        "success": False,
+                        "message": (result.stderr or result.stdout or "Upload failed").strip()
+                    }
             except Exception as e:
                 print(f"[B2] Warning: to B2: {e}")
+                b2_upload = {"success": False, "message": str(e)}
+
+            if b2_upload.get("success"):
+                remote_log("EXAM_GEN_SUCCESS", f"Generated exam schedule with {accuracy:.2f}% accuracy", "success", {
+                    "accuracy": accuracy,
+                    "output": os.path.basename(output_path),
+                    "b2_path": b2_upload.get("b2_path")
+                })
+            else:
+                remote_log("EXAM_B2_UPLOAD_WARNING", b2_upload.get("message", "Upload failed"), "warning", {
+                    "output": os.path.basename(output_path)
+                })
             
             return jsonify({
                 "status": "success",
                 "message": "Exam schedule generated successfully",
                 "accuracy": f"{accuracy:.2f}%",
                 "output_file": os.path.basename(output_path),
-                "job_id": job_id
+                "job_id": job_id,
+                "b2_upload": b2_upload
             })
         else:
+            remote_log("EXAM_GEN_FAILURE", "Failed to generate exam schedule", "warning", {"department": department})
             save_progress(job_id, "failed", 0, 0, "Failed to generate exam schedule")
             return jsonify({"status": "error", "message": "Failed to generate exam schedule"}), 400
     except Exception as e:
+        remote_log("EXAM_GEN_ERROR", str(e), "error")
         save_progress(job_id, "error", 0, 0, str(e))
         return jsonify({"status": "error", "message": str(e)}), 500
 
