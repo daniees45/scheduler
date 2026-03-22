@@ -557,11 +557,13 @@ def generate():
             try:
                 import subprocess
                 php_script = os.path.join(PROJECT_ROOT, 'web', 'api', 'upload_generated_to_b2.php')
+                php_bin = os.environ.get('PHP_BIN', 'php')
                 result = subprocess.run(
-                    ['csv/final/', php_script, output_path],
+                    [php_bin, php_script, output_path],
                     capture_output=True,
                     text=True,
-                    timeout=30
+                    timeout=30,
+                    cwd=PROJECT_ROOT
                 )
                 if result.returncode == 0:
                     print(f"[B2] Uploaded {output_filename} to B2")
@@ -745,11 +747,13 @@ def generate_exam():
             try:
                 import subprocess
                 php_script = os.path.join(PROJECT_ROOT, 'web', 'api', 'upload_generated_to_b2.php')
+                php_bin = os.environ.get('PHP_BIN', 'php')
                 result = subprocess.run(
-                    ['csv/final/', php_script, output_path],
+                    [php_bin, php_script, output_path],
                     capture_output=True,
                     text=True,
-                    timeout=30
+                    timeout=30,
+                    cwd=PROJECT_ROOT
                 )
                 if result.returncode == 0:
                     print(f"[B2] Uploaded exam schedule to B2")
