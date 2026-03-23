@@ -705,10 +705,11 @@ def generate_exam():
     if not run_headless_exam:
         return jsonify({"status": "error", "message": "Exam scheduler not available"}), 500
 
+    department = data.get('department')
+
     try:
         save_progress(job_id, "running", 0, 0, "Generating exam schedule...")
         remote_log("EXAM_GEN_START", f"Started exam schedule generation for {department or 'General'}", "info", {"params": data})
-        department = data.get('department')
         hall_name = data.get('exam_hall_name')
         hall_capacity = data.get('exam_hall_capacity')
         exam_lock_paths = data.get('general_schedule_paths') or data.get('general_schedule_path')
