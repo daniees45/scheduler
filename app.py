@@ -27,6 +27,11 @@ except ImportError:
     run_headless_exam = None
 
 try:
+    from exam_combined_web import run_combined_exam
+except ImportError:
+    run_combined_exam = None
+
+try:
     from deep_learning import get_classifier, get_bidirectional_feedback, ScheduleFeatures
 except ImportError:
     get_classifier = None
@@ -378,6 +383,15 @@ def ai_train():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
+@app.route('/cancel', methods=['POST'])
+def cancel_generation():
+    """Mark the current generation job as cancelled."""
+    data = request.get_json(force=True, silent=True) or {}
+    job_id = data.get('job_id', '')
+    save_progress(job_id, 'cancelled', 0, 0, 'Generation cancelled by user')
+    return jsonify({'status': 'cancelled', 'job_id': job_id})
+
+
 @app.route('/progress', methods=['GET'])
 def get_progress():
     """Get current scheduling progress"""
@@ -649,11 +663,185 @@ def generate():
         save_progress(job_id, "error", 0, 0, str(e))
         return jsonify({"status": "error", "message": str(e)}), 500
 
+def _generate_combined_exam(data: dict, job_id: str):
+    """Handle combined multi-department exam scheduling (3 slots/day, shared rooms)."""
+    import csv as _csv
+
+    if not run_combined_exam:
+        return jsonify({"status": "error", "message": "Combined exam scheduler not available"}), 500
+
+    temp_dir = os.path.join(PROJECT_ROOT, 'temp')
+    os.makedirs(temp_dir, exist_ok=True)
+    final_dir = os.path.join(PROJECT_ROOT, 'csv', 'final')
+    os.makedirs(final_dir, exist_ok=True)
+
+    # --- Collect input files -------------------------------------------------
+    # The frontend sends a list of {csv_content, csv_filename} objects.
+    input_files_raw = data.get('combined_csv_files') or []
+    # Also accept a single csv_content as a one-element list (backward compat).
+    if not input_files_raw and data.get('csv_content'):
+        input_files_raw = [{
+            'csv_content': data['csv_content'],
+            'csv_filename': data.get('csv_filename', 'exam_courses.csv')
+        }]
+
+    if not input_files_raw:
+        return jsonify({"status": "error", "message": "No exam CSV files provided for combined mode"}), 400
+
+    input_paths = []
+    for idx, entry in enumerate(input_files_raw):
+        content  = entry.get('csv_content')
+        filename = entry.get('csv_filename') or f'combined_exam_{idx}.csv'
+        safe_name = ''.join(ch if ch.isalnum() or ch in ('_', '-', '.') else '_' for ch in os.path.basename(filename))
+        path = os.path.join(temp_dir, f"combined_exam_input_{job_id}_{idx}_{safe_name}")
+        try:
+            if isinstance(content, list):
+                with open(path, 'w', newline='', encoding='utf-8') as f:
+                    writer = _csv.writer(f)
+                    for row in content:
+                        if isinstance(row, list):
+                            writer.writerow(row)
+            elif content:
+                with open(path, 'w', encoding='utf-8') as f:
+                    f.write(str(content))
+            else:
+                continue
+            input_paths.append(path)
+        except Exception as e:
+            return jsonify({"status": "error", "message": f"Failed to prepare combined exam input: {e}"}), 500
+
+    if not input_paths:
+        return jsonify({"status": "error", "message": "All provided CSV files were empty"}), 400
+
+    # --- Output path ---------------------------------------------------------
+    custom_filename = data.get('output_filename') or data.get('output_file', 'exam_schedule')
+    custom_filename = os.path.basename(str(custom_filename))
+    custom_filename = ''.join(c for c in custom_filename if c.isalnum() or c in '-_')
+    if not custom_filename:
+        custom_filename = f"exam_schedule_{job_id}"
+    if not custom_filename.startswith('exam_schedule_'):
+        custom_filename = f"exam_schedule_{custom_filename}"
+    output_path = os.path.join(final_dir, f"{custom_filename}.csv")
+
+    # --- Config from request -------------------------------------------------
+    max_per_day = int(data.get('max_exams_per_day', 1) or 1)
+    rooms_csv   = os.path.join(PROJECT_ROOT, 'csv', 'general', 'rooms.csv')
+
+    # Optional per-room capacity override from hall fields
+    rooms_override = None
+    hall_names_raw = data.get('exam_hall_name') or ''
+    hall_caps_raw  = data.get('exam_hall_capacity') or data.get('exam_hall_capacities')
+    if hall_names_raw:
+        names = [h.strip() for h in str(hall_names_raw).split(',') if h.strip()]
+        caps_list = []
+        if hall_caps_raw:
+            if isinstance(hall_caps_raw, list):
+                caps_list = [int(c) for c in hall_caps_raw if str(c).strip().isdigit()]
+            else:
+                caps_list = [int(c) for c in str(hall_caps_raw).split(',') if c.strip().isdigit()]
+        if caps_list and len(caps_list) == len(names):
+            rooms_override = dict(zip(names, caps_list))
+        elif caps_list and len(caps_list) == 1:
+            rooms_override = {n: caps_list[0] for n in names}
+
+    try:
+        save_progress(job_id, "running", 0, 0, "Starting combined exam scheduler...")
+        remote_log("EXAM_COMBINED_START", f"Combined exam generation started ({len(input_paths)} files)", "info", {"params": data})
+
+        def _progress(percent: int, message: str, placed: int = 0):
+            save_progress(job_id, "running", max(0, min(100, int(percent))), int(placed), message)
+
+        success = run_combined_exam(
+            input_files=input_paths,
+            output_file=output_path,
+            rooms_csv=rooms_csv,
+            rooms_override=rooms_override,
+            max_per_day=max_per_day,
+            progress_callback=_progress,
+            timeout_seconds=180,
+        )
+
+        if not success:
+            save_progress(job_id, "failed", 0, 0, "Combined exam scheduling failed")
+            remote_log("EXAM_COMBINED_FAILURE", "Combined exam scheduling failed", "warning")
+            return jsonify({"status": "error", "message": "Failed to generate combined exam timetable"}), 400
+
+        save_progress(job_id, "success", 100, 0, "Combined exam timetable generated")
+
+        if not os.path.exists(output_path):
+            return jsonify({"status": "error", "message": "Combined exam file was not created"}), 500
+
+        # Accuracy: rows placed / total input rows across all files
+        accuracy = 100.0
+        try:
+            total_in  = sum(
+                sum(1 for _ in open(p, encoding='utf-8')) - 1
+                for p in input_paths if os.path.exists(p)
+            )
+            total_out = sum(1 for _ in open(output_path, encoding='utf-8')) - 1
+            if total_in > 0:
+                accuracy = round((total_out / total_in) * 100, 2)
+        except Exception:
+            pass
+
+        # B2 upload (reuse same approach as single-dept exam)
+        b2_upload = {"success": False, "message": "Upload not attempted"}
+        try:
+            import subprocess, json as _json
+            php_script = os.path.join(PROJECT_ROOT, 'web', 'api', 'upload_generated_to_b2.php')
+            result = subprocess.run(
+                [os.environ.get('PHP_BIN', 'php'), php_script, output_path],
+                capture_output=True, text=True, timeout=30, cwd=PROJECT_ROOT
+            )
+            if result.returncode == 0:
+                parsed = {}
+                try:
+                    parsed = _json.loads((result.stdout or '').strip() or '{}')
+                except Exception:
+                    pass
+                b2_upload = {
+                    "success": True,
+                    "message": parsed.get("message", "Uploaded to B2"),
+                    "b2_path": parsed.get("b2_path", f"csv/final/{os.path.basename(output_path)}")
+                }
+            else:
+                b2_upload = {"success": False, "message": (result.stderr or result.stdout or "Upload failed").strip()}
+        except Exception as e:
+            b2_upload = {"success": False, "message": str(e)}
+
+        remote_log("EXAM_COMBINED_SUCCESS", f"Combined exam generated {accuracy:.2f}% accuracy", "success", {
+            "accuracy": accuracy, "output": os.path.basename(output_path)
+        })
+
+        return jsonify({
+            "status": "success",
+            "message": "Combined exam timetable generated successfully",
+            "accuracy": f"{accuracy:.2f}%",
+            "output_file": os.path.basename(output_path),
+            "job_id": job_id,
+            "b2_upload": b2_upload,
+            "combined_mode": True,
+        })
+
+    except Exception as e:
+        remote_log("EXAM_COMBINED_ERROR", str(e), "error")
+        save_progress(job_id, "error", 0, 0, str(e))
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
 @app.route('/generate/exam', methods=['POST'])
 def generate_exam():
     """Generate an exam schedule using AI"""
-    data = request.json or {}
+    data = request.get_json(force=True, silent=True) or {}
     job_id = data.get('job_id', 'exam_' + str(int(time.time())))
+
+    # -----------------------------------------------------------------------
+    # Combined (all-department) mode: multi-file, 3 slots per day
+    # -----------------------------------------------------------------------
+    combined_mode = bool(data.get('combined_mode', False))
+    if combined_mode:
+        return _generate_combined_exam(data, job_id)
+    # -----------------------------------------------------------------------
 
     input_path = None
     csv_content = data.get('csv_content')
