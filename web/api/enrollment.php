@@ -16,6 +16,14 @@ if (!isset($_SESSION['user_id'])) {
 $user_id = $_SESSION['user_id'];
 $role = $_SESSION['role'] ?? '';
 
+$has_enrollment_section = false;
+$section_check = $conn->prepare("SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'student_enrollments' AND COLUMN_NAME = 'section' LIMIT 1");
+if ($section_check) {
+    $section_check->execute();
+    $section_check_res = $section_check->get_result();
+    $has_enrollment_section = $section_check_res && $section_check_res->num_rows > 0;
+}
+
 // Only students can enroll
 if ($role !== 'student') {
     http_response_code(403);
@@ -36,7 +44,7 @@ if ($method === 'GET' && $action === 'my_enrollments') {
             se.created_at,
             c.id as course_id,
             c.course_code,
-            c.course_name,
+            c.course_title,
             c.level,
             c.department,
             c.semester as course_semester,
@@ -97,7 +105,7 @@ if ($method === 'GET' && $action === 'available_courses') {
         SELECT 
             c.id,
             c.course_code,
-            c.course_name,
+            c.course_title,
             c.level,
             c.department,
             c.semester,
@@ -141,6 +149,14 @@ if ($method === 'POST' && $action === 'enroll') {
     $input = json_decode(file_get_contents('php://input'), true);
     $course_id = intval($input['course_id'] ?? 0);
     $semester = $input['semester'] ?? '1';
+    $selected_section = strtoupper(trim((string)($input['selected_section'] ?? '')));
+    if ($selected_section !== '') {
+        $selected_section = preg_replace('/^\s*SEC(?:TION)?\s*/i', '', $selected_section);
+        $selected_section = preg_replace('/[^A-Z0-9]/', '', (string)$selected_section);
+    }
+    if ($selected_section === 'DEFAULT') {
+        $selected_section = '';
+    }
     
     if ($course_id <= 0) {
         http_response_code(400);
@@ -150,7 +166,7 @@ if ($method === 'POST' && $action === 'enroll') {
     
     // Check if course exists and is for student's level
     $level = $_SESSION['level'] ?? 0;
-    $stmt = $conn->prepare("SELECT id, course_code, course_name, level FROM courses WHERE id = ? AND level = ?");
+    $stmt = $conn->prepare("SELECT id, course_code, course_title, level FROM courses WHERE id = ? AND level = ?");
     $stmt->bind_param("ii", $course_id, $level);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -175,8 +191,14 @@ if ($method === 'POST' && $action === 'enroll') {
     }
     
     // Enroll
-    $stmt = $conn->prepare("INSERT INTO student_enrollments (user_id, course_id, semester) VALUES (?, ?, ?)");
-    $stmt->bind_param("iis", $user_id, $course_id, $semester);
+    if ($has_enrollment_section) {
+        $stmt = $conn->prepare("INSERT INTO student_enrollments (user_id, course_id, section, semester) VALUES (?, ?, ?, ?)");
+        $section_to_store = $selected_section !== '' ? $selected_section : null;
+        $stmt->bind_param("iiss", $user_id, $course_id, $section_to_store, $semester);
+    } else {
+        $stmt = $conn->prepare("INSERT INTO student_enrollments (user_id, course_id, semester) VALUES (?, ?, ?)");
+        $stmt->bind_param("iis", $user_id, $course_id, $semester);
+    }
     
     if ($stmt->execute()) {
         echo json_encode([

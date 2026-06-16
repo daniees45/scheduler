@@ -2,7 +2,11 @@
 // web/api/update_schedule_row.php
 header('Content-Type: application/json');
 require_once 'db.php';
+require_once __DIR__ . '/auth_guard.php';
 require_once __DIR__ . '/../../lib/B2Storage.php';
+
+require_http_methods('POST');
+require_admin_user();
 
 $data = json_decode(file_get_contents('php://input'), true);
 $course_code = $data['course_code'] ?? null;

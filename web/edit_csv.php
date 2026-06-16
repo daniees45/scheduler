@@ -3,17 +3,66 @@
 $page_title = 'Edit CSV Data';
 include 'includes/header.php';
 
-// Check if data is from session (uploaded CSV)
-if (isset($_GET['session']) && isset($_SESSION['uploaded_csv'])) {
-    $csvData = $_SESSION['uploaded_csv']['data'];
-    $filename = $_SESSION['uploaded_csv']['filename'];
-    $upload_id = $_SESSION['uploaded_csv']['id'];
-    
-    $headers = array_shift($csvData);
-    $rows = $csvData;
-    $source = 'session';
-    $is_file = false;
-    
+// Check if data is from session (uploaded CSV or ready-for-scheduling data)
+$sessionToken = $_GET['session'] ?? '';
+if ($sessionToken !== '') {
+    $hasUploaded = isset($_SESSION['uploaded_csv']) && is_array($_SESSION['uploaded_csv']);
+    $hasReady = isset($_SESSION['ready_for_scheduling']) && is_array($_SESSION['ready_for_scheduling']);
+
+    $useUploaded = false;
+    $useReady = false;
+
+    if ($hasReady) {
+        $readyId = $_SESSION['ready_for_scheduling']['id'] ?? '';
+        if ($readyId !== '' && hash_equals((string)$readyId, (string)$sessionToken)) {
+            $useReady = true;
+        }
+    }
+
+    if (!$useReady && $hasUploaded) {
+        $uploadedId = $_SESSION['uploaded_csv']['id'] ?? '';
+        if ($uploadedId !== '' && hash_equals((string)$uploadedId, (string)$sessionToken)) {
+            $useUploaded = true;
+        }
+    }
+
+    if (!$useReady && !$useUploaded) {
+        if ($hasReady) {
+            $useReady = true;
+        } elseif ($hasUploaded) {
+            $useUploaded = true;
+        }
+    }
+
+    if ($useReady) {
+        $csvData = $_SESSION['ready_for_scheduling']['data'] ?? [];
+        $filename = $_SESSION['ready_for_scheduling']['filename'] ?? 'session_data.csv';
+        $upload_id = $_SESSION['ready_for_scheduling']['id'] ?? $sessionToken;
+        $headers = !empty($csvData) ? array_shift($csvData) : [];
+        $rows = $csvData;
+        $source = 'session_ready';
+        $is_file = false;
+    } elseif ($useUploaded) {
+        $csvData = $_SESSION['uploaded_csv']['data'] ?? [];
+        $filename = $_SESSION['uploaded_csv']['filename'] ?? 'session_data.csv';
+        $upload_id = $_SESSION['uploaded_csv']['id'] ?? $sessionToken;
+        $headers = !empty($csvData) ? array_shift($csvData) : [];
+        $rows = $csvData;
+        $source = 'session_uploaded';
+        $is_file = false;
+    }
+
+    if (empty($headers)) {
+        echo '<div style="padding: 2rem; text-align: center;">';
+        echo '<i class="fa-solid fa-exclamation-triangle" style="font-size: 3rem; color: #f59e0b;"></i>';
+        echo '<h2>No Session Data to Edit</h2>';
+        echo '<p>Your editable session data has expired. Please upload or create manual input again.</p>';
+        echo '<a href="generate.php" class="glass-btn"><i class="fa-solid fa-arrow-left"></i> Back to Generator</a>';
+        echo '</div>';
+        include 'includes/footer.php';
+        exit;
+    }
+
 } elseif (isset($_GET['file'])) {
     $filename = $_GET['file'];
     // Security: only allow csv/ or root level csv files
@@ -63,79 +112,100 @@ if (isset($_GET['session']) && isset($_SESSION['uploaded_csv'])) {
 }
 ?>
 
-<div class="glass-panel" style="padding: 2rem;">
-    <div id="saveSyncBanner" style="display: none; margin-bottom: 1rem; padding: 0.9rem 1rem; border-radius: 8px; border: 1px solid rgba(16, 185, 129, 0.45); background: rgba(16, 185, 129, 0.12); color: #10b981; font-weight: 600;"></div>
+<div class="glass-panel" style="padding: 2rem; border-top: 4px solid var(--primary-color);">
+    <div id="saveSyncBanner" style="display: none; margin-bottom: 1.5rem; padding: 1rem; border-radius: 8px; border: 1px solid rgba(16, 185, 129, 0.45); background: rgba(16, 185, 129, 0.12); color: #10b981; font-weight: 600;"></div>
 
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
-        <h2><i class="fa-solid fa-edit"></i> Editing: <?php echo htmlspecialchars($filename); ?></h2>
-        <div style="display: flex; gap: 10px;">
-            <button onclick="addRow()" class="glass-btn secondary small"><i class="fa-solid fa-plus"></i> Add Row</button>
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; margin-bottom: 2rem;">
+        <div>
+            <h2 style="margin: 0 0 0.5rem 0; color: white; display: flex; align-items: center; gap: 0.75rem;">
+                <i class="fa-solid fa-file-csv" style="color: var(--primary-color);"></i> Data Editor
+            </h2>
+            <p style="margin: 0; color: var(--text-muted); font-size: 0.95rem;">
+                Currently editing: <strong style="color: white;"><?php echo htmlspecialchars($filename); ?></strong>
+            </p>
+        </div>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <button onclick="addRow()" class="glass-btn secondary small">
+                <i class="fa-solid fa-plus"></i> Add Row
+            </button>
             <?php if ($is_file): ?>
-                <button onclick="saveToFile()" class="glass-btn small" style="background: linear-gradient(135deg, #10b981, #34d399);">
+                <button onclick="saveToFile()" class="glass-btn small" style="background: linear-gradient(135deg, #10b981, #059669); border: none;">
                     <i class="fa-solid fa-save"></i> Save Changes
                 </button>
             <?php endif; ?>
-            <button onclick="useForScheduling()" class="glass-btn small" style="background: linear-gradient(135deg, #6366f1, #a855f7);">
+            <button onclick="useForScheduling()" class="glass-btn primary small" style="background: linear-gradient(135deg, var(--primary-color), var(--secondary-color)); border: none; box-shadow: 0 4px 15px rgba(var(--primary-rgb), 0.4);">
                 <i class="fa-solid fa-wand-magic-sparkles"></i> Use for Scheduling
+            </button>
+            <button onclick="window.history.length > 1 ? window.history.back() : window.location.href='generate.php';" class="glass-btn secondary small" style="border-color: rgba(var(--danger-rgb), 0.5); color: var(--danger);">
+                <i class="fa-solid fa-xmark"></i> Cancel
             </button>
         </div>
     </div>
 
-    <div style="margin-bottom: 1rem; padding: 1rem; background: rgba(99, 102, 241, 0.1); border-radius: 8px;">
+    <div style="margin-bottom: 2rem; padding: 1rem 1.5rem; background: rgba(var(--primary-rgb), 0.1); border-left: 4px solid var(--primary-color); border-radius: 4px;">
         <p style="margin: 0; display: flex; align-items: center; gap: 10px;">
-            <i class="fa-solid fa-info-circle" style="color: #6366f1;"></i>
-            <span style="color: var(--text-muted);">Edit cells directly in the table. Click <strong>Use for Scheduling</strong> when ready to generate the timetable.</span>
+            <i class="fa-solid fa-info-circle" style="color: var(--primary-color);"></i>
+            <span style="color: var(--text-muted);">Edit cells directly in the table below. Click <strong>Use for Scheduling</strong> when you're ready to proceed to generation.</span>
         </p>
     </div>
 
-    <div id="paginationControls" style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
-        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-            <input type="text" id="searchInput" class="glass-input" style="min-width: 220px;" placeholder="Search rows..." oninput="applyFilter()">
+    <!-- Controls Row -->
+    <div class="glass-panel resource-card" style="padding: 1.5rem; margin-bottom: 2rem; display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: center; justify-content: space-between; border: 1px solid rgba(255,255,255,0.05);">
+        <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
+            <div style="position: relative;">
+                <i class="fa-solid fa-search" style="position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: var(--text-muted);"></i>
+                <input type="text" id="searchInput" class="glass-input" style="min-width: 280px; padding-left: 40px;" placeholder="Search rows..." oninput="applyFilter()">
+            </div>
             <button class="glass-btn secondary small" type="button" onclick="clearFilter()">
-                <i class="fa-solid fa-rotate"></i> Reset
+                <i class="fa-solid fa-rotate-right"></i> Reset
             </button>
-            <label style="color: var(--text-muted); font-size: 0.9rem;">Rows per page</label>
-            <select id="rowsPerPage" class="glass-input" style="width: 110px;" onchange="setRowsPerPage()">
-                <option value="10">10</option>
-                <option value="25" selected>25</option>
-                <option value="50">50</option>
-                <option value="100">100</option>
-            </select>
+            <div style="display: flex; align-items: center; gap: 10px; border-left: 1px solid rgba(255,255,255,0.1); padding-left: 15px;">
+                <label style="color: var(--text-muted); font-size: 0.9rem;">Show</label>
+                <select id="rowsPerPage" class="glass-input" style="width: 80px; padding: 0.4rem 0.8rem;" onchange="setRowsPerPage()">
+                    <option value="10">10</option>
+                    <option value="25" selected>25</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                </select>
+            </div>
         </div>
-        <div style="display: flex; gap: 10px; align-items: center;">
-            <button class="glass-btn secondary small" id="prevPageBtn" onclick="goToPage(currentPage - 1)">
-                <i class="fa-solid fa-chevron-left"></i> Prev
+        <div style="display: flex; gap: 10px; align-items: center; background: rgba(0,0,0,0.2); padding: 0.5rem 1rem; border-radius: 20px;">
+            <button class="glass-btn secondary small" id="prevPageBtn" onclick="goToPage(currentPage - 1)" style="padding: 0.3rem 0.8rem;">
+                <i class="fa-solid fa-chevron-left"></i>
             </button>
-            <span id="pageInfo" style="color: var(--text-muted); font-size: 0.9rem;">Page 1 of 1</span>
-            <button class="glass-btn secondary small" id="nextPageBtn" onclick="goToPage(currentPage + 1)">
-                Next <i class="fa-solid fa-chevron-right"></i>
+            <span id="pageInfo" style="color: var(--text-muted); font-size: 0.9rem; font-family: monospace; font-weight: bold; min-width: 100px; text-align: center;">Page 1 of 1</span>
+            <button class="glass-btn secondary small" id="nextPageBtn" onclick="goToPage(currentPage + 1)" style="padding: 0.3rem 0.8rem;">
+                <i class="fa-solid fa-chevron-right"></i>
             </button>
         </div>
     </div>
 
-    <div style="overflow-x: auto;">
-        <table class="data-table" id="csvTable">
-            <thead>
-                <tr>
-                    <?php foreach ($headers as $h): ?>
-                        <th><?php echo htmlspecialchars($h); ?></th>
-                    <?php endforeach; ?>
-                    <th style="width: 50px;"></th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php foreach ($rows as $rowIndex => $row): ?>
+    <!-- Table Card -->
+    <div class="glass-panel resource-card" style="padding: 0; overflow: hidden; border: 1px solid rgba(255,255,255,0.05);">
+        <div style="overflow-x: auto;">
+            <table class="data-table" id="csvTable" style="margin: 0; border: none; width: 100%;">
+                <thead style="background: rgba(0,0,0,0.4);">
                     <tr>
-                        <?php foreach ($row as $cellIndex => $cell): ?>
-                            <td contenteditable="true"><?php echo htmlspecialchars($cell); ?></td>
+                        <?php foreach ($headers as $h): ?>
+                            <th style="padding: 1.2rem 1rem; color: var(--primary-color); font-weight: 600; text-transform: uppercase; letter-spacing: 1px; font-size: 0.8rem; border-bottom: 2px solid rgba(255,255,255,0.1);"><?php echo htmlspecialchars($h); ?></th>
                         <?php endforeach; ?>
-                        <td>
-                            <button class="text-btn danger" onclick="deleteRow(this)"><i class="fa-solid fa-trash"></i></button>
-                        </td>
+                        <th style="width: 50px; border-bottom: 2px solid rgba(255,255,255,0.1);"></th>
                     </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                    <?php foreach ($rows as $rowIndex => $row): ?>
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); transition: background 0.2s;">
+                            <?php foreach ($row as $cellIndex => $cell): ?>
+                                <td contenteditable="true" style="padding: 1rem; color: #e2e8f0; font-size: 0.95rem; outline: none; transition: background 0.2s;" onfocus="this.style.background='rgba(var(--primary-rgb),0.1)'" onblur="this.style.background='transparent'"><?php echo htmlspecialchars($cell); ?></td>
+                            <?php endforeach; ?>
+                            <td style="padding: 1rem; text-align: center;">
+                                <button class="text-btn danger" onclick="deleteRow(this)" style="padding: 0.5rem; border-radius: 6px; background: rgba(var(--danger-rgb), 0.1);"><i class="fa-solid fa-trash"></i></button>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 

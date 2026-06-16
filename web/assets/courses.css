@@ -145,3 +145,196 @@
 .courses-modal-save-btn {
     flex: 1;
 }
+
+/* ----- Actions cell: keep buttons side by side ------------- */
+.courses-actions-cell {
+    white-space: nowrap;
+}
+
+/* Button wrapper inside the actions cell */
+.courses-actions-wrap {
+    display: inline-flex;
+    gap: 0.4rem;
+    align-items: center;
+}
+
+/* ============================================================
+   RESPONSIVE BREAKPOINTS
+   ============================================================ */
+
+/* Tablet (≤1024px) ----------------------------------------- */
+@media (max-width: 1024px) {
+    .courses-action-bar {
+        gap: 0.75rem;
+    }
+
+    .courses-search-form {
+        max-width: none;
+    }
+}
+
+/* Mobile landscape / large phone (≤768px) ------------------- */
+@media (max-width: 768px) {
+    .courses-container {
+        padding: 1rem;
+    }
+
+    /* Stack search + Add button vertically */
+    .courses-action-bar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+    }
+
+    .courses-search-form {
+        max-width: none;
+        width: 100%;
+    }
+
+    /* Search input grows, level select stays compact */
+    .courses-search-form .glass-input:not(.courses-level-select) {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .courses-level-select {
+        width: 90px;
+        flex-shrink: 0;
+    }
+
+    /* "Add Course" button full width */
+    .courses-action-bar > .glass-btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    /* Actions cell: td is already flex from style.css (label left, content right).
+       Keep the wrapper as a tight button group on the right side. */
+    .courses-actions-cell {
+        white-space: normal;
+    }
+
+    .courses-actions-wrap {
+        display: inline-flex;
+        gap: 0.4rem;
+        align-items: center;
+        flex-shrink: 0;
+    }
+
+    /* Action buttons must NOT be 100% width (style.css sets .glass-btn to 100% on mobile) */
+    .courses-actions-wrap .glass-btn {
+        width: auto !important;
+        min-height: unset !important;
+        padding: 6px 10px;
+    }
+
+    .courses-delete-form {
+        display: contents; /* dissolve form box; button becomes direct child of wrap */
+    }
+
+    /* Empty row: suppress the card card-row treatment */
+    .courses-empty-row {
+        background: transparent !important;
+        border: none !important;
+        padding: 0 !important;
+    }
+
+    .courses-empty-row td {
+        display: block !important;
+        text-align: center;
+        padding: 1.5rem !important;
+        border-bottom: none !important;
+    }
+
+    .courses-empty-row td::before {
+        display: none !important;
+    }
+
+    /* Modal: full-width with padding + scroll */
+    .courses-modal-overlay {
+        padding: 1rem;
+        align-items: flex-end; /* sheet-style from bottom on mobile */
+    }
+
+    .courses-modal-panel {
+        max-width: 100%;
+        max-height: 90dvh;
+        max-height: 90vh; /* fallback */
+        overflow-y: auto;
+        padding: 1.5rem 1rem;
+        border-bottom-left-radius: 0;
+        border-bottom-right-radius: 0;
+    }
+
+    /* Two-col Level/Credits grid stays 2-col but with smaller gap */
+    .courses-modal-two-col {
+        gap: 0.6rem;
+    }
+
+    /* Pagination centred, compact */
+    .courses-pagination {
+        margin-top: 1rem;
+        gap: 0.6rem;
+    }
+}
+
+/* Small phone (≤480px) ------------------------------------- */
+@media (max-width: 480px) {
+    /* Type badge: tiny font stays readable */
+    .courses-type-badge {
+        font-size: 0.7rem;
+        padding: 3px 6px;
+    }
+
+    /* Level/Credits: stack vertically on very small screens */
+    .courses-modal-two-col {
+        grid-template-columns: 1fr;
+    }
+
+    .courses-modal-panel {
+        padding: 1rem 0.75rem;
+        max-height: 92dvh;
+        max-height: 92vh;
+    }
+
+    .courses-modal-overlay {
+        padding: 0;
+    }
+}
+
+
+/* --- Loading Spinner --- */
+.courses-spinner-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.courses-spinner {
+    border: 4px solid rgba(255, 255, 255, 0.3);
+    border-top: 4px solid #fff;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+}
+
+.courses-spinner-label {
+    color: #fff;
+    font-size: 1rem;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}

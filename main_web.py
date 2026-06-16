@@ -8,7 +8,7 @@ import threading
 import re
 from types import SimpleNamespace
 import csv
-from load_data import load_combined_data, get_department_group, get_department_room_file
+from load_data import load_combined_data, get_department_group, get_department_room_file, normalize_course_code
 from builder import build_domain
 from constraints import make_constraints
 from csp import CSP
@@ -73,6 +73,63 @@ def _validate_ai_solution_hard_constraints(solution, data):
         "05:00 PM": 3,
     }
 
+    time_24_to_idx = {
+        "07:00": 0,
+        "10:00": 1,
+        "14:00": 2,
+        "17:00": 3,
+    }
+
+    def _slot_index(raw_value):
+        if raw_value is None:
+            return None
+
+        if isinstance(raw_value, (int, float)):
+            idx = int(raw_value)
+            return idx if 0 <= idx <= 3 else None
+
+        value = str(raw_value).strip()
+        if not value:
+            return None
+
+        if value.isdigit():
+            idx = int(value)
+            return idx if 0 <= idx <= 3 else None
+
+        start = value.split("-")[0].strip().lower().replace(".", "")
+        start = re.sub(r'\s+', ' ', start)
+        compact = start.replace(" ", "")
+
+        ampm_match = re.match(r'^(\d{1,2})(?::(\d{2}))?(am|pm)$', compact)
+        if ampm_match:
+            hour = int(ampm_match.group(1))
+            minute = int(ampm_match.group(2) or "00")
+            suffix = ampm_match.group(3)
+            if suffix == 'am':
+                hour = 0 if hour == 12 else hour
+            else:
+                hour = 12 if hour == 12 else hour + 12
+            return time_24_to_idx.get(f"{hour:02d}:{minute:02d}")
+
+        hm_match = re.match(r'^(\d{1,2}):(\d{2})$', compact)
+        if hm_match:
+            hour = int(hm_match.group(1))
+            minute = int(hm_match.group(2))
+            return time_24_to_idx.get(f"{hour:02d}:{minute:02d}")
+
+        canonical_match = re.match(r'^(\d{1,2}):(\d{2})\s*(am|pm)$', start)
+        if canonical_match:
+            hour = int(canonical_match.group(1))
+            minute = int(canonical_match.group(2))
+            suffix = canonical_match.group(3)
+            if suffix == 'am':
+                hour = 0 if hour == 12 else hour
+            else:
+                hour = 12 if hour == 12 else hour + 12
+            return time_24_to_idx.get(f"{hour:02d}:{minute:02d}")
+
+        return time_start_to_idx.get(start.upper())
+
     special_rooms_all = data.get("special_rooms", {}) or {}
 
     def _normalize_code(raw_code):
@@ -95,6 +152,7 @@ def _validate_ai_solution_hard_constraints(solution, data):
         return " ".join(str(value or "").strip().lower().split())
 
     reserved_rooms = set()
+    room_pool_ids = set((data.get("rooms", {}) or {}).keys())
     for info in special_rooms.values():
         if isinstance(info, dict):
             reserved_name = str(info.get("room_name", info.get("room", ""))).strip()
@@ -156,22 +214,29 @@ def _validate_ai_solution_hard_constraints(solution, data):
                     if str(day).strip().lower() != str(fixed_day).strip().lower():
                         errors.append(f"Special-day violation for {course_code}: expected {fixed_day}, got {day}")
 
-            if fixed_slot is not None:
-                slot_start = slot.split("-")[0].strip()
-                if time_start_to_idx.get(slot_start) != fixed_slot:
-                    errors.append(f"Special-time violation for {course_code}: expected slot {fixed_slot}, got {slot}")
+            expected_slot = _slot_index(fixed_slot)
+            if expected_slot is None and fixed_time:
+                expected_slot = _slot_index(fixed_time)
+            actual_slot = _slot_index(slot)
+
+            if expected_slot is not None:
+                if actual_slot != expected_slot:
+                    expected_label = fixed_time if fixed_time else f"slot {fixed_slot}"
+                    errors.append(f"Special-time violation for {course_code}: expected {expected_label}, got {slot}")
             elif fixed_time:
                 slot_start = slot.split("-")[0].strip().lower().replace(" ", "")
                 fixed_time_norm = fixed_time.lower().replace(" ", "")
                 if slot_start != fixed_time_norm:
                     errors.append(f"Special-time violation for {course_code}: expected {fixed_time}, got {slot}")
         elif _norm_room(room) in reserved_rooms:
-            errors.append(f"Reserved-room violation: {course_code} cannot use {room}")
+            room_id = str(room or "").strip().replace(" ", "_")
+            if room_id not in room_pool_ids:
+                errors.append(f"Reserved-room violation: {course_code} cannot use {room}")
 
     return len(errors) == 0, errors
 
 def run_headless(input_file, mode_choice, output_file, ai_preference, course_type="Departmental", 
-                 department="1", availability_mode="1", exam_mode=False, model="csp", general_schedule_path=None,
+                 department="1", availability_mode="1", exam_mode=False, model="csp", semester=None, general_schedule_path=None,
                  progress_session_id=None, weight_room=10.0, weight_lecturer=5.0, weight_balance=8.0,
                  progress_callback=None, max_runtime_seconds=45, fast_mode=True):
     """
@@ -233,6 +298,193 @@ def run_headless(input_file, mode_choice, output_file, ai_preference, course_typ
         except Exception as e:
             print(f"[WARNING] Could not overwrite master general schedule: {e}")
 
+    def _canonical_department_label(label: str) -> str:
+        raw = str(label or "").strip().lower().replace(" ", "").replace("_", "").replace("-", "")
+        alias_map = {
+            "cs/it/bbis": "csitbbis",
+            "csitbbis": "csitbbis",
+            "cs": "csitbbis",
+            "it": "csitbbis",
+            "bbis": "csitbbis",
+            "computingscience": "csitbbis",
+            "business": "business",
+            "education": "education",
+            "developmentstudies": "developmentstudies",
+            "biomedicalengineering": "biomedicalengineering",
+            "nursing": "nursing",
+            "theology": "theology",
+            "general": "general",
+        }
+        return alias_map.get(raw, raw)
+
+    def _normalize_lecturer_name(name: str) -> str:
+        text = str(name or "").strip().lower().replace("_", " ")
+        return " ".join(text.split())
+
+    def _load_shared_course_departments() -> dict:
+        candidates = [
+            os.path.join(temp_dir, "csv", "general", "shared_courses.csv"),
+            "csv/general/shared_courses.csv",
+            "shared_courses.csv",
+        ]
+        target = next((p for p in candidates if os.path.exists(p)), None)
+        if not target:
+            return {}
+
+        try:
+            shared_df = pd.read_csv(target)
+            shared_df.columns = [str(c).strip().lower() for c in shared_df.columns]
+            dep_map = {}
+
+            for _, row in shared_df.iterrows():
+                code = normalize_course_code(str(row.get("course_code", "")))
+                if not code:
+                    continue
+
+                raw_depts = str(row.get("department", row.get("departments", "")) or "")
+                labels = [
+                    part.strip() for part in re.split(r"[,/;|]+", raw_depts)
+                    if str(part).strip()
+                ]
+                normalized = {_canonical_department_label(dep) for dep in labels if dep}
+                if normalized:
+                    dep_map.setdefault(code, set()).update(normalized)
+
+            return dep_map
+        except Exception as e:
+            print(f"[WARNING] Could not parse shared_courses.csv for block filtering: {e}")
+            return {}
+
+    def _apply_special_locks_to_solution(solution_rows, data_dict, time_slots):
+        """Force special-room courses back to locked room/day/time across all AI models."""
+        if not isinstance(solution_rows, list) or not solution_rows:
+            return 0
+
+        special_rooms_raw = (data_dict or {}).get("special_rooms", {}) or {}
+        if not special_rooms_raw:
+            return 0
+
+        day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+        day_to_idx_local = {"monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3, "friday": 4}
+        time_24_to_idx = {
+            "07:00": 0,
+            "10:00": 1,
+            "14:00": 2,
+            "17:00": 3,
+        }
+
+        def _normalize_code(raw_code):
+            code = str(raw_code or "").strip().upper()
+            code = re.sub(r'\[Sec\s+.*?\]', '', code, flags=re.IGNORECASE)
+            code = code.split(":")[0].strip()
+            return re.split(r'\s*/\s*', code)[0].strip()
+
+        def _slot_index(raw_value):
+            if raw_value is None:
+                return None
+
+            if isinstance(raw_value, (int, float)):
+                idx = int(raw_value)
+                return idx if 0 <= idx < len(time_slots) else None
+
+            value = str(raw_value).strip()
+            if not value:
+                return None
+
+            if value.isdigit():
+                idx = int(value)
+                return idx if 0 <= idx < len(time_slots) else None
+
+            start = value.split("-")[0].strip().lower().replace(".", "")
+            start = re.sub(r'\s+', ' ', start)
+            compact = start.replace(" ", "")
+
+            ampm_match = re.match(r'^(\d{1,2})(?::(\d{2}))?(am|pm)$', compact)
+            if ampm_match:
+                hour = int(ampm_match.group(1))
+                minute = int(ampm_match.group(2) or "00")
+                suffix = ampm_match.group(3)
+                if suffix == 'am':
+                    hour = 0 if hour == 12 else hour
+                else:
+                    hour = 12 if hour == 12 else hour + 12
+                return time_24_to_idx.get(f"{hour:02d}:{minute:02d}")
+
+            hm_match = re.match(r'^(\d{1,2}):(\d{2})$', compact)
+            if hm_match:
+                hour = int(hm_match.group(1))
+                minute = int(hm_match.group(2))
+                return time_24_to_idx.get(f"{hour:02d}:{minute:02d}")
+
+            canonical_match = re.match(r'^(\d{1,2}):(\d{2})\s*(am|pm)$', start)
+            if canonical_match:
+                hour = int(canonical_match.group(1))
+                minute = int(canonical_match.group(2))
+                suffix = canonical_match.group(3)
+                if suffix == 'am':
+                    hour = 0 if hour == 12 else hour
+                else:
+                    hour = 12 if hour == 12 else hour + 12
+                return time_24_to_idx.get(f"{hour:02d}:{minute:02d}")
+
+            return None
+
+        normalized_special = {}
+        for code, info in special_rooms_raw.items():
+            norm = _normalize_code(code)
+            if norm and norm not in normalized_special:
+                normalized_special[norm] = info
+
+        corrected = 0
+        for row in solution_rows:
+            if not isinstance(row, dict):
+                continue
+
+            code_norm = _normalize_code(row.get("course_code", ""))
+            special = normalized_special.get(code_norm)
+            if not isinstance(special, dict):
+                continue
+
+            fixed_room = str(special.get("room_name", special.get("room", ""))).strip()
+            fixed_day = special.get("fixed_day", special.get("day"))
+            fixed_slot = special.get("fixed_slot", special.get("slot"))
+            fixed_time = str(special.get("fixed_time", "")).strip()
+
+            changed = False
+
+            if fixed_room:
+                if str(row.get("room", "")).strip() != fixed_room:
+                    row["room"] = fixed_room
+                    changed = True
+                if str(row.get("room_name", "")).strip() != fixed_room:
+                    row["room_name"] = fixed_room
+                    changed = True
+
+            day_idx = None
+            if isinstance(fixed_day, (int, float)) or str(fixed_day).isdigit():
+                day_idx = int(fixed_day)
+            elif str(fixed_day).strip():
+                day_idx = day_to_idx_local.get(str(fixed_day).strip().lower())
+            if day_idx is not None and 0 <= day_idx < len(day_names):
+                day_name = day_names[day_idx]
+                if str(row.get("day", "")).strip() != day_name:
+                    row["day"] = day_name
+                    changed = True
+
+            slot_idx = _slot_index(fixed_slot)
+            if slot_idx is None and fixed_time:
+                slot_idx = _slot_index(fixed_time)
+            if slot_idx is not None and 0 <= slot_idx < len(time_slots):
+                fixed_slot_label = time_slots[slot_idx]
+                if str(row.get("time_slot", "")).strip() != fixed_slot_label:
+                    row["time_slot"] = fixed_slot_label
+                    changed = True
+
+            if changed:
+                corrected += 1
+
+        return corrected
+
     def _archive_schedule_history() -> str | None:
         if not os.path.exists(output_file):
             return None
@@ -278,10 +530,14 @@ def run_headless(input_file, mode_choice, output_file, ai_preference, course_typ
 
                 if history_timestamped and os.path.exists(history_timestamped):
                     try:
-                        b2.upload_file(history_timestamped, f"csv/history/{os.path.basename(history_timestamped)}")
-                        print(f"[B2] Uploaded timestamped history: {history_timestamped}")
+                       # b2.upload_file(history_timestamped, f"csv/history/{os.path.basename(history_timestamped)}")
+                       # print(f"[B2] Uploaded timestamped history: {history_timestamped}")
+                        # Delete local timestamped version after successful upload
+                        os.remove(history_timestamped)
+                        print(f"[CLEANUP] Deleted local timestamped history: {history_timestamped}")
                     except Exception as e:
                         print(f"[B2] Failed to upload timestamped history: {e}")
+
 
                 if os.path.exists(history_data):
                     try:
@@ -350,6 +606,10 @@ def run_headless(input_file, mode_choice, output_file, ai_preference, course_typ
     # Log all input parameters for debugging
     print(f"[START] Parameters: course_type='{course_type}', department='{department}'")
     
+    # Set Environment Variables for constraints module
+    if semester:
+        os.environ['SCHEDULER_SEMESTER'] = str(semester)
+
     # 1. AI Memory Loading
     print(f"[AI] Loading Intelligence from {model_file}...")
     preference_model = load_trained_model(model_path=model_file)
@@ -425,15 +685,28 @@ def run_headless(input_file, mode_choice, output_file, ai_preference, course_typ
         print("[INFO] General session detected. Skipping general schedule blocks.")
     else:
         inferred_semester = None
-        if os.path.exists(input_file):
+        if semester in ["1", "2"]:
+            inferred_semester = semester
+        elif semester == "3":
+            print("[INFO] All Semesters selected. Processing all courses and blocks.")
+            inferred_semester = None
+
+        if os.path.exists(input_file) and inferred_semester is not None:
             try:
                 input_df = pd.read_csv(input_file)
                 if 'Semester' in input_df.columns:
-                    sem_series = input_df['Semester'].dropna().astype(str)
-                    if not sem_series.empty:
-                        inferred_semester = sem_series.mode().iloc[0]
-            except Exception:
-                pass
+                    original_count = len(input_df)
+                    filtered_df = input_df[input_df['Semester'].astype(str).str.strip() == inferred_semester]
+                    filtered_count = len(filtered_df)
+                    print(f"[INFO] Filtered input file to Semester {inferred_semester}: {filtered_count} courses (from {original_count} total)")
+                    
+                    if filtered_df.empty:
+                        print(f"[WARNING] No courses found for Semester {inferred_semester}! The schedule may be empty.")
+                    
+                    # Rewrite the input file so the rest of the pipeline only sees the filtered data
+                    filtered_df.to_csv(input_file, index=False)
+            except Exception as e:
+                print(f"[ERROR] Could not filter input by semester: {e}")
 
         # Step A: Collect all custom block paths (from list or single string)
         custom_paths = []
@@ -485,6 +758,71 @@ def run_headless(input_file, mode_choice, output_file, ai_preference, course_typ
             blocked_blocks.extend(baseline_blocks)
             print(f"[INFO] Loaded {len(baseline_blocks)} baseline blocks from {default_gen_path}")
             _emit_progress(progress_callback, 12, f"Loaded {len(baseline_blocks)} default VVU blocks", session_id=progress_session_id)
+
+        # Smart block relevance filter: drop unrelated cross-department courses while
+        # preserving shared courses, same-lecturer collisions, same-course locks, and General blocks.
+        if blocked_blocks:
+            target_department_key = _canonical_department_label(inferred_department)
+            shared_course_departments = _load_shared_course_departments()
+
+            active_course_codes = set()
+            active_lecturers = set()
+            try:
+                active_df = pd.read_csv(input_file)
+                active_df.columns = [str(c).strip().lower() for c in active_df.columns]
+                if "course_code" in active_df.columns:
+                    for code in active_df["course_code"].dropna().astype(str).tolist():
+                        norm_code = normalize_course_code(code)
+                        if norm_code:
+                            active_course_codes.add(norm_code)
+                if "lecturer_name" in active_df.columns:
+                    for name in active_df["lecturer_name"].dropna().astype(str).tolist():
+                        norm_lect = _normalize_lecturer_name(name)
+                        if norm_lect:
+                            active_lecturers.add(norm_lect)
+            except Exception as e:
+                print(f"[WARNING] Could not compute active course/lecturer context for block filter: {e}")
+
+            filtered_blocks = []
+            dropped = 0
+            for block in blocked_blocks:
+                block_code = normalize_course_code(block.get("course_code", ""))
+                block_lecturer = _normalize_lecturer_name(block.get("lecturer_name", ""))
+
+                keep = False
+
+                # Keep legacy/partial rows we cannot safely classify.
+                if not block_code:
+                    keep = True
+
+                # Preserve same-course locks.
+                if not keep and block_code in active_course_codes:
+                    keep = True
+
+                # Preserve cross-department lecturer occupancy protection.
+                if not keep and block_lecturer and block_lecturer in active_lecturers:
+                    keep = True
+
+                # Preserve General blocks for all departments.
+                if not keep and block_code and get_department_group(block_code) == "General":
+                    keep = True
+
+                # Keep shared courses that explicitly include the current department.
+                if not keep and block_code:
+                    shared_depts = shared_course_departments.get(block_code, set())
+                    if target_department_key and target_department_key in shared_depts:
+                        keep = True
+
+                if keep:
+                    filtered_blocks.append(block)
+                else:
+                    dropped += 1
+
+            blocked_blocks = filtered_blocks
+            if dropped > 0:
+                print(f"[INFO] Dropped {dropped} unrelated block(s) after shared-course relevance filtering for {inferred_department}.")
+                _emit_progress(progress_callback, 24, f"Dropped {dropped} unrelated cross-department blocks", session_id=progress_session_id)
+            print(f"[INFO] Block relevance filter retained {len(blocked_blocks)} block(s).")
 
     # Build baseline occupancy for AI schedulers from blocked blocks so room/day/time
     # collisions are treated as already occupied, and preserve block metadata lookup.
@@ -610,7 +948,9 @@ def run_headless(input_file, mode_choice, output_file, ai_preference, course_typ
     if not os.path.exists(special_rooms_path):
         special_rooms_path = "special_rooms.csv"  # Fallback to root
     print(f"[INFO] Using special rooms file: {special_rooms_path}")
-    data = load_combined_data([input_file], interactive=False, rooms_csv_path=rooms_csv_path, special_rooms_path=special_rooms_path, blocked_blocks=blocked_blocks)
+    data = load_combined_data([input_file], interactive=False, rooms_csv_path=rooms_csv_path, 
+                              special_rooms_path=special_rooms_path, blocked_blocks=blocked_blocks,
+                              availability_mode=availability_mode)
     _emit_progress(progress_callback, 40, "Loading timetable data and special rooms...", session_id=progress_session_id)
 
     locked_export_rows = []
@@ -795,6 +1135,7 @@ def run_headless(input_file, mode_choice, output_file, ai_preference, course_typ
             
             course_dicts.append({
                 "code": sec.course_code,
+                "section_id": sec.id,  # Unique section identifier to preserve per-section titles
                 "title": sec.section_title or sec.course_code,
                 "department": sec.departmental_group,
                 "credits": sec.credit_hours,
@@ -806,7 +1147,7 @@ def run_headless(input_file, mode_choice, output_file, ai_preference, course_typ
                 "fixed_room": sec.requested_room.replace("_", " ") if sec.requested_room is not None else None
             })
             
-        room_dicts = [{"name": r.name, "capacity": r.capacity} for r in data["rooms"].values()]
+        room_dicts = [{"name": r.name, "capacity": r.capacity, "department": getattr(r, 'department', 'General')} for r in data["rooms"].values()]
         
         unified_solver = AIUnifiedScheduler(
             data_path=".",
@@ -829,8 +1170,9 @@ def run_headless(input_file, mode_choice, output_file, ai_preference, course_typ
         if model == "ga":
             solution, _, _ = unified_solver.schedule_with_ga()
         elif model == "rl":
-            rl_episodes = 30 if fast_mode else 100
+            rl_episodes = 100 if fast_mode else 300
             solution, _, _ = unified_solver.schedule_with_rl(num_episodes=rl_episodes)
+
         elif model == "nn":
             solution, _, _ = unified_solver.schedule_with_nn()
         elif model == "ensemble":
@@ -844,6 +1186,14 @@ def run_headless(input_file, mode_choice, output_file, ai_preference, course_typ
             print(f"[HYBRID] Winner: {best_method}")
     
     if solution:
+        lock_fixes = _apply_special_locks_to_solution(
+            solution,
+            data,
+            time_slots=["07:00 AM - 09:30 AM", "10:00 AM - 12:30 PM", "02:00 PM - 04:30 PM", "05:00 PM - 06:00 PM"]
+        )
+        if lock_fixes > 0:
+            print(f"[LOCK] Re-applied special locks to {lock_fixes} AI assignment(s) before validation.")
+
         valid, hard_errors = _validate_ai_solution_hard_constraints(solution, data)
         if not valid:
             print("[FAILURE] AI output violates hard constraints. Rejecting schedule.")
@@ -893,16 +1243,15 @@ def run_headless(input_file, mode_choice, output_file, ai_preference, course_typ
         return True, accuracy
     else:
         print(f"[FAILURE] {model.upper()} found no valid schedule within constraints.")
-        if str(model).lower() in ['ensemble', 'hybrid']:
-            print(f"[FAILURE] {model.upper()} failed to find any valid solution. Dataset might be irresolvable.")
-            _emit_progress(progress_callback, 100, "No valid schedule found by any algorithm", 0, session_id=progress_session_id)
-            return False, 0.0
-            
+
         if _seconds_left() < 6:
             _emit_progress(progress_callback, 100, f"{model.upper()} timed out under latency budget", 0, session_id=progress_session_id)
             return False, 0.0
 
-        _emit_progress(progress_callback, 85, f"{model.upper()} failed. Running AI Ensemble fallback...", session_id=progress_session_id)
+        model_lower = str(model).lower()
+        is_second_chance_for_ensemble = model_lower in ['ensemble', 'hybrid']
+        fallback_banner = "Running recovery Ensemble fallback..." if is_second_chance_for_ensemble else "Running AI Ensemble fallback..."
+        _emit_progress(progress_callback, 85, f"{model.upper()} failed. {fallback_banner}", session_id=progress_session_id)
         
         try:
             # Prepare minimal representation of courses (preserve smart-lock/blocking fields)
@@ -927,6 +1276,16 @@ def run_headless(input_file, mode_choice, output_file, ai_preference, course_typ
                 
             room_dicts = [{"name": r.name, "capacity": r.capacity} for r in data["rooms"].values()]
 
+            fallback_strict_departmental = data['config'].get('strict_departmental', True)
+            fallback_existing_schedule = ai_existing_schedule
+            fallback_existing_lookup = ai_existing_course_lookup
+
+            # If Ensemble/Hybrid already failed once, relax only what is needed for a true recovery pass.
+            if is_second_chance_for_ensemble:
+                fallback_strict_departmental = False
+                fallback_existing_schedule = []
+                fallback_existing_lookup = {}
+
             ensemble_scheduler = AIUnifiedScheduler(
                 data_path=".",
                 courses=course_dicts,
@@ -938,9 +1297,9 @@ def run_headless(input_file, mode_choice, output_file, ai_preference, course_typ
                 enable_rl=False,
                 enable_nn=False,
                 enable_ensemble=True,  # ONLY run Ensemble for ultra-fast fallback
-                existing_schedule=ai_existing_schedule,
-                existing_course_lookup=ai_existing_course_lookup,
-                strict_departmental=data['config']['strict_departmental'],
+                existing_schedule=fallback_existing_schedule,
+                existing_course_lookup=fallback_existing_lookup,
+                strict_departmental=fallback_strict_departmental,
                 is_general_session=data['config']['is_general_session'],
                 verbose=True
             )
@@ -953,6 +1312,14 @@ def run_headless(input_file, mode_choice, output_file, ai_preference, course_typ
                 
                 # Enrich and finalize constraints before export 
                 enriched_fallback = ensemble_scheduler._finalize_and_enrich_schedule(fallback_solution)
+
+                fallback_lock_fixes = _apply_special_locks_to_solution(
+                    enriched_fallback,
+                    data,
+                    time_slots=["07:00 AM - 09:30 AM", "10:00 AM - 12:30 PM", "02:00 PM - 04:30 PM", "05:00 PM - 06:00 PM"]
+                )
+                if fallback_lock_fixes > 0:
+                    print(f"[LOCK] Re-applied special locks to {fallback_lock_fixes} fallback assignment(s) before validation.")
 
                 valid, hard_errors = _validate_ai_solution_hard_constraints(enriched_fallback, data)
                 if not valid:

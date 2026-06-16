@@ -120,3 +120,44 @@
 .notification-pill--urgent {
     background: rgba(239, 68, 68, 0.3);
 }
+
+/* ============================================================
+   notifications.css — Mobile responsive breakpoints
+   ============================================================ */
+
+@media (max-width: 768px) {
+    .notifications-container {
+        padding: 1rem;
+    }
+    .notifications-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+    }
+    .notifications-header-btns {
+        width: 100%;
+        flex-direction: column;
+    }
+    .notifications-header-btns .glass-btn {
+        width: 100%;
+    }
+}
+
+@media (max-width: 480px) {
+    .notifications-container {
+        padding: 0.75rem;
+    }
+    .notifications-panel {
+        padding: 1rem;
+    }
+    .notification-body {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+    .notification-item-actions {
+        align-self: flex-end;
+    }
+    .notification-title-row {
+        flex-wrap: wrap;
+    }
+}

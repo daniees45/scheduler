@@ -4,6 +4,7 @@
  * AI-powered scheduling recommendations based on priorities, productivity patterns, and goals
  */
 require_once 'db.php';
+require_once __DIR__ . '/../includes/unified_schedule_service.php';
 
 header('Content-Type: application/json');
 
@@ -25,6 +26,10 @@ try {
         case 'get_suggestions':
             $category = $_GET['category'] ?? 'all';
             echo json_encode(getSmartSuggestions($user_id, $category, $conn, $user_role, $lecturer_id));
+            break;
+
+        case 'get_insights':
+            echo json_encode(getPlannerInsights($user_id, $conn, $user_role, $lecturer_id));
             break;
         
         case 'accept_suggestion':
@@ -99,7 +104,8 @@ function getSmartSuggestions($user_id, $category, $conn, $user_role, $lecturer_i
     return [
         'success' => true,
         'suggestions' => $suggestions,
-        'count' => count($suggestions)
+        'count' => count($suggestions),
+        'insights' => getPlannerInsights($user_id, $conn, $user_role, $lecturer_id)
     ];
 }
 
@@ -112,58 +118,129 @@ function generateSuggestions($user_id, $conn, $user_role, $lecturer_id) {
     $stmt = $conn->prepare("DELETE FROM schedule_suggestions WHERE user_id = ? AND status = 'pending'");
     $stmt->bind_param("i", $user_id);
     $stmt->execute();
-    
-    // Get user's busy blocks from courses and personal events
-    $busy_blocks = getBusyBlocks($user_id, $conn, $user_role, $lecturer_id);
-    
-    // Get user priorities
-    $priorities = getUserPriorities($user_id, $conn);
-    
-    // Get productivity patterns
-    $productivity_patterns = getProductivityPatterns($user_id, $conn);
-    
-    // Get task preferences (learned)
-    $task_preferences = getTaskPreferences($user_id, $conn);
-    
-    // Find free time slots
-    $free_slots = findFreeSlots($busy_blocks);
-    
-    // Score and rank slots
-    $scored_slots = scoreSlots($free_slots, $priorities, $productivity_patterns, $task_preferences);
-    
-    // Insert top suggestions
+
+    $schedule_rows = buildStudentScheduleRows($conn, $semester = (string)($_SESSION['semester'] ?? '1'));
+    $personal_events = getPersonalEvents($user_id, $conn);
+    $productivity_context = buildPythonProductivityContext($user_id, $conn);
+
+    $python_result = runPythonSuggestions([
+        'role' => 'student',
+        'task_category' => 'study',
+        'schedule_rows' => $schedule_rows,
+        'personal_events' => $personal_events,
+        'min_minutes' => 60,
+        'day_start' => '07:00',
+        'day_end' => '21:00',
+        'productivity' => $productivity_context,
+    ]);
+
+    if (empty($python_result['success'])) {
+        return ['success' => false, 'error' => $python_result['error'] ?? 'Python suggestion engine failed'];
+    }
+
     $inserted = 0;
-    foreach ($scored_slots as $slot) {
+    foreach (($python_result['suggestions'] ?? []) as $slot) {
         if ($inserted >= 15) break;
-        
+
         $stmt = $conn->prepare("
             INSERT INTO schedule_suggestions 
             (user_id, suggestion_type, day, start_time, end_time, duration_minutes, 
              priority_score, productivity_score, reason)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ");
-        
+
+        $type = 'study_slot';
+        $priority_score = (float)($slot['final_score'] ?? $slot['score'] ?? 0);
+        $productivity_score = (float)($slot['preference_score'] ?? 0.5);
+        $duration = (int)($slot['duration_minutes'] ?? 0);
+        $reason = trim((string)($slot['reason'] ?? 'Suggested free slot'));
+        if (isset($slot['preference_score'])) {
+            $reason .= sprintf(' Preference %.2f.', (float)$slot['preference_score']);
+        }
+
         $stmt->bind_param("issssiids",
             $user_id,
-            $slot['type'],
+            $type,
             $slot['day'],
             $slot['start_time'],
             $slot['end_time'],
-            $slot['duration'],
-            $slot['priority_score'],
-            $slot['productivity_score'],
-            $slot['reason']
+            $duration,
+            $priority_score,
+            $productivity_score,
+            $reason
         );
-        
+
         if ($stmt->execute()) {
             $inserted++;
         }
     }
-    
+
     return [
         'success' => true,
         'message' => "Generated $inserted scheduling suggestions",
-        'suggestions_count' => $inserted
+        'suggestions_count' => $inserted,
+        'quality_prediction' => $python_result['quality_prediction'] ?? null
+    ];
+}
+
+function buildStudentScheduleRows($conn, $semester) {
+    $unified_payload = unified_schedule_fetch($conn, $_SESSION, ['semester' => $semester]);
+    $schedule_rows = [];
+    foreach (($unified_payload['rows'] ?? []) as $row) {
+        $schedule_rows[] = [
+            'day' => $row['day'] ?? '',
+            'time' => $row['time'] ?? '',
+            'label' => trim((string)(($row['course_code'] ?? 'Class') . ' ' . ($row['room'] ?? ''))),
+        ];
+    }
+    return $schedule_rows;
+}
+
+function buildPythonProductivityContext($user_id, $conn) {
+    $stats_stmt = $conn->prepare("SELECT COUNT(*) as total_tasks,
+                                         AVG(quality_rating) as avg_quality_rating,
+                                         SUM(CASE WHEN completion_status = 'completed' THEN 1 ELSE 0 END) as completed_tasks
+                                  FROM productivity_log
+                                  WHERE user_id = ? AND logged_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)");
+    $stats_stmt->bind_param('i', $user_id);
+    $stats_stmt->execute();
+    $stats = $stats_stmt->get_result()->fetch_assoc() ?: [];
+
+    $pref_stmt = $conn->prepare("SELECT COUNT(*) as learned_preferences,
+                                        SUM(times_accepted) as accepted_total,
+                                        SUM(times_rejected) as rejected_total
+                                 FROM task_preferences WHERE user_id = ?");
+    $pref_stmt->bind_param('i', $user_id);
+    $pref_stmt->execute();
+    $pref = $pref_stmt->get_result()->fetch_assoc() ?: [];
+
+    $peak_stmt = $conn->prepare("SELECT HOUR(start_time) as hour
+                                 FROM productivity_log
+                                 WHERE user_id = ? AND completion_status = 'completed'
+                                 GROUP BY HOUR(start_time)
+                                 ORDER BY AVG(productivity_score) DESC
+                                 LIMIT 3");
+    $peak_stmt->bind_param('i', $user_id);
+    $peak_stmt->execute();
+    $peak_res = $peak_stmt->get_result();
+    $peak_hours = [];
+    while ($row = $peak_res->fetch_assoc()) {
+        $peak_hours[] = (int)$row['hour'];
+    }
+
+    $total_tasks = (int)($stats['total_tasks'] ?? 0);
+    $completed_tasks = (int)($stats['completed_tasks'] ?? 0);
+    $accepted_total = (int)($pref['accepted_total'] ?? 0);
+    $rejected_total = (int)($pref['rejected_total'] ?? 0);
+    $feedback_total = $accepted_total + $rejected_total;
+
+    return [
+        'completion_rate' => $total_tasks > 0 ? round($completed_tasks / $total_tasks, 3) : 0.0,
+        'avg_quality_rating' => round((float)($stats['avg_quality_rating'] ?? 0), 3),
+        'learned_preferences' => (int)($pref['learned_preferences'] ?? 0),
+        'peak_productivity_hours' => $peak_hours,
+        'accept_rate' => $feedback_total > 0 ? round($accepted_total / $feedback_total, 3) : 0.5,
+        'q_confidence' => $feedback_total > 0 ? round(min(1, $feedback_total / 20), 3) : 0.0,
     ];
 }
 
@@ -710,6 +787,7 @@ function acceptSuggestion($user_id, $suggestion_id, $conn) {
     
     // Update task preferences (Q-learning)
     updateTaskPreference($user_id, $suggestion, 'accept', $conn);
+    forwardSuggestionFeedback($user_id, $suggestion, 'accept');
     
     return [
         'success' => true,
@@ -740,11 +818,144 @@ function rejectSuggestion($user_id, $suggestion_id, $reason, $conn) {
     
     // Update task preferences (Q-learning)
     updateTaskPreference($user_id, $suggestion, 'reject', $conn);
+    forwardSuggestionFeedback($user_id, $suggestion, 'reject', $reason);
     
     return [
         'success' => true,
         'message' => 'Suggestion rejected and preferences updated'
     ];
+}
+
+function forwardSuggestionFeedback($user_id, $suggestion, $action, $reason = '') {
+    $payload = [
+        'action' => $action,
+        'quality' => $action === 'accept' ? 1.0 : 0.0,
+        'metadata' => [
+            'user_id' => $user_id,
+            'source' => 'planner_suggestions',
+            'suggestion_type' => $suggestion['suggestion_type'] ?? 'study_slot',
+            'day' => $suggestion['day'] ?? '',
+            'start_time' => $suggestion['start_time'] ?? '',
+            'end_time' => $suggestion['end_time'] ?? '',
+            'reason' => $reason,
+        ],
+        'features' => [
+            'priority_score' => (float)($suggestion['priority_score'] ?? 0),
+            'productivity_score' => (float)($suggestion['productivity_score'] ?? 0),
+            'duration_minutes' => (int)($suggestion['duration_minutes'] ?? 0),
+        ],
+    ];
+
+    $base = function_exists('scheduler_ai_base_url') ? scheduler_ai_base_url() : '';
+    if (!$base) {
+        return;
+    }
+
+    $ch = curl_init(rtrim($base, '/') . '/feedback');
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 2);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+    curl_exec($ch);
+    curl_close($ch);
+}
+
+function getPlannerInsights($user_id, $conn, $user_role, $lecturer_id) {
+    $counts_stmt = $conn->prepare("SELECT
+                                        SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending_count,
+                                        SUM(CASE WHEN status = 'accepted' THEN 1 ELSE 0 END) as accepted_count,
+                                        SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END) as rejected_count
+                                   FROM schedule_suggestions WHERE user_id = ?");
+    $counts_stmt->bind_param('i', $user_id);
+    $counts_stmt->execute();
+    $counts = $counts_stmt->get_result()->fetch_assoc() ?: [];
+
+    $pref_stmt = $conn->prepare("SELECT COUNT(*) as learned_preferences,
+                                        AVG(preference_score) as avg_preference_score,
+                                        SUM(times_accepted) as times_accepted,
+                                        SUM(times_rejected) as times_rejected
+                                 FROM task_preferences WHERE user_id = ?");
+    $pref_stmt->bind_param('i', $user_id);
+    $pref_stmt->execute();
+    $prefs = $pref_stmt->get_result()->fetch_assoc() ?: [];
+
+    $prod_stmt = $conn->prepare("SELECT COUNT(*) as total_tasks,
+                                        AVG(quality_rating) as avg_quality_rating,
+                                        SUM(CASE WHEN completion_status = 'completed' THEN 1 ELSE 0 END) as completed_tasks
+                                 FROM productivity_log
+                                 WHERE user_id = ? AND logged_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)");
+    $prod_stmt->bind_param('i', $user_id);
+    $prod_stmt->execute();
+    $prod = $prod_stmt->get_result()->fetch_assoc() ?: [];
+
+    $best_stmt = $conn->prepare("SELECT preferred_day, TIME_FORMAT(preferred_time_start, '%H:%i') as start_time
+                                 FROM task_preferences
+                                 WHERE user_id = ?
+                                 ORDER BY preference_score DESC, times_accepted DESC
+                                 LIMIT 1");
+    $best_stmt->bind_param('i', $user_id);
+    $best_stmt->execute();
+    $best = $best_stmt->get_result()->fetch_assoc() ?: null;
+
+    $semester = (string)($_SESSION['semester'] ?? '1');
+    $schedule_rows = $user_role === 'lecturer'
+        ? buildLecturerScheduleRows($conn, getLecturerNameForInsights($conn, $lecturer_id), getLecturerDepartmentForInsights($conn, $lecturer_id))
+        : buildStudentScheduleRows($conn, $semester);
+    $personal_events = getPersonalEvents($user_id, $conn);
+    $python_result = runPythonSuggestions([
+        'role' => $user_role === 'lecturer' ? 'lecturer' : 'student',
+        'task_category' => $user_role === 'lecturer' ? 'office_hour' : 'study',
+        'schedule_rows' => $schedule_rows,
+        'personal_events' => $personal_events,
+        'min_minutes' => 60,
+        'day_start' => '07:00',
+        'day_end' => '21:00',
+        'productivity' => buildPythonProductivityContext($user_id, $conn),
+    ]);
+
+    $accepted = (int)($counts['accepted_count'] ?? 0);
+    $rejected = (int)($counts['rejected_count'] ?? 0);
+    $decisions = $accepted + $rejected;
+    $total_tasks = (int)($prod['total_tasks'] ?? 0);
+    $completed_tasks = (int)($prod['completed_tasks'] ?? 0);
+
+    return [
+        'success' => true,
+        'pending_count' => (int)($counts['pending_count'] ?? 0),
+        'accepted_count' => $accepted,
+        'rejected_count' => $rejected,
+        'accept_rate' => $decisions > 0 ? round(($accepted / $decisions) * 100, 1) : 0.0,
+        'learned_preferences' => (int)($prefs['learned_preferences'] ?? 0),
+        'avg_preference_score' => round((float)($prefs['avg_preference_score'] ?? 0), 2),
+        'completion_rate' => $total_tasks > 0 ? round(($completed_tasks / $total_tasks) * 100, 1) : 0.0,
+        'avg_quality_rating' => round((float)($prod['avg_quality_rating'] ?? 0), 2),
+        'best_focus_window' => $best ? trim(($best['preferred_day'] ?? '') . ' ' . ($best['start_time'] ?? '')) : 'Not learned yet',
+        'quality_prediction' => $python_result['quality_prediction'] ?? null,
+    ];
+}
+
+function getLecturerNameForInsights($conn, $lecturer_id) {
+    if ($lecturer_id <= 0) {
+        return '';
+    }
+    $stmt = $conn->prepare("SELECT name FROM lecturers WHERE id = ? LIMIT 1");
+    $stmt->bind_param('i', $lecturer_id);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    return trim((string)($row['name'] ?? ''));
+}
+
+function getLecturerDepartmentForInsights($conn, $lecturer_id) {
+    if ($lecturer_id <= 0) {
+        return 'General';
+    }
+    $stmt = $conn->prepare("SELECT department FROM lecturers WHERE id = ? LIMIT 1");
+    $stmt->bind_param('i', $lecturer_id);
+    $stmt->execute();
+    $row = $stmt->get_result()->fetch_assoc();
+    return trim((string)($row['department'] ?? 'General')) ?: 'General';
 }
 
 function updateTaskPreference($user_id, $suggestion, $action, $conn) {

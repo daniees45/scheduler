@@ -32,14 +32,14 @@ function analyze_constraints() {
 
     if ($conn instanceof mysqli) {
         try {
-            $aq = $conn->query(
-                "SELECT
-                    COUNT(CASE WHEN action='SCHEDULE_GEN_SUCCESS' THEN 1 END) AS s,
-                    COUNT(CASE WHEN action='SCHEDULE_GEN_FAILURE' THEN 1 END) AS f
-                  FROM audit_log
-                 WHERE action IN ('SCHEDULE_GEN_SUCCESS','SCHEDULE_GEN_FAILURE')
-                   AND log_time >= DATE_SUB(NOW(), INTERVAL 90 DAY)"
-            );
+                        $aq = $conn->query(
+                                "SELECT
+                                        COUNT(CASE WHEN action IN ('SCHEDULE_GEN_SUCCESS','EXAM_GEN_SUCCESS','EXAM_COMBINED_SUCCESS') THEN 1 END) AS s,
+                                        COUNT(CASE WHEN action IN ('SCHEDULE_GEN_FAILURE','EXAM_GEN_FAILURE','EXAM_COMBINED_FAILURE') THEN 1 END) AS f
+                                    FROM audit_log
+                                 WHERE action IN ('SCHEDULE_GEN_SUCCESS','SCHEDULE_GEN_FAILURE','EXAM_GEN_SUCCESS','EXAM_GEN_FAILURE','EXAM_COMBINED_SUCCESS','EXAM_COMBINED_FAILURE')
+                                     AND log_time >= DATE_SUB(NOW(), INTERVAL 90 DAY)"
+                        );
             if ($aq && ($ar = $aq->fetch_assoc())) {
                 $s = intval($ar['s']); $f = intval($ar['f']);
                 if ($s + $f > 0) {
@@ -459,12 +459,12 @@ function calculate_quality_metrics() {
         }
         
         // Get schedule generation success rates
-        $query = "SELECT 
-                    COUNT(CASE WHEN action = 'SCHEDULE_GEN_SUCCESS' THEN 1 END) as successes,
-                    COUNT(CASE WHEN action IN ('SCHEDULE_GEN_FAILURE', 'SCHEDULE_GEN_ERROR') THEN 1 END) as failures
-                  FROM audit_log
-                  WHERE action LIKE 'SCHEDULE_GEN_%'
-                  AND log_time >= DATE_SUB(NOW(), INTERVAL 30 DAY)";
+                $query = "SELECT 
+                                        COUNT(CASE WHEN action IN ('SCHEDULE_GEN_SUCCESS','EXAM_GEN_SUCCESS','EXAM_COMBINED_SUCCESS') THEN 1 END) as successes,
+                                        COUNT(CASE WHEN action IN ('SCHEDULE_GEN_FAILURE', 'SCHEDULE_GEN_ERROR', 'EXAM_GEN_FAILURE', 'EXAM_GEN_ERROR', 'EXAM_COMBINED_FAILURE', 'EXAM_COMBINED_ERROR') THEN 1 END) as failures
+                                    FROM audit_log
+                                    WHERE action IN ('SCHEDULE_GEN_START','SCHEDULE_GEN_SUCCESS','SCHEDULE_GEN_FAILURE','SCHEDULE_GEN_ERROR','EXAM_GEN_START','EXAM_GEN_SUCCESS','EXAM_GEN_FAILURE','EXAM_GEN_ERROR','EXAM_COMBINED_START','EXAM_COMBINED_SUCCESS','EXAM_COMBINED_FAILURE','EXAM_COMBINED_ERROR')
+                                    AND log_time >= DATE_SUB(NOW(), INTERVAL 30 DAY)";
         
         $result = $conn->query($query);
         if ($result && $row = $result->fetch_assoc()) {

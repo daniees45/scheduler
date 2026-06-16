@@ -182,3 +182,51 @@
 .schedules-save-btn {
     background: linear-gradient(135deg, #10b981, #059669);
 }
+
+/* ============================================================
+   schedules.css — Mobile responsive breakpoints
+   ============================================================ */
+
+@media (max-width: 768px) {
+    .schedules-container {
+        padding: 1rem;
+    }
+    .schedule-card {
+        padding: 1rem;
+    }
+    .schedule-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+    }
+    .schedule-meta {
+        gap: 0.75rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .schedules-container {
+        padding: 0.75rem;
+    }
+    .schedules-filters {
+        flex-direction: column;
+    }
+    .schedules-filter-select {
+        min-width: unset;
+        width: 100%;
+    }
+    .schedules-refresh-btn {
+        width: 100%;
+    }
+    .schedule-actions .glass-btn {
+        flex: 1;
+        min-width: 0;
+    }
+    .schedules-icon-wrap {
+        width: 60px;
+        height: 60px;
+    }
+    .schedules-icon {
+        font-size: 1.5rem;
+    }
+}

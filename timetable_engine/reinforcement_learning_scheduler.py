@@ -166,7 +166,6 @@ class ReinforcementLearningScheduler:
             self._normalize_course_code(code): info
             for code, info in all_special_constraints.items()
             if isinstance(info, dict)
-            and " ".join(str(info.get('room_name', '')).strip().lower().split()) in available_room_names_normalized
         }
         
         # Build normalized reserved rooms set
@@ -475,15 +474,22 @@ class ReinforcementLearningScheduler:
         
         # Check Department match (Strict)
         if self.strict_departmental and not course.get('is_general', False):
-            course_dept = course.get('departmental_group', course.get('department', "General"))
-            room_dept = room.get('department', "General")
-            
-            if room_dept != "General":
-                rd = str(room_dept).lower().replace("/", " ").replace("-", " ")
-                cg = str(course_dept).lower().replace("/", " ").replace("-", " ")
-                is_match = (rd == cg) or (rd in cg) or (cg in rd)
-                if not is_match:
-                    return False, "Departmental room mismatch"
+            # Bypass if room is explicitly fixed/requested
+            if room.get('name') == course.get('fixed_room'):
+                pass
+            else:
+                special = self._get_special_constraint(course.get('code'))
+                if special and special.get('room_name') == room.get('name'):
+                    pass
+                else:
+                    course_dept = course.get('departmental_group', course.get('department', "General"))
+                    room_dept = room.get('department', "General")
+                    
+                    rd = str(room_dept).lower().replace("/", " ").replace("-", " ")
+                    cg = str(course_dept).lower().replace("/", " ").replace("-", " ")
+                    is_match = (rd == cg) or (rd in cg) or (cg in rd)
+                    if not is_match:
+                        return False, "Departmental room mismatch"
         
         return True, "Valid"
     
@@ -693,15 +699,21 @@ class ReinforcementLearningScheduler:
             course = self.courses[step]
             
             # Generate available actions (all possible assignments)
-            fixed_day = course.get('fixed_day')
-            fixed_time = course.get('fixed_time')
-            fixed_room = course.get('fixed_room')
+            spec = self._get_special_constraint(course.get('code', ''))
+            f_day = course.get('fixed_day') or spec.get('fixed_day')
+            f_time = course.get('fixed_time') or spec.get('fixed_time')
+            f_room = course.get('fixed_room') or spec.get('room_name')
 
-            # Prune action space early for fixed courses if possible
-            # We filter by index if they are strings
-            target_days = [self.days.index(fixed_day)] if fixed_day in self.days else range(len(self.days))
-            target_slots = [self.time_slots.index(fixed_time)] if fixed_time in self.time_slots else range(len(self.time_slots))
-            target_rooms = [i for i, r in enumerate(self.rooms) if r['name'] == fixed_room] if fixed_room else range(len(self.rooms))
+            target_days = [self.days.index(f_day)] if f_day in self.days else range(len(self.days))
+            
+            # Use normalized time matching
+            if f_time:
+                target_slots = [i for i, s in enumerate(self.time_slots) if self._slot_matches_fixed_time(s, f_time)]
+                if not target_slots: target_slots = range(len(self.time_slots))
+            else:
+                target_slots = range(len(self.time_slots))
+                
+            target_rooms = [i for i, r in enumerate(self.rooms) if self._room_matches(r['name'], f_room)] if f_room else range(len(self.rooms))
 
             available_actions = [
                 Action(step, l, r, d, s)
@@ -712,14 +724,16 @@ class ReinforcementLearningScheduler:
             ]
             
             # If after pruning we have no actions (e.g. invalid fixed room), fallback for robustness
+            # But MUST still respect hard constraints if they exist
             if not available_actions:
                  available_actions = [
                     Action(step, l, r, d, s)
                     for l in range(len(self.lecturers))
-                    for r in range(len(self.rooms))
-                    for d in range(len(self.days))
-                    for s in range(len(self.time_slots))
+                    for r in target_rooms
+                    for d in target_days
+                    for s in target_slots
                 ]
+
             
             # Select action
             action = self.select_action(state, available_actions)
@@ -755,6 +769,7 @@ class ReinforcementLearningScheduler:
                 
                 assigned_courses.append({
                     'course_code': course['code'],
+                    'section_id': course.get('section_id'),  # Include section_id if available
                     'course_title': course.get('title', ''),
                     'lecturer': lecturer,
                     'room': room['name'],
@@ -970,18 +985,43 @@ class ReinforcementLearningScheduler:
                     break
 
             if best_action is None:
-                # Last resort: prefer a non-reserved room even if other constraints conflict.
-                fallback_room_idx = next(
-                    (
-                        i for i, room in enumerate(self.rooms)
-                        if self._normalize_room_name(room.get('name', '')) not in self.reserved_rooms_normalized
-                    ),
-                    0
-                )
-                fallback_lecturer_idx = lecturer_indices[0] if lecturer_indices else 0
-                fallback_day_idx = day_indices[0] if day_indices else 0
-                fallback_slot_idx = slot_indices[0] if slot_indices else 0
-                best_action = Action(0, fallback_lecturer_idx, fallback_room_idx, fallback_day_idx, fallback_slot_idx)
+                # Last resort: search for a slot with MINIMUM conflicts
+                # (instead of dumping everything into index 0)
+                fallback_candidates = []
+                for l_idx in lecturer_indices:
+                    for d_idx in day_indices:
+                        for s_idx in slot_indices:
+                            for r_idx in room_indices:
+                                act = Action(0, l_idx, r_idx, d_idx, s_idx)
+                                
+                                # Count hard conflicts manually
+                                r_name = self.rooms[r_idx]['name']
+                                l_name = self.lecturers[l_idx]
+                                rk = f"{self.days[d_idx]}_{self.time_slots[s_idx]}"
+                                
+                                conf = 0
+                                if room_occ[r_name].get(rk): conf += 1
+                                if lect_occ[l_name].get(rk): conf += 1
+                                
+                                fallback_candidates.append((conf, act))
+                                if conf == 0: break # Found a spot with no hard conflict (only soft ones)
+                            if any(c[0] == 0 for c in fallback_candidates): break
+                        if any(c[0] == 0 for c in fallback_candidates): break
+                    if any(c[0] == 0 for c in fallback_candidates): break
+                
+                if fallback_candidates:
+                    # Pick one of the candidates with minimum conflicts
+                    min_conf = min(c[0] for c in fallback_candidates)
+                    best_candidates = [c[1] for c in fallback_candidates if c[0] == min_conf]
+                    best_action = random.choice(best_candidates)
+                else:
+                    # Absolute emergency fallback
+                    fallback_room_idx = room_indices[0] if room_indices else 0
+                    fallback_lecturer_idx = lecturer_indices[0] if lecturer_indices else 0
+                    fallback_day_idx = day_indices[0] if day_indices else 0
+                    fallback_slot_idx = slot_indices[0] if slot_indices else 0
+                    best_action = Action(0, fallback_lecturer_idx, fallback_room_idx, fallback_day_idx, fallback_slot_idx)
+
 
             lecturer = self.lecturers[best_action.lecturer_idx]
             room = self.rooms[best_action.room_idx]

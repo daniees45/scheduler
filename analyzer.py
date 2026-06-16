@@ -1,6 +1,7 @@
 import pandas as pd
 import os
 import pickle
+import stat
 from pandas.errors import EmptyDataError
 from q_learner import QLearner
 
@@ -14,6 +15,29 @@ TIME_TO_SLOT = {
 
 day_map = {"Mon":0, "Tue":1, "Wed":2, "Thu":3, "Fri":4,
            "Monday":0, "Tuesday":1, "Wednesday":2, "Thursday":3, "Friday":4}
+
+
+def _is_trusted_model_file(model_path: str) -> bool:
+    """Allow model loads only from regular, non-world-writable files owned by this user."""
+    if not os.path.exists(model_path):
+        return False
+
+    abs_path = os.path.realpath(model_path)
+    project_root = os.path.realpath(os.path.dirname(__file__))
+    if not abs_path.startswith(project_root + os.sep):
+        return False
+
+    st = os.stat(abs_path)
+    if not stat.S_ISREG(st.st_mode):
+        return False
+    if os.path.islink(model_path):
+        return False
+    if hasattr(os, "getuid") and st.st_uid != os.getuid():
+        return False
+    if st.st_mode & (stat.S_IWGRP | stat.S_IWOTH):
+        return False
+
+    return True
 
 def train_model(history_data: str, feedback_data: str = "user_feedback.csv",
                 model_save_path: str = "scheduling_model.pkl"):
@@ -102,6 +126,9 @@ def load_trained_model(model_path: str = "scheduling_model.pkl"):
     Loads the trained AI intelligence model from disk.
     """
     if os.path.exists(model_path):
+        if not _is_trusted_model_file(model_path):
+            print(f"Refusing to load untrusted model file: {model_path}")
+            return {}
         with open(model_path, "rb") as f:
             model_data = pickle.load(f)
         print(f"Model loaded from {model_path}")

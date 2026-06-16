@@ -47,14 +47,17 @@ def run_headless_exam(input_file: str, output_file: str, department: str | None 
     
     _emit_progress(10, "Loading exam configuration...")
 
-    exam_config_overrides = None
+    # Force grouped exam scheduling so all sections of a course share one exam slot.
+    exam_config_overrides = {
+        "group_sections_by_course": True
+    }
     rooms_override = None
     if hall_name:
         hall_name = hall_name.strip()
-        exam_config_overrides = {
+        exam_config_overrides.update({
             "single_room": True,
             "default_room_name": hall_name
-        }
+        })
         print(f"[INFO] Exam hall requested: {hall_name}")
 
         if hall_capacity is not None:

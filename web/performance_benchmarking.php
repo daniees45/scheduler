@@ -67,6 +67,13 @@ function bm_format_ghs(?float $value): string {
     return $value === null ? '--' : 'GH₵' . number_format(round($value));
 }
 
+function bm_num($value, float $fallback = 0.0): float {
+    if (is_numeric($value)) {
+        return (float)$value;
+    }
+    return $fallback;
+}
+
 function bm_find_value($data, array $keys) {
     if (!is_array($data)) return null;
     foreach ($keys as $key) {
@@ -168,21 +175,21 @@ if ($conn instanceof mysqli) {
     try {
         // 1. AI conflict-free rate: SCHEDULE_GEN_SUCCESS / (SUCCESS + FAILURE)
         $r = $conn->query(
-            "SELECT COUNT(CASE WHEN action='SCHEDULE_GEN_SUCCESS' THEN 1 END) s,
-                    COUNT(CASE WHEN action='SCHEDULE_GEN_FAILURE' THEN 1 END) f
+            "SELECT COUNT(CASE WHEN action IN ('SCHEDULE_GEN_SUCCESS','EXAM_GEN_SUCCESS','EXAM_COMBINED_SUCCESS') THEN 1 END) s,
+                COUNT(CASE WHEN action IN ('SCHEDULE_GEN_FAILURE','EXAM_GEN_FAILURE','EXAM_COMBINED_FAILURE') THEN 1 END) f
              FROM audit_log
-             WHERE action IN ('SCHEDULE_GEN_SUCCESS','SCHEDULE_GEN_FAILURE')"
+             WHERE action IN ('SCHEDULE_GEN_SUCCESS','SCHEDULE_GEN_FAILURE','EXAM_GEN_SUCCESS','EXAM_GEN_FAILURE','EXAM_COMBINED_SUCCESS','EXAM_COMBINED_FAILURE')"
         );
         if ($r && ($row = $r->fetch_assoc()) && ($row['s'] + $row['f']) > 0) {
             $_bm_conflict_free_rate = round($row['s'] / ($row['s'] + $row['f']) * 100, 1);
         }
 
         // 2. Avg generation time (seconds) from audit_log details "in Xs"
-        $r = $conn->query(
-            "SELECT details FROM audit_log
-              WHERE action='SCHEDULE_GEN_SUCCESS'
-              ORDER BY log_time DESC LIMIT 30"
-        );
+                $r = $conn->query(
+                        "SELECT details FROM audit_log
+                            WHERE action IN ('SCHEDULE_GEN_SUCCESS','EXAM_GEN_SUCCESS','EXAM_COMBINED_SUCCESS')
+                            ORDER BY log_time DESC LIMIT 30"
+                );
         $times = [];
         if ($r) while ($row = $r->fetch_assoc()) {
             if (preg_match('/in\s+([\d.]+)s/i', $row['details'] ?? '', $m)) {
@@ -231,13 +238,13 @@ foreach ($_bm_systems as $key => $meta) {
 
 if ($conn instanceof mysqli) {
     try {
-        $q = $conn->query(
-            "SELECT id, action, details
-               FROM audit_log
-              WHERE action IN ('SCHEDULE_GEN_START','SCHEDULE_GEN_SUCCESS','SCHEDULE_GEN_FAILURE','SCHEDULE_GEN_ERROR')
-                AND log_time >= DATE_SUB(NOW(), INTERVAL 90 DAY)
-              ORDER BY log_time ASC, id ASC"
-        );
+                $q = $conn->query(
+                        "SELECT id, action, details
+                             FROM audit_log
+                            WHERE action IN ('SCHEDULE_GEN_START','SCHEDULE_GEN_SUCCESS','SCHEDULE_GEN_FAILURE','SCHEDULE_GEN_ERROR','EXAM_GEN_START','EXAM_GEN_SUCCESS','EXAM_GEN_FAILURE','EXAM_GEN_ERROR','EXAM_COMBINED_START','EXAM_COMBINED_SUCCESS','EXAM_COMBINED_FAILURE','EXAM_COMBINED_ERROR')
+                                AND log_time >= DATE_SUB(NOW(), INTERVAL 90 DAY)
+                            ORDER BY log_time ASC, id ASC"
+                );
         $pending_by_dept = [];
         $pending_global  = [];
 
@@ -246,7 +253,7 @@ if ($conn instanceof mysqli) {
                 $action  = $row['action'] ?? '';
                 $details = $row['details'] ?? '';
 
-                if ($action === 'SCHEDULE_GEN_START') {
+                if (in_array($action, ['SCHEDULE_GEN_START','EXAM_GEN_START','EXAM_COMBINED_START'], true)) {
                     $dept = bm_extract_department($details) ?? '__unknown__';
                     $algo = bm_extract_algo($details);
                     if ($algo && isset($_bm_algo_metrics[$algo])) {
@@ -256,7 +263,7 @@ if ($conn instanceof mysqli) {
                     continue;
                 }
 
-                if (!in_array($action, ['SCHEDULE_GEN_SUCCESS','SCHEDULE_GEN_FAILURE','SCHEDULE_GEN_ERROR'], true)) {
+                if (!in_array($action, ['SCHEDULE_GEN_SUCCESS','SCHEDULE_GEN_FAILURE','SCHEDULE_GEN_ERROR','EXAM_GEN_SUCCESS','EXAM_GEN_FAILURE','EXAM_GEN_ERROR','EXAM_COMBINED_SUCCESS','EXAM_COMBINED_FAILURE','EXAM_COMBINED_ERROR'], true)) {
                     continue;
                 }
 
@@ -272,7 +279,7 @@ if ($conn instanceof mysqli) {
                 if (!$algo || !isset($_bm_algo_metrics[$algo])) continue;
 
                 $_bm_algo_metrics[$algo]['attempts']++;
-                if ($action === 'SCHEDULE_GEN_SUCCESS') {
+                if (in_array($action, ['SCHEDULE_GEN_SUCCESS','EXAM_GEN_SUCCESS','EXAM_COMBINED_SUCCESS'], true)) {
                     $_bm_algo_metrics[$algo]['successes']++;
                     $acc = bm_extract_accuracy($details);
                     if ($acc !== null) $_bm_algo_metrics[$algo]['accuracies'][] = $acc;
@@ -360,6 +367,12 @@ if ($_bm_live['this']['quality'] === null) {
     $_bm_live['this']['quality'] = max(1.0, min(10.0, round(($_bm_live['this']['success_rate'] * 0.7 + $_bm_room_util * 0.3) / 10, 1)));
 }
 
+// Normalize key numeric values used by executive summary so display never breaks.
+$_bm_live['this']['avg_seconds'] = max(1.0, bm_num($_bm_live['this']['avg_seconds'], $_bm_gen_seconds));
+$_bm_live['this']['success_rate'] = max(0.0, min(100.0, bm_num($_bm_live['this']['success_rate'], $_bm_conflict_free_rate)));
+$_bm_live['this']['quality'] = max(1.0, min(10.0, bm_num($_bm_live['this']['quality'], 8.5)));
+$_bm_room_util = max(0.0, min(100.0, bm_num($_bm_room_util, 87.0)));
+
 $_bm_gen_min = $_bm_live['this']['avg_seconds'] / 60.0;
 $_bm_gen_display = bm_format_time($_bm_live['this']['avg_seconds']);
 
@@ -404,6 +417,14 @@ $_bm_time_saved_disp    = number_format($_bm_time_saved) . ' hrs';
 $_bm_quality_disp       = bm_format_score($_bm_live['this']['quality']);
 $_bm_labor_savings_disp = bm_format_ghs(round($_bm_labor_savings / 1000) * 1000);
 $_bm_labor_desc         = number_format($_bm_time_saved) . ' hours × GH₵300/hr admin cost';
+
+// Final guard rails for executive summary cards.
+if ($_bm_gen_display === '--') {
+    $_bm_gen_display = '0 min';
+}
+if ($_bm_quality_disp === '--') {
+    $_bm_quality_disp = '0.0 / 10';
+}
 
 $_bm_time_values = array_filter([
     $_bm_live['this']['avg_seconds'],

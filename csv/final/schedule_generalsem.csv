@@ -1,0 +1,38 @@
+Course Code,Course Title,Credit Hrs,Lecturer Name,Room Name,Day,Time,course_level,Semester,start_time,no_of_students,enrollment
+PSYC 105,Introduction to Psychology [Sec A],3,Akua K. Amponsah,Baobab RM6,Thursday,10:00 AM - 12:30 PM,100,2,10:00 AM,30,30
+GNED 230,Career Exploration and Planning [Sec A],NC,Ama O. Karikari,CS LAB,Wednesday,07:00 AM - 09:30 AM,200,1,07:00 AM,30,30
+GNED 468,Job Search Strategies and Techniques [Sec B],NC,Ama O. Karikari,Baobab RM4,Thursday,05:00 PM - 06:00 PM,400,1,05:00 PM,30,30
+GNED 125,Study Skills [Sec B] (SONM),NC,Ama O. Karikari,Baobab RM4,Monday,07:00 AM - 09:30 AM,100,2,07:00 AM,30,30
+GNED 125,Study Skills [Sec A],NC,Ama O. Karikari,CS LAB,Tuesday,02:00 PM - 04:30 PM,100,2,02:00 PM,30,30
+ENGL 112,Language and Writing Skills II [Sec B] (FOS & SOB),2,C. Pokuaa,American High,Monday,10:00 AM - 12:30 PM,100,2,10:00 AM,30,30
+ENGL 112,Language and Writing Skills II [Sec A] (SONM),2,C. Pokuaa,Baobab RM6,Monday,02:00 PM - 04:30 PM,100,2,02:00 PM,30,30
+ENGL 112,Language and Writing Skills II [Sec C] (SOE & FASS),2,C. Pokuaa,Baobab RM6,Thursday,07:00 AM - 09:30 AM,100,2,07:00 AM,30,30
+CMME 115,Introduction to Communication Skills [Sec A],2,Dr. A. Oye,Baobab RM2,Wednesday,07:00 AM - 09:30 AM,100,2,07:00 AM,30,30
+CMME 115,Introduction to Communication Skills [Sec C],2,Dr. A. Oye,American High,Wednesday,10:00 AM - 12:30 PM,100,2,10:00 AM,30,30
+CMME 115,Introduction to Communication Skills [Sec B](SONM),2,Dr. A. Oye,Baobab RM1,Wednesday,02:00 PM - 04:30 PM,100,2,02:00 PM,30,30
+SOCI 115,Principles of Sociology [Sec A],3,Dr. D. Dovie,CS LAB,Friday,07:00 AM - 09:30 AM,100,2,07:00 AM,30,30
+RELB 163,Life and Teachings of Jesus [Sec A],3,Dr. F. Tenortey,Baobab RM1,Tuesday,07:00 AM - 09:30 AM,100,2,07:00 AM,30,30
+RELB 163,Life and Teachings of Jesus [Sec C] (SONM),3,Dr. F. Tenortey,American High,Friday,10:00 AM - 12:30 PM,100,2,10:00 AM,30,30
+RELB 163,Life and Teachings of Jesus [Sec B],3,Dr. F. Tenortey,American High,Tuesday,10:00 AM - 12:30 PM,100,2,10:00 AM,30,30
+RELG 451,Bible and Family Dynamics [Sec B],3,Dr. J. Andor,CS LAB,Wednesday,10:00 AM - 12:30 PM,400,1,10:00 AM,30,30
+ENGL 111,Language and Writing Skills I [Sec B],2,Dr. S. Adjei-Mensah,CS LAB,Thursday,10:00 AM - 12:30 PM,100,1,10:00 AM,30,30
+ENGL 111,Language and Writing Skills I [Sec D] (SONM),2,Dr. S. Adjei-Mensah,Baobab RM3,Wednesday,07:00 AM - 09:30 AM,100,1,07:00 AM,30,30
+ENGL 111,Language and Writing Skills I [Sec A],2,Dr. S. Adjei-Mensah,American High,Monday,07:00 AM - 09:30 AM,100,1,07:00 AM,30,30
+ENGL 111,Language and Writing Skills I [Sec C] (SONM),2,Dr. S. Adjei-Mensah,CS LAB,Monday,10:00 AM - 12:30 PM,100,1,10:00 AM,30,30
+RELG 451,Bible and Family Dynamics [Sec A],3,Dr. S. Amoh,Baobab RM6,Thursday,02:00 PM - 04:30 PM,400,1,02:00 PM,30,30
+AFST 205,Introduction to African Music [Sec A],1,E. Boahen,Baobab RM1,Monday,07:00 AM - 09:30 AM,200,2,07:00 AM,30,30
+AFST 205,Introduction to African Music [Sec B],1,E. Boahen,Baobab RM6,Tuesday,02:00 PM - 04:30 PM,200,2,02:00 PM,30,30
+AFST 243,Chieftaincy and Development [Sec B],1,F. Opoku,Baobab RM6,Friday,07:00 AM - 09:30 AM,200,2,07:00 AM,30,30
+AFST 243,Chieftaincy and Development [Sec A],1,F. Opoku,Baobab RM4,Friday,10:00 AM - 12:30 PM,200,2,10:00 AM,30,30
+FREN 121,French for General Communication I [Sec A],2,J. Elorm Doufodji,American High,Monday,02:00 PM - 04:30 PM,100,1,02:00 PM,30,30
+FREN 121,French for General Communication I [Sec B],2,J. Elorm Doufodji,American High,Tuesday,07:00 AM - 09:30 AM,100,1,07:00 AM,30,30
+FREN 122,French for General Communication II [Sec A],2,J. Rhule,American High,Thursday,02:00 PM - 04:30 PM,200,1,02:00 PM,30,30
+FREN 122,French for General Communication II [Sec B],2,J. Rhule,CS LAB,Tuesday,07:00 AM - 09:30 AM,200,1,07:00 AM,30,30
+PEAC 100,Physical Activity [Sec A],NC,K. Oheneba Nti,B. Ball Court,Monday,05:00 PM - 06:00 PM,100,1,05:00 PM,30,30
+HLTH 200,Health Principles [Sec A],3,K. Oheneba Nti,American High,Wednesday,02:00 PM - 04:30 PM,100,1,02:00 PM,30,30
+HLTH 200,Health Principles [Sec B],3,K. Oheneba Nti,Baobab RM3,Friday,10:00 AM - 12:30 PM,100,1,10:00 AM,30,30
+MATH 121,College Algebra [Sec A],3,O. Osei-Tutu,Baobab RM1,Thursday,02:00 PM - 04:30 PM,100,2,02:00 PM,30,30
+RELB 250,Principles of Christian Faith [Sec A],3,Ps. E. Osei,Baobab RM3,Thursday,10:00 AM - 12:30 PM,200,1,10:00 AM,30,30
+RELT 385,Introduction to Biblical Foundation of Ethics [Sec A],3,Ps. E. Takyi,Baobab RM6,Wednesday,07:00 AM - 09:30 AM,300,2,07:00 AM,30,30
+RELT 385,Introduction to Biblical Foundation of Ethics [Sec B],3,Ps. I. Kyere,Baobab RM1,Wednesday,10:00 AM - 12:30 PM,300,2,10:00 AM,30,30
+RELB 250,Principles of Christian Faith [Sec B],3,Ps. P. Obeng Manu,Baobab RM3,Monday,07:00 AM - 09:30 AM,200,1,07:00 AM,30,30

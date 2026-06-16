@@ -1,13 +1,12 @@
 <?php
 // web/api/upload_csv.php
 // Parse CSV and store in session for immediate editing (no folder storage)
-session_start();
+require_once __DIR__ . '/auth_guard.php';
 
 header('Content-Type: application/json');
 
-if (!isset($_SESSION['user_id'])) {
-    die(json_encode(["status" => "error", "message" => "Unauthorized"]));
-}
+require_http_methods('POST');
+require_authenticated_user();
 
 if (!isset($_FILES["csv_file"]) || $_FILES["csv_file"]["error"] !== UPLOAD_ERR_OK) {
     die(json_encode(["status" => "error", "message" => "No file uploaded or upload error occurred."]));

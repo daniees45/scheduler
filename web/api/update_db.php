@@ -4,6 +4,12 @@
 
 require_once 'db.php';
 require_once __DIR__ . '/../../lib/B2Storage.php';
+require_once __DIR__ . '/auth_guard.php';
+header('Content-Type: application/json');
+
+require_http_methods(['GET', 'POST']);
+require_authenticated_user();
+require_admin_user();
 
 $b2 = new B2Storage();
 
@@ -14,11 +20,19 @@ if (strpos($chosen_file, 'csv/final/') === false && strpos($chosen_file, '/') ==
     $chosen_file = 'csv/final/' . $chosen_file;
 }
 
-$csv_path = '../../' . $chosen_file;
+if (!preg_match('/^[a-zA-Z0-9_\-\.\/]+\.csv$/', $chosen_file) || strpos($chosen_file, '..') !== false || strpos($chosen_file, 'csv/final/') !== 0) {
+    http_response_code(400);
+    echo json_encode(["status" => "error", "message" => "Invalid file path."]);
+    exit;
+}
+
+$base_dir = realpath('../../');
+$csv_path = $base_dir . '/' . $chosen_file;
 $temp_path = null;
 
 // Try local first
-if (!file_exists($csv_path)) {
+$local_real_path = realpath($csv_path);
+if (!$local_real_path || strpos($local_real_path, $base_dir . DIRECTORY_SEPARATOR) !== 0 || !file_exists($local_real_path)) {
     // Try B2
     $result = $b2->download($chosen_file);
     if ($result['success']) {
@@ -26,10 +40,14 @@ if (!file_exists($csv_path)) {
         $temp_path = tempnam(sys_get_temp_dir(), 'sched_');
         file_put_contents($temp_path, $result['content']);
         $csv_path = $temp_path;
-        error_log("update_db: Using B2 source for $chosen_file");
+        error_log("update_db: Using Cloud storage source for $chosen_file");
     } else {
-        die(json_encode(["status" => "error", "message" => "Schedule CSV not found locally or in B2: $chosen_file"]));
+        http_response_code(404);
+        echo json_encode(["status" => "error", "message" => "Schedule CSV not found locally or in B2."]);
+        exit;
     }
+} else {
+    $csv_path = $local_real_path;
 }
 
 try {
@@ -91,7 +109,8 @@ try {
     echo json_encode(["status" => "success", "message" => "Imported $count sections to database."]);
 
 } catch (Exception $e) {
+    error_log('update_db failed: ' . $e->getMessage());
     http_response_code(500);
-    echo json_encode(["status" => "error", "message" => $e->getMessage()]);
+    echo json_encode(["status" => "error", "message" => "Import failed. Check server logs."]);
 }
 ?>

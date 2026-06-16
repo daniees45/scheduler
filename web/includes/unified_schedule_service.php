@@ -1,5 +1,37 @@
 <?php
 
+/**
+ * Split a schedule course-code cell that may join multiple codes with
+ * slashes (e.g. "COCS 364 / INFT 364" or "COCS 364 \/ INFT 364").
+ * Returns an array of upper-cased, trimmed individual codes.
+ */
+function unified_schedule_split_codes(string $raw): array
+{
+    $parts = preg_split('/\s*(?:\\\\\/|\/)\s*/', $raw);
+    $out = [];
+    foreach ($parts as $p) {
+        $p = strtoupper(trim($p));
+        if ($p !== '') {
+            $out[] = $p;
+        }
+    }
+    return $out ?: [strtoupper(trim($raw))];
+}
+
+/**
+ * Return true if any of the codes in the slash-combined $raw cell
+ * appears in the $enrolled_codes lookup map.
+ */
+function unified_schedule_code_matches(string $raw, array $enrolled_codes): bool
+{
+    foreach (unified_schedule_split_codes($raw) as $code) {
+        if (isset($enrolled_codes[$code])) {
+            return true;
+        }
+    }
+    return false;
+}
+
 function unified_schedule_normalize_level($value): int
 {
     if (is_int($value)) {
@@ -95,6 +127,22 @@ function unified_schedule_alias_row_fields(array $row): array
     $enrollment = $pick($row, ['enrollment', 'no_of_students', 'students']);
     if ($enrollment !== '' && empty($row['enrollment'])) {
         $row['enrollment'] = $enrollment;
+    }
+
+    $section = $pick($row, ['section', 'sec', 'class_section', 'class_group']);
+    
+    // If section is still empty, try to extract from title or code like "[SEC A]" or "SEC A"
+    if ($section === '') {
+        $search_text = ($row['course_title'] ?? '') . ' ' . ($row['course_code'] ?? '');
+        if (preg_match('/\[SEC\s*([A-Z0-9]+)\]/i', $search_text, $m)) {
+            $section = strtoupper($m[1]);
+        } elseif (preg_match('/\bSEC\s*([A-Z0-9]+)\b/i', $search_text, $m)) {
+            $section = strtoupper($m[1]);
+        }
+    }
+
+    if ($section !== '' && empty($row['section'])) {
+        $row['section'] = $section;
     }
 
     return $row;
@@ -197,15 +245,64 @@ function unified_schedule_parse_cutoff(mysqli $conn, string $semester, ?string $
     return date('Y-m-d H:i:s', $ts);
 }
 
-function unified_schedule_available_snapshots(mysqli $conn, string $semester, int $limit = 50): array
+function unified_schedule_has_column(mysqli $conn, string $table, string $column): bool
+{
+    static $cache = [];
+    $key = strtolower($table . '.' . $column);
+    if (array_key_exists($key, $cache)) {
+        return $cache[$key];
+    }
+
+    $stmt = $conn->prepare("SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ? LIMIT 1");
+    if (!$stmt) {
+        $cache[$key] = false;
+        return false;
+    }
+
+    $stmt->bind_param('ss', $table, $column);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    $cache[$key] = ($res && $res->num_rows > 0);
+
+    return $cache[$key];
+}
+
+function unified_schedule_get_system_setting(mysqli $conn, string $key, string $default = ''): string
+{
+    $stmt = $conn->prepare("SELECT setting_value FROM system_settings WHERE setting_key = ? LIMIT 1");
+    if (!$stmt) {
+        return $default;
+    }
+
+    $stmt->bind_param('s', $key);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    if ($res && ($row = $res->fetch_assoc())) {
+        $val = trim((string)($row['setting_value'] ?? ''));
+        return $val !== '' ? $val : $default;
+    }
+
+    return $default;
+}
+
+function unified_schedule_available_snapshots(mysqli $conn, string $semester, string $academic_year = '', int $limit = 50): array
 {
     $limit = max(1, min(200, $limit));
     $rows = [];
 
+    $has_academic_year = unified_schedule_has_column($conn, 'generated_schedules', 'academic_year');
+    $academic_year = trim($academic_year);
+
     $query = "SELECT id, schedule_name, department, semester, created_at
               FROM generated_schedules
               WHERE (schedule_name NOT LIKE 'exam_%' OR schedule_name IS NULL)
-              AND (semester = ? OR semester IS NULL OR TRIM(semester) = '')
+              AND (semester = ? OR semester IS NULL OR TRIM(semester) = '')";
+
+    if ($has_academic_year && $academic_year !== '') {
+        $query .= " AND academic_year = ?";
+    }
+
+    $query .= "
               ORDER BY created_at DESC, id DESC
               LIMIT {$limit}";
 
@@ -214,7 +311,11 @@ function unified_schedule_available_snapshots(mysqli $conn, string $semester, in
         return $rows;
     }
 
-    $stmt->bind_param('s', $semester);
+    if ($has_academic_year && $academic_year !== '') {
+        $stmt->bind_param('ss', $semester, $academic_year);
+    } else {
+        $stmt->bind_param('s', $semester);
+    }
     $stmt->execute();
     $res = $stmt->get_result();
 
@@ -224,6 +325,7 @@ function unified_schedule_available_snapshots(mysqli $conn, string $semester, in
             'schedule_name' => (string)($row['schedule_name'] ?? ''),
             'department' => (string)($row['department'] ?? 'General'),
             'semester' => (string)($row['semester'] ?? ''),
+            'academic_year' => (string)($row['academic_year'] ?? ''),
             'created_at' => (string)($row['created_at'] ?? '')
         ];
     }
@@ -231,15 +333,21 @@ function unified_schedule_available_snapshots(mysqli $conn, string $semester, in
     return $rows;
 }
 
-function unified_schedule_latest_sources(mysqli $conn, string $semester, ?string $cutoff_saved_at): array
+function unified_schedule_latest_sources(mysqli $conn, string $semester, string $academic_year, ?string $cutoff_saved_at): array
 {
     $sources = [];
     $seen = [];
+    $has_academic_year = unified_schedule_has_column($conn, 'generated_schedules', 'academic_year');
+    $academic_year = trim($academic_year);
 
     $sql = "SELECT id, schedule_name, department, semester, created_at, schedule_data
             FROM generated_schedules
             WHERE (schedule_name NOT LIKE 'exam_%' OR schedule_name IS NULL)
               AND (semester = ? OR semester IS NULL OR TRIM(semester) = '')";
+
+    if ($has_academic_year && $academic_year !== '') {
+        $sql .= " AND academic_year = ?";
+    }
 
     if (!empty($cutoff_saved_at)) {
         $sql .= " AND created_at <= ?";
@@ -252,7 +360,11 @@ function unified_schedule_latest_sources(mysqli $conn, string $semester, ?string
         return $sources;
     }
 
-    if (!empty($cutoff_saved_at)) {
+    if ($has_academic_year && $academic_year !== '' && !empty($cutoff_saved_at)) {
+        $stmt->bind_param('sss', $semester, $academic_year, $cutoff_saved_at);
+    } elseif ($has_academic_year && $academic_year !== '') {
+        $stmt->bind_param('ss', $semester, $academic_year);
+    } elseif (!empty($cutoff_saved_at)) {
         $stmt->bind_param('ss', $semester, $cutoff_saved_at);
     } else {
         $stmt->bind_param('s', $semester);
@@ -272,6 +384,7 @@ function unified_schedule_latest_sources(mysqli $conn, string $semester, ?string
             'id' => (int)($row['id'] ?? 0),
             'schedule_name' => (string)($row['schedule_name'] ?? ''),
             'department' => $dep_key === 'general' ? 'General' : (string)($row['department'] ?? ''),
+            'academic_year' => (string)($row['academic_year'] ?? ''),
             'created_at' => (string)($row['created_at'] ?? ''),
             'schedule_data' => (string)($row['schedule_data'] ?? '')
         ];
@@ -302,7 +415,7 @@ function unified_schedule_get_lecturer_name(mysqli $conn, int $user_id): string
     return '';
 }
 
-function unified_schedule_get_student_enrollments(mysqli $conn, int $user_id, string $semester): array
+function unified_schedule_get_student_enrollments(mysqli $conn, int $user_id, string $semester, string $academic_year = ''): array
 {
     $rows = [];
 
@@ -319,6 +432,14 @@ function unified_schedule_get_student_enrollments(mysqli $conn, int $user_id, st
         $has_section = $section_res && $section_res->num_rows > 0;
     }
 
+    $has_academic_year = false;
+    $academic_stmt = $conn->prepare("SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'student_enrollments' AND COLUMN_NAME = 'academic_year' LIMIT 1");
+    if ($academic_stmt) {
+        $academic_stmt->execute();
+        $academic_res = $academic_stmt->get_result();
+        $has_academic_year = $academic_res && $academic_res->num_rows > 0;
+    }
+
     $sql = "SELECT c.id, c.course_code, c.course_title, c.level, c.department,
                    l.name AS lecturer_name, se.semester";
     if ($has_section) {
@@ -330,7 +451,13 @@ function unified_schedule_get_student_enrollments(mysqli $conn, int $user_id, st
     $sql .= " FROM student_enrollments se
               JOIN courses c ON se.course_id = c.id
               LEFT JOIN lecturers l ON c.lecturer_id = l.id
-              WHERE se.user_id = ? AND (se.semester = ? OR se.semester IS NULL OR TRIM(se.semester) = '')
+              WHERE se.user_id = ? AND (se.semester = ? OR se.semester IS NULL OR TRIM(se.semester) = '')";
+
+    if ($has_academic_year && trim($academic_year) !== '') {
+        $sql .= " AND se.academic_year = ?";
+    }
+
+    $sql .= "
               ORDER BY c.course_code";
 
     $stmt = $conn->prepare($sql);
@@ -338,7 +465,11 @@ function unified_schedule_get_student_enrollments(mysqli $conn, int $user_id, st
         return $rows;
     }
 
-    $stmt->bind_param('is', $user_id, $semester);
+    if ($has_academic_year && trim($academic_year) !== '') {
+        $stmt->bind_param('iss', $user_id, $semester, $academic_year);
+    } else {
+        $stmt->bind_param('is', $user_id, $semester);
+    }
     $stmt->execute();
     $res = $stmt->get_result();
 
@@ -354,12 +485,17 @@ function unified_schedule_fetch(mysqli $conn, array $session, array $options = [
     $role = (string)($session['role'] ?? 'guest');
     $user_id = (int)($session['user_id'] ?? 0);
     $semester = (string)($options['semester'] ?? ($session['semester'] ?? '1'));
+    $academic_year = trim((string)($options['academic_year'] ?? ''));
+    if ($academic_year === '') {
+        $academic_year = unified_schedule_get_system_setting($conn, 'current_academic_year', '');
+    }
     $requested_saved_at = isset($options['saved_at']) ? (string)$options['saved_at'] : '';
     $schedule_id = (int)($options['schedule_id'] ?? 0);
 
     $cutoff_saved_at = unified_schedule_parse_cutoff($conn, $semester, $requested_saved_at, $schedule_id);
-    $sources = unified_schedule_latest_sources($conn, $semester, $cutoff_saved_at);
-    $snapshots = unified_schedule_available_snapshots($conn, $semester, 60);
+    $include_all_student_rows = !empty($options['include_all_student_rows']);
+    $sources = unified_schedule_latest_sources($conn, $semester, $academic_year, $cutoff_saved_at);
+    $snapshots = unified_schedule_available_snapshots($conn, $semester, $academic_year, 60);
 
     $rows = [];
     $seen = [];
@@ -378,6 +514,7 @@ function unified_schedule_fetch(mysqli $conn, array $session, array $options = [
             'id' => (int)$src['id'],
             'schedule_name' => (string)$src['schedule_name'],
             'department' => (string)$src['department'],
+            'academic_year' => (string)($src['academic_year'] ?? ''),
             'created_at' => (string)$src['created_at']
         ];
     }, $sources);
@@ -388,22 +525,26 @@ function unified_schedule_fetch(mysqli $conn, array $session, array $options = [
         foreach ($sources as $source) {
             $parsed_rows = unified_schedule_extract_rows($source['schedule_data'] ?? '');
             foreach ($parsed_rows as $row) {
-                $row_lecturer = trim((string)($row['lecturer name'] ?? ($row['lecturer'] ?? '')));
+                $row_lecturer = trim((string)($row['lecturer_name'] ?? ($row['lecturer name'] ?? ($row['lecturer'] ?? ''))));
                 if ($lecturer_name === '' || $row_lecturer === '' || strcasecmp($row_lecturer, $lecturer_name) !== 0) {
                     continue;
                 }
 
-                $code = strtoupper(trim((string)($row['course code'] ?? ($row['course'] ?? ($row['code'] ?? '')))));
+                $code = strtoupper(trim((string)($row['course_code'] ?? ($row['course code'] ?? ($row['course'] ?? ($row['code'] ?? ''))))));
+                // Split slash-combined codes; use first part for display
+                $code_parts = unified_schedule_split_codes($code);
+                $code = $code_parts[0];
                 $day = trim((string)($row['day'] ?? ''));
-                $time = trim((string)($row['time'] ?? ($row['assigned time'] ?? ($row['assigned_time'] ?? ''))));
-                $room = trim((string)($row['room name'] ?? ($row['room'] ?? ($row['room_name'] ?? ''))));
-                $title = trim((string)($row['course title'] ?? ($row['title'] ?? '')));
+                $time = trim((string)($row['time'] ?? ($row['assigned_time'] ?? ($row['assigned time'] ?? ''))));
+                $room = trim((string)($row['room_name'] ?? ($row['room name'] ?? ($row['room'] ?? ''))));
+                $title = trim((string)($row['course_title'] ?? ($row['course title'] ?? ($row['title'] ?? ''))));
 
                 if ($code === '' || $day === '' || $time === '') {
                     continue;
                 }
 
-                $dedupe_key = strtolower($code . '|' . $day . '|' . $time . '|' . $room . '|' . $row_lecturer);
+                $section_val = trim((string)($row['section'] ?? ''));
+                $dedupe_key = strtolower($code . '|' . $day . '|' . $time . '|' . $room . '|' . $row_lecturer . '|' . $section_val);
                 if (isset($seen[$dedupe_key])) {
                     continue;
                 }
@@ -425,6 +566,7 @@ function unified_schedule_fetch(mysqli $conn, array $session, array $options = [
         return [
             'role' => $role,
             'semester' => $semester,
+            'academic_year' => $academic_year,
             'saved_at' => $effective_saved_at,
             'requested_saved_at' => $requested_saved_at,
             'snapshots' => $snapshots,
@@ -436,7 +578,7 @@ function unified_schedule_fetch(mysqli $conn, array $session, array $options = [
     }
 
     $level = unified_schedule_normalize_level($session['level'] ?? 0);
-    $enrollments = unified_schedule_get_student_enrollments($conn, $user_id, $semester);
+    $enrollments = unified_schedule_get_student_enrollments($conn, $user_id, $semester, $academic_year);
     $enrolled_codes = [];
     foreach ($enrollments as $enrollment) {
         $code = strtoupper(trim((string)($enrollment['course_code'] ?? '')));
@@ -448,33 +590,49 @@ function unified_schedule_fetch(mysqli $conn, array $session, array $options = [
     foreach ($sources as $source) {
         $parsed_rows = unified_schedule_extract_rows($source['schedule_data'] ?? '');
         foreach ($parsed_rows as $row) {
-            $code = strtoupper(trim((string)($row['course code'] ?? ($row['course'] ?? ($row['code'] ?? '')))));
-            if ($code === '') {
+            $code_raw = strtoupper(trim((string)($row['course_code'] ?? ($row['course code'] ?? ($row['course'] ?? ($row['code'] ?? ''))))));
+            if ($code_raw === '') {
                 continue;
             }
 
-            if (!empty($enrolled_codes) && !isset($enrolled_codes[$code])) {
-                continue;
+            // Resolve the canonical code: prefer whichever part matched an enrollment
+            $code = $code_raw;
+            if (!empty($enrolled_codes) && !$include_all_student_rows) {
+                if (!unified_schedule_code_matches($code_raw, $enrolled_codes)) {
+                    continue;
+                }
+                // Use the specific enrolled code that matched (first match wins)
+                foreach (unified_schedule_split_codes($code_raw) as $part) {
+                    if (isset($enrolled_codes[$part])) {
+                        $code = $part;
+                        break;
+                    }
+                }
+            } else {
+                // No enrollments: use first code in the cell
+                $codes = unified_schedule_split_codes($code_raw);
+                $code = $codes[0];
             }
 
-            if (empty($enrolled_codes) && $level > 0) {
-                $row_level = unified_schedule_normalize_level($row['level'] ?? '');
+            if (($include_all_student_rows || empty($enrolled_codes)) && $level > 0) {
+                $row_level = unified_schedule_normalize_level($row['course_level'] ?? ($row['level'] ?? ''));
                 if ($row_level > 0 && $row_level !== $level) {
                     continue;
                 }
             }
 
             $day = trim((string)($row['day'] ?? ''));
-            $time = trim((string)($row['time'] ?? ($row['assigned time'] ?? ($row['assigned_time'] ?? ''))));
-            $room = trim((string)($row['room name'] ?? ($row['room'] ?? ($row['room_name'] ?? ''))));
-            $lecturer = trim((string)($row['lecturer name'] ?? ($row['lecturer'] ?? 'TBA')));
-            $title = trim((string)($row['course title'] ?? ($row['title'] ?? $code)));
+            $time = trim((string)($row['time'] ?? ($row['assigned_time'] ?? ($row['assigned time'] ?? ''))));
+            $room = trim((string)($row['room_name'] ?? ($row['room name'] ?? ($row['room'] ?? ''))));
+            $lecturer = trim((string)($row['lecturer_name'] ?? ($row['lecturer name'] ?? ($row['lecturer'] ?? 'TBA'))));
+            $title = trim((string)($row['course_title'] ?? ($row['course title'] ?? ($row['title'] ?? $code))));
 
             if ($day === '' || $time === '') {
                 continue;
             }
 
-            $dedupe_key = strtolower($code . '|' . $day . '|' . $time . '|' . $room);
+            $section_val = trim((string)($row['section'] ?? ''));
+            $dedupe_key = strtolower($code . '|' . $day . '|' . $time . '|' . $room . '|' . $section_val);
             if (isset($seen[$dedupe_key])) {
                 continue;
             }
@@ -487,6 +645,7 @@ function unified_schedule_fetch(mysqli $conn, array $session, array $options = [
                 'time' => $time,
                 'room' => $room,
                 'lecturer' => $lecturer,
+                'section' => trim((string)($row['section'] ?? '')),
                 'department' => (string)$source['department'],
                 'source_created_at' => (string)$source['created_at']
             ];
@@ -496,6 +655,7 @@ function unified_schedule_fetch(mysqli $conn, array $session, array $options = [
     return [
         'role' => $role,
         'semester' => $semester,
+        'academic_year' => $academic_year,
         'saved_at' => $effective_saved_at,
         'requested_saved_at' => $requested_saved_at,
         'snapshots' => $snapshots,

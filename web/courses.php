@@ -1,17 +1,22 @@
 <?php
 $page_title = 'Manage Courses';
 $page_css = 'assets/courses.css';
-include 'includes/header.php';
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 require_once 'api/db.php';
+require_once 'includes/access_control.php';
 
 // Access Control - Admin Only
 requireAdmin();
 
 // Handlers
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['delete_id'])) {
-        $stmt = $conn->prepare("DELETE FROM courses WHERE id = ?");
-        $stmt->bind_param("i", $_POST['delete_id']);
+    if (isset($_POST['delete_id']) && isset($_POST['course_title'])) {
+
+        $stmt = $conn->prepare("DELETE FROM courses WHERE id = ? AND course_title =? ");
+        $stmt->bind_param("is", $_POST['delete_id'], $_POST['course_title'] );
         $stmt->execute();
         trigger_b2_sync();
         header("Location: courses.php?msg=deleted");
@@ -24,6 +29,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $level = $_POST['level'];
         $credits = $_POST['credits'];
         $type = $_POST['type'];
+        $sections_text = trim((string)($_POST['sections'] ?? 'Sec A'));
+        // Split by comma, allow flexible input (e.g. 'Sec A, Sec B')
+        $section_names = array_filter(array_map('trim', preg_split('/,|\n/', $sections_text)));
+        if (empty($section_names)) {
+            $section_names = ['Sec A'];
+        }
         $department = trim((string)($_POST['department'] ?? ''));
         if ($department === '') {
             if (strcasecmp((string)$type, 'General') === 0) {
@@ -37,28 +48,72 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         try {
-            $conn->begin_transaction();
-            $stmt = $conn->prepare("INSERT INTO courses (course_code, course_title, level, credit_hours, type, department) VALUES (?, ?, ?, ?, ?, ?)");
-            $stmt->bind_param("ssiiss", $code, $title, $level, $credits, $type, $department);
-            $stmt->execute();
-            $course_id = $conn->insert_id;
+    $conn->begin_transaction();
 
-            // Create a default empty section for this course
-            $stmt = $conn->prepare("INSERT INTO sections (course_id) VALUES (?)");
-            $stmt->bind_param("i", $course_id);
-            $stmt->execute();
+    foreach ($section_names as $section_name) {
 
-            $conn->commit();
-            trigger_b2_sync();
-            header("Location: courses.php?msg=added");
-            exit;
+        // Create title with single section
+        if (empty($section_name)) {
+              $course_title_with_section = $title ;
+        }else {
+        $course_title_with_section = $title . ' [' . $section_name . ']';
         }
-        catch (Exception $e) {
-            $conn->rollback();
-            $error = "Error adding course: " . $e->getMessage();
-        }
+
+        // Insert course
+        $stmt = $conn->prepare("
+            INSERT INTO courses
+            (course_code, course_title, level, credit_hours, type, department, sections_count)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ");
+
+        $single_section_count = 1;
+
+        $stmt->bind_param(
+            "ssiissi",
+            $code,
+            $course_title_with_section,
+            $level,
+            $credits,
+            $type,
+            $department,
+            $single_section_count
+        );
+
+        $stmt->execute();
+        $course_id = $conn->insert_id;
+
+        // Insert section
+        $stmt = $conn->prepare("
+            INSERT INTO sections
+            (course_id, section_name, section_title)
+            VALUES (?, ?, ?)
+        ");
+
+        $section_title = $course_title_with_section;
+
+        $stmt->bind_param(
+            "iss",
+            $course_id,
+            $section_name,
+            $section_title
+        );
+
+        $stmt->execute();
+    }
+
+    $conn->commit();
+    trigger_b2_sync();
+    header("Location: courses.php?msg=added");
+    exit;
+
+} catch (Exception $e) {
+    $conn->rollback();
+    $error = "Error adding course: " . $e->getMessage();
+}
     }
 }
+
+include 'includes/header.php';
 
 $search = $_GET['search'] ?? '';
 $search_param = "%$search%";
@@ -128,6 +183,12 @@ if (!in_array($selected_department, $department_options, true)) {
 ?>
 
 <div class="glass-panel courses-container">
+
+     <!-- <div id="coursesSpinner" class="courses-spinner-overlay" aria-hidden="true">
+        <div class="courses-spinner"></div>
+        <span class="courses-spinner-label" id="coursesSpinnerLabel">Loading&hellip;</span>
+    </div> -->
+
     <!-- Top Action Bar -->
     <div class="courses-action-bar">
         <form method="GET" class="courses-search-form">
@@ -182,6 +243,7 @@ if (!in_array($selected_department, $department_options, true)) {
                     <th>Code</th>
                     <th>Title</th>
                     <th>Level</th>
+                    <th>Semester</th>
                     <th>Credits</th>
                     <th>Type</th>
                     <th>Lecturer</th>
@@ -192,42 +254,46 @@ if (!in_array($selected_department, $department_options, true)) {
                 <?php if (count($courses) > 0): ?>
                 <?php foreach ($courses as $course): ?>
                 <tr>
-                    <td><span class="courses-code-text">
+                    <td data-label="Code"><span class="courses-code-text">
                             <?php echo htmlspecialchars($course['course_code']); ?>
                         </span></td>
-                    <td>
+                    <td data-label="Title">
                         <?php echo htmlspecialchars($course['course_title']); ?>
                     </td>
-                    <td>
+                    <td data-label="Level">
                         <?php echo htmlspecialchars($course['level']); ?>
                     </td>
-                    <td>
+                    <td data-label="Semester">
+                        <?php echo htmlspecialchars($course['semester']); ?>
+                    </td>
+                    <td data-label="Credits">
                         <?php echo htmlspecialchars($course['credit_hours']); ?>
                     </td>
-                    <td>
+                    <td data-label="Type">
                         <span class="courses-type-badge <?php echo $course['type'] == 'General' ? 'courses-type-badge--general' : 'courses-type-badge--departmental'; ?>">
                             <?php echo htmlspecialchars($course['type']); ?>
                         </span>
                     </td>
-                    <td>
+                    <td data-label="Lecturer">
                         <?php echo htmlspecialchars($course['lecturer_name'] ?? 'Unassigned'); ?>
                     </td>
-                    <td>
-                        <a href="edit_course.php?id=<?php echo $course['id']; ?>" class="glass-btn secondary courses-edit-btn"><i
-                                class="fa-solid fa-pen"></i></a>
-                        <form method="POST" class="courses-delete-form"
-                            onsubmit="confirmAction(event, 'Delete Course', 'Are you sure you want to delete this course?')">
-                            <input type="hidden" name="delete_id" value="<?php echo $course['id']; ?>">
-                            <button type="submit" class="glass-btn secondary courses-delete-btn"><i
-                                    class="fa-solid fa-trash"></i></button>
-                        </form>
+                    <td data-label="Actions" class="courses-actions-cell">
+                        <div class="courses-actions-wrap">
+                            <a href="edit_course.php?id=<?php echo $course['id']; ?>" class="glass-btn secondary courses-edit-btn"><i class="fa-solid fa-pen"></i></a>
+                            <form method="POST" class="courses-delete-form"
+                                onsubmit="confirmAction(event, 'Delete Course', 'Are you sure you want to delete this course?')">
+                                <input type="hidden" name="delete_id" value="<?php echo $course['id'], $course['course_title']; ?>">
+                                <input type="hidden" name="course_title" value="<?php echo $course['course_title']; ?>">
+                                <button type="submit" class="glass-btn secondary courses-delete-btn"><i class="fa-solid fa-trash"></i></button>
+                            </form>
+                        </div>
                     </td>
                 </tr>
                 <?php
     endforeach; ?>
                 <?php
 else: ?>
-                <tr>
+                <tr class="courses-empty-row">
                     <td colspan="7" class="courses-empty-cell">No courses found.</td>
                 </tr>
                 <?php
@@ -313,6 +379,11 @@ endif; ?>
                         <?php endforeach; ?>
                     </select>
                 </div>
+                <div>
+                    <label class="courses-modal-label">Sections</label>
+                    <input type="text" name="sections" class="glass-input" value="Sec A" placeholder="e.g. Sec A, Sec B">
+                    <small style="color: var(--text-muted);">Separate multiple sections with commas (e.g. Sec A, Sec B)</small>
+                </div>
                 <div class="courses-modal-actions">
                     <button type="submit" class="glass-btn courses-modal-save-btn">Save</button>
                     <button type="button" onclick="document.getElementById('addModal').style.display='none'"
@@ -337,6 +408,22 @@ endif; ?>
 
     typeSelect.addEventListener('change', syncDepartmentFromType);
 })();
+
+function showSpinner(message = 'Loading&hellip;') {
+    const spinnerOverlay = document.getElementById('coursesSpinner');
+    const spinnerLabel = document.getElementById('coursesSpinnerLabel');
+    if (spinnerOverlay && spinnerLabel) {
+        spinnerLabel.textContent = message || 'Loading';
+        spinnerOverlay.style.display = 'flex'; spinnerOverlay.removeAttribute('aria-hidden');
+    }
+}
+
+function hideSpinner() {
+    const spinnerOverlay = document.getElementById('coursesSpinner');
+    if (spinnerOverlay) {
+        spinnerOverlay.style.display = 'none'; spinnerOverlay.setAttribute('aria-hidden', 'true');
+    }
+}
 </script>
 
 <?php include 'includes/footer.php'; ?>

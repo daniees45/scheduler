@@ -68,7 +68,7 @@ requireRole(['super_admin']);
     </div>
 </div>
 
-<script src="config.js"></script>
+<script src="config.js?v=<?php echo filemtime(__DIR__ . '/config.js'); ?>"></script>
 <script>
     async function safeAlert(title, message, type = 'info') {
         const fn = window.customAlert || window.showAlert;

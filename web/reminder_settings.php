@@ -11,6 +11,9 @@ $user_id = $_SESSION['user_id'];
     <p class="reminder-settings-subtitle">
         Configure when and how you want to be reminded about your commitments
     </p>
+    <div class="glass-panel" style="margin-bottom: 1rem; padding: 1rem 1.2rem; border-left: 4px solid var(--primary-color);">
+        <strong>Email reminders are active.</strong> Select <em>Email</em> as the delivery method to use your configured SMTP settings for reminder notifications.
+    </div>
     
     <div class="glass-panel reminder-settings-panel">
         <div id="settingsList">
@@ -143,7 +146,7 @@ function renderSettings() {
                         <select class="glass-input" 
                                 onchange="updateSettingDelivery(${index}, this.value)">
                             <option value="in_app" ${setting.delivery_method === 'in_app' ? 'selected' : ''}>In-App</option>
-                            <option value="email" ${setting.delivery_method === 'email' ? 'selected' : ''} disabled>Email (Coming Soon)</option>
+                            <option value="email" ${setting.delivery_method === 'email' ? 'selected' : ''}>Email</option>
                             <option value="sms" ${setting.delivery_method === 'sms' ? 'selected' : ''} disabled>SMS (Coming Soon)</option>
                         </select>
                     </div>

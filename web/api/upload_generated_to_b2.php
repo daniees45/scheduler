@@ -5,6 +5,13 @@
 
 require_once __DIR__ . '/../../lib/B2Storage.php';
 
+if (PHP_SAPI !== 'cli') {
+    http_response_code(403);
+    header('Content-Type: application/json');
+    echo json_encode(['status' => 'error', 'message' => 'Forbidden']);
+    exit;
+}
+
 // Get file path from command line argument
 $file_path = $argv[1] ?? null;
 

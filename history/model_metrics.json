@@ -1,20 +1,20 @@
 {
   "status": "trained",
-  "training_samples": 599,
-  "validation_samples": 150,
-  "total_samples": 749,
+  "training_samples": 40,
+  "validation_samples": 10,
+  "total_samples": 50,
   "invalid_samples": 0,
-  "accuracy": 0.7466666666666667,
-  "precision": 0.7317073170731707,
-  "recall": 0.7894736842105263,
-  "f1": 0.759493670886076,
-  "roc_auc": 0.7550675675675675,
-  "timestamp": "2026-02-26T20:15:19.118501",
+  "accuracy": 0.8,
+  "precision": 0.6666666666666666,
+  "recall": 1.0,
+  "f1": 0.8,
+  "roc_auc": 0.7916666666666667,
+  "timestamp": "2026-05-20T12:23:57.221587",
   "top_5_features": {
-    "department_difficulty": 0.2448878532750536,
-    "lecturer_experience_level": 0.21850134539854885,
-    "course_level": 0.1753068477249754,
-    "day_of_week": 0.12447491745404621,
-    "credits_weight": 0.11638682462392626
+    "time_gap_factor": 0.17993789037552566,
+    "consecutive_hours_per_day": 0.16551691558955275,
+    "room_utilization_rate": 0.12900662056022255,
+    "lecturer_availability_score": 0.07146581349630354,
+    "department_difficulty": 0.06689624887453118
   }
 }

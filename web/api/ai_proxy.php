@@ -27,6 +27,7 @@ $allowed = [
     '/health',
     '/ai/status',
     '/progress',
+    '/cancel',
     '/generate',
     '/api/generate',
     '/generate/exam',
@@ -38,7 +39,9 @@ $allowed = [
     '/analytics/performance',
     '/explain/schedule',
     '/api/feasibility/heatmap',
-    '/api/conflicts/relax'
+    '/api/conflicts/relax',
+    '/ai/train/all',
+    '/ai/train/progress'
 ];
 
 $baseEndpoint = explode('?', $endpoint, 2)[0];
@@ -80,6 +83,7 @@ if ($method !== 'GET' && $rawBody !== false && $rawBody !== '') {
 $response = curl_exec($ch);
 $curlErr = curl_error($ch);
 $statusCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+$contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
 curl_close($ch);
 
 if ($response === false) {
@@ -90,6 +94,18 @@ if ($response === false) {
 
 if ($statusCode >= 100 && $statusCode < 600) {
     http_response_code($statusCode);
+}
+
+// If Flask returned an error status but non-JSON body (e.g. HTML debug page),
+// wrap it in a JSON error so the client always receives a parseable response.
+if ($statusCode >= 400 && stripos($contentType, 'application/json') === false) {
+    // Extract a short plain-text hint from the body (first 200 chars, no tags)
+    $hint = strip_tags((string)$response);
+    $hint = trim(preg_replace('/\s+/', ' ', $hint));
+    if (strlen($hint) > 200) $hint = substr($hint, 0, 200) . '…';
+    if ($hint === '') $hint = 'Unknown server error';
+    echo json_encode(['status' => 'error', 'message' => $hint]);
+    exit;
 }
 
 echo $response;

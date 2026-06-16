@@ -2,7 +2,12 @@
 // web/api/cleanup_data.php
 header('Content-Type: application/json');
 require_once 'db.php';
+require_once __DIR__ . '/auth_guard.php';
 require_once __DIR__ . '/../../lib/B2Storage.php';
+
+require_http_methods('POST');
+require_authenticated_user();
+require_admin_user();
 
 $b2 = new B2Storage();
 
@@ -40,7 +45,7 @@ if (!$download_result['success']) {
     http_response_code(404);
     echo json_encode([
         'status' => 'error',
-        'message' => "File $input_name not found in B2: " . $download_result['error']
+        'message' => "File $input_name not found in B2"
     ]);
     exit;
 }
@@ -80,7 +85,7 @@ if (file_exists($temp_output)) {
             // Clean up old versions
             $b2->deleteOldVersions($output_path);
         } else {
-            $b2_status = "B2 upload failed: " . $result['error'];
+            $b2_status = "Cloud upload failed: " . $result['error'];
         }
     }
     

@@ -24,7 +24,7 @@ function analyze_time_distribution($schedule_csv_content = null) {
         $b2 = new B2Storage();
         $result = $b2->download('csv/final/final_web_schedule.csv');
         if (!$result['success']) {
-            return ['success' => false, 'error' => 'Schedule CSV not found in B2'];
+            return ['success' => false, 'error' => 'Schedule CSV not available'];
         }
         $schedule_csv_content = $result['content'];
     }

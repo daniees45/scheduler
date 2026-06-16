@@ -1,6 +1,7 @@
 flask
 flask-cors
 pandas
+python-dateutil
 requests
 tabula-py
 flask-sqlalchemy

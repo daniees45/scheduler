@@ -215,6 +215,77 @@ input:checked + .slider:before {
     margin-top: 5px;
 }
 
+/* Current logo/icon row */
+.branding-current-logo-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 8px;
+    transition: opacity 0.2s;
+}
+
+.branding-current-logo-img {
+    max-height: 44px;
+    max-width: 120px;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    border-radius: 4px;
+    flex-shrink: 0;
+}
+
+.branding-favicon-img {
+    max-height: 32px;
+    max-width: 32px;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
+.branding-current-logo-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    min-width: 0;
+}
+
+.branding-remove-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.75rem;
+    color: var(--danger, #ef4444);
+    cursor: pointer;
+    user-select: none;
+}
+
+.branding-remove-label input[type="checkbox"] {
+    accent-color: var(--danger, #ef4444);
+    cursor: pointer;
+}
+
+/* Preview logo image */
+.branding-preview-logo-img {
+    display: block;
+    max-height: 28px;
+    max-width: 80px;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    border-radius: 3px;
+}
+
+.field-hint {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    font-weight: 400;
+}
+
 .branding-preview-panel {
     padding: 1.5rem;
     background: rgba(255,255,255,0.05);
@@ -238,10 +309,19 @@ input:checked + .slider:before {
 }
 
 .branding-preview-logo {
-    width: 24px;
-    height: 24px;
+    min-width: 24px;
+    min-height: 24px;
     background: var(--primary-color);
     border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+/* Hide color square when logo image is present */
+.branding-preview-logo:has(.branding-preview-logo-img) {
+    background: transparent;
 }
 
 .branding-preview-text {
@@ -258,4 +338,40 @@ input:checked + .slider:before {
     font-size: 0.75rem;
     color: var(--text-muted);
     margin-top: 1rem;
+}
+
+/* ============================================================
+   settings.css — Mobile responsive breakpoints
+   ============================================================ */
+
+@media (max-width: 768px) {
+    .settings-page-panel {
+        padding: 1rem;
+    }
+    .settings-grid-2,
+    .settings-grid-2-wide {
+        grid-template-columns: 1fr;
+    }
+    .settings-inline-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .danger-zone-actions {
+        flex-direction: column;
+    }
+    .danger-zone-actions .glass-btn {
+        width: 100%;
+    }
+}
+
+@media (max-width: 480px) {
+    .settings-page-panel {
+        padding: 0.75rem;
+    }
+    .danger-zone-box {
+        padding: 1rem;
+    }
+    .branding-preview-panel {
+        padding: 1rem;
+    }
 }

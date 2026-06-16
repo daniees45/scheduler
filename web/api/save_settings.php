@@ -6,6 +6,7 @@
 session_start();
 header('Content-Type: application/json');
 require_once 'db.php';
+require_once __DIR__ . '/ai_learning.php';
 
 if (!isset($_SESSION['user_id'])) {
     echo json_encode(['status' => 'error', 'message' => 'Unauthorized']);
@@ -152,10 +153,17 @@ try {
 
         case 'student':
             if ($role !== 'student') throw new Exception("Unauthorized student access");
+            ai_learning_ensure_schema($conn);
             $conn->query("INSERT IGNORE INTO user_settings (user_id) VALUES ($user_id)");
+            $productivity_pref = $payload['productivity_pref'] ?? 'Detailed';
+            if (!in_array($productivity_pref, ['Detailed', 'Basic', 'Off'], true)) {
+                $productivity_pref = 'Detailed';
+            }
+            $auto_suggest_free = isset($payload['auto_suggest_free']) ? intval($payload['auto_suggest_free']) : 1;
             $stmt = $conn->prepare("UPDATE user_settings SET productivity_pref = ?, auto_suggest_free = ? WHERE user_id = ?");
-            $stmt->bind_param("sii", $payload['productivity_pref'], $payload['auto_suggest_free'], $user_id);
+            $stmt->bind_param("sii", $productivity_pref, $auto_suggest_free, $user_id);
             $stmt->execute();
+            ai_learning_sync_user_profile($conn, $user_id);
             break;
 
         case 'admin':
@@ -189,6 +197,7 @@ try {
             $stmt = $conn->prepare("UPDATE ai_settings SET suggestion_intensity = ?, preferred_work_start = ?, preferred_work_end = ?, max_daily_workload = ?, accept_learning_toggle = ? WHERE user_id = ?");
             $stmt->bind_param("ssssii", $payload['intensity'], $payload['work_start'], $payload['work_end'], $payload['max_load'], $payload['learning_toggle'], $user_id);
             $stmt->execute();
+            ai_learning_sync_user_profile($conn, $user_id);
             break;
 
         case 'branding':
@@ -203,6 +212,7 @@ try {
             );
             $color_strength = (int)($payload['color_strength'] ?? $_POST['color_strength'] ?? 100);
             $color_strength = max(50, min(150, $color_strength));
+            $text_color = normalize_hex_color($payload['text_color'] ?? $_POST['text_color'] ?? '#f8fafc', '#f8fafc');
             $icon = $payload['icon'] ?? $_POST['icon'] ?? '';
             
             $logo_path = $payload['logo'] ?? $_POST['logo'] ?? null;
@@ -231,11 +241,14 @@ try {
             if (!has_column($conn, 'branding_settings', 'site_color_strength')) {
                 @$conn->query("ALTER TABLE branding_settings ADD COLUMN site_color_strength TINYINT UNSIGNED NOT NULL DEFAULT 100 AFTER site_secondary_color");
             }
+            if (!has_column($conn, 'branding_settings', 'site_text_color')) {
+                @$conn->query("ALTER TABLE branding_settings ADD COLUMN site_text_color VARCHAR(7) NULL AFTER site_color_strength");
+            }
 
-            if (has_column($conn, 'branding_settings', 'site_secondary_color') && has_column($conn, 'branding_settings', 'site_color_strength')) {
-                $conn->query("INSERT IGNORE INTO branding_settings (id, site_title, site_color, site_secondary_color, site_color_strength, site_bg_color, site_logo, site_icon, updated_by) VALUES (1, 'VVU Scheduler AI', '#2563eb', '#3f83f8', 100, '#0f172a', NULL, NULL, $user_id)");
-                $stmt = $conn->prepare("UPDATE branding_settings SET site_title = ?, site_color = ?, site_secondary_color = ?, site_color_strength = ?, site_bg_color = ?, site_logo = ?, site_icon = ?, updated_by = ? WHERE id = 1");
-                $stmt->bind_param("sssisssi", $title, $color, $secondary_color, $color_strength, $bg_color, $logo_path, $icon, $user_id);
+            if (has_column($conn, 'branding_settings', 'site_secondary_color') && has_column($conn, 'branding_settings', 'site_color_strength') && has_column($conn, 'branding_settings', 'site_text_color')) {
+                $conn->query("INSERT IGNORE INTO branding_settings (id, site_title, site_color, site_secondary_color, site_color_strength, site_text_color, site_bg_color, site_logo, site_icon, updated_by) VALUES (1, 'VVU Scheduler AI', '#2563eb', '#3f83f8', 100, '#f8fafc', '#0f172a', NULL, NULL, $user_id)");
+                $stmt = $conn->prepare("UPDATE branding_settings SET site_title = ?, site_color = ?, site_secondary_color = ?, site_color_strength = ?, site_text_color = ?, site_bg_color = ?, site_logo = ?, site_icon = ?, updated_by = ? WHERE id = 1");
+                $stmt->bind_param("sssissssi", $title, $color, $secondary_color, $color_strength, $text_color, $bg_color, $logo_path, $icon, $user_id);
             } elseif (has_column($conn, 'branding_settings', 'site_secondary_color')) {
                 $conn->query("INSERT IGNORE INTO branding_settings (id, site_title, site_color, site_secondary_color, site_bg_color, site_logo, site_icon, updated_by) VALUES (1, 'VVU Scheduler AI', '#2563eb', '#3f83f8', '#0f172a', NULL, NULL, $user_id)");
                 $stmt = $conn->prepare("UPDATE branding_settings SET site_title = ?, site_color = ?, site_secondary_color = ?, site_bg_color = ?, site_logo = ?, site_icon = ?, updated_by = ? WHERE id = 1");
@@ -246,6 +259,32 @@ try {
                 $stmt->bind_param("sssssi", $title, $color, $bg_color, $logo_path, $icon, $user_id);
             }
             $stmt->execute();
+            break;
+
+        case 'system':
+            if ($role !== 'faculty_admin' && $role !== 'super_admin') throw new Exception("Unauthorized access");
+            
+            $semester = $payload['current_semester'] ?? '1';
+            $start = $payload['semester_start_date'] ?? date('Y-m-d');
+            $end = $payload['semester_end_date'] ?? date('Y-m-d');
+            $academic_year = trim((string)($payload['current_academic_year'] ?? ''));
+            if (!preg_match('/^\d{4}\/\d{4}$/', $academic_year)) {
+                $y = (int)date('Y');
+                $academic_year = $y . '/' . ($y + 1);
+            }
+
+            $data_to_save = [
+                'current_semester' => $semester,
+                'current_academic_year' => $academic_year,
+                'semester_start_date' => $start,
+                'semester_end_date' => $end
+            ];
+
+            foreach ($data_to_save as $key => $val) {
+                $stmt = $conn->prepare("INSERT INTO system_settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = ?");
+                $stmt->bind_param("sss", $key, $val, $val);
+                $stmt->execute();
+            }
             break;
 
         default:

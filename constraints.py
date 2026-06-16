@@ -346,8 +346,40 @@ def flexible_lecturer_assignment(assignment: Dict[str, Any],
     if other_available_slots:
         return True  # Lecturer has alternatives, can use this slot
     
-    # No alternatives available at all - cannot assign
+# No alternatives available at all - cannot assign
     return False
+
+
+def no_student_feedback_clash(assignment: Dict[str, Any],
+                               var_id: str,
+                               value: Any,
+                               sections: Dict[str, ClassSection],
+                               feedback_clashes: List[Tuple[str, str, str]],
+                               csp_instance: Any = None) -> bool:
+    """
+    Enforces student-reported clashes. If Course A and Course B were reported
+    as clashing, they cannot be scheduled at the same time.
+    """
+    day, slot, _ = value
+    this_sec = sections[var_id]
+    this_code = this_sec.course_code
+    
+    for _, c1, c2 in feedback_clashes:
+        if this_code == c1 or this_code == c2:
+            target_code = c2 if this_code == c1 else c1
+            
+            # Check current assignments for any section matching target_code
+            for other_id, other_val in assignment.items():
+                if other_id == var_id:
+                    continue
+                
+                other_day, other_slot, _ = other_val
+                if day == other_day and slot == other_slot:
+                    other_sec = sections[other_id]
+                    if other_sec.course_code == target_code:
+                        return False
+    return True
+
 
 
 def make_constraints(sections: list,  rooms: dict, preference_model: dict = None, blocked_blocks: list = None,
@@ -370,6 +402,21 @@ def make_constraints(sections: list,  rooms: dict, preference_model: dict = None
         base_constraints.append(functools.partial(no_blocked_slot_conflict, sections=sections_by_id, 
                                                  blocked_blocks=blocked_blocks, course_cohorts=course_cohorts))
         
+    # --- Student feedback clash constraints ---
+    try:
+        from student_feedback import get_student_clash_constraints
+        import os
+        semester = os.environ.get('SCHEDULER_SEMESTER')
+        if semester:
+            clashes = get_student_clash_constraints(semester)
+            if clashes:
+                base_constraints.append(functools.partial(no_student_feedback_clash, 
+                                                         sections=sections_by_id, 
+                                                         feedback_clashes=clashes))
+    except (ImportError, Exception):
+        pass # Feedback module or file may not be ready
+
     return base_constraints
+
 
 

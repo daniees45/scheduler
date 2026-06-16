@@ -6,10 +6,6 @@ SLOT_TIME = {
     2: ("2:00 PM", "4:30 PM"),
     3: ("5:00 PM", "6:00 PM")
 }
-
-
-
-
 def export_solution(solution, data, out_path : str):
     """
     Exports the scheduling solution to a CSV file.

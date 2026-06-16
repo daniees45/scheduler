@@ -1,10 +1,11 @@
 {
-  "days": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
-  "slots_per_day": 2,
+  "days": ["Mon W1", "Tue W1", "Wed W1", "Thu W1", "Fri W1", "Mon W2", "Tue W2", "Wed W2", "Thu W2", "Fri W2"],
+  "slots_per_day": 3,
   "strict_capacity": true,
   "slot_times": {
     "0": ["9:00 AM", "12:00 PM"],
-    "1": ["2:00 PM", "5:00 PM"]
+    "1": ["2:00 PM", "5:00 PM"],
+    "2": ["6:00 PM", "9:00 PM"]
   },
   "max_exams_per_day_per_cohort": 2,
   "cohort_mode": "level_semester",

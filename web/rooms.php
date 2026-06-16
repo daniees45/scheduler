@@ -82,6 +82,12 @@ foreach ($room_sources as $source) {
 ?>
 
 <div class="glass-panel rooms-panel">
+    <!-- Loading Spinner -->
+    <div id="roomsSpinner" class="rooms-spinner-overlay" aria-hidden="true">
+        <div class="rooms-spinner"></div>
+        <span class="rooms-spinner-label" id="roomsSpinnerLabel">Loading&hellip;</span>
+    </div>
+
     <div class="rooms-header-row">
         <div>
             <h2 class="rooms-title"><i class="fa-solid fa-building"></i> Department Rooms Management</h2>
@@ -144,14 +150,14 @@ function renderRows() {
         const tr = document.createElement('tr');
         tr.className = 'rooms-table-row';
         tr.innerHTML = `
-            <td class="rooms-body-cell">
+            <td class="rooms-body-cell" data-label="Room Name">
                 <input class="glass-input rooms-input" value="${escapeHtml(row.room_name)}" onchange="updateRoomName(${index}, this.value)">
             </td>
-            <td class="rooms-body-cell">
+            <td class="rooms-body-cell rooms-capacity-col" data-label="Capacity">
                 <input type="number" min="1" class="glass-input rooms-input" value="${parseInt(row.capacity || 50, 10)}" onchange="updateCapacity(${index}, this.value)">
             </td>
-            <td class="rooms-body-cell rooms-action-cell">
-                <button class="glass-btn secondary small" onclick="removeRow(${index})"><i class="fa-solid fa-trash"></i></button>
+            <td class="rooms-body-cell rooms-action-cell" data-label="Action">
+                <button class="glass-btn secondary small rooms-action-btn" onclick="removeRow(${index})"><i class="fa-solid fa-trash"></i></button>
             </td>
         `;
         tbody.appendChild(tr);
@@ -226,8 +232,10 @@ function updateCapacity(index, value) {
 
 async function reloadSource() {
     if (!selectedKey) return;
+    showSpinner('Reloading…');
     await fetchSourceFromServer(selectedKey);
     changeSource();
+    hideSpinner();
 }
 
 function escapeHtml(value) {
@@ -263,6 +271,7 @@ async function saveCurrentSource() {
         data: [['room_name', 'capacity'], ...cleanRows]
     };
 
+    showSpinner('Saving to B2…');
     try {
         const res = await fetch('api/save_csv.php', {
             method: 'POST',
@@ -272,6 +281,7 @@ async function saveCurrentSource() {
         const data = await res.json();
 
         if (data.status !== 'success') {
+            hideSpinner();
             await showAlert(data.message || 'Failed to save room file.', 'Save Error');
             return;
         }
@@ -288,14 +298,27 @@ async function saveCurrentSource() {
         renderSourceSelect();
         renderRows();
         renderStatus();
+        hideSpinner();
         await showAlert('Saved to B2 and synced to database successfully.', 'Success');
     } catch (error) {
+        hideSpinner();
         await showAlert('Save failed: ' + error.message, 'Save Error');
     }
 }
 
 renderSourceSelect();
 changeSource();
+
+function showSpinner(label) {
+    const el = document.getElementById('roomsSpinner');
+    const lbl = document.getElementById('roomsSpinnerLabel');
+    if (lbl) lbl.textContent = label || 'Loading…';
+    if (el) { el.style.display = 'flex'; el.removeAttribute('aria-hidden'); }
+}
+function hideSpinner() {
+    const el = document.getElementById('roomsSpinner');
+    if (el) { el.style.display = 'none'; el.setAttribute('aria-hidden', 'true'); }
+}
 </script>
 
 <?php include 'includes/footer.php'; ?>

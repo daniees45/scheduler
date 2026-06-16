@@ -52,7 +52,14 @@ async function apiCallViaProxy(endpoint, options = {}) {
         });
 
         if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            let errMsg = `HTTP ${response.status}: ${response.statusText}`;
+            try {
+                const clone = response.clone();
+                const errData = await clone.json();
+                if (errData && errData.message) errMsg = errData.message;
+                else if (errData && errData.error) errMsg = errData.error;
+            } catch (_) {}
+            throw new Error(errMsg);
         }
 
         return response;
@@ -93,7 +100,14 @@ async function apiCall(endpoint, options = {}, retryCount = 0) {
         const response = await fetch(url, config);
         
         if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            let errMsg = `HTTP ${response.status}: ${response.statusText}`;
+            try {
+                const clone = response.clone();
+                const errData = await clone.json();
+                if (errData && errData.message) errMsg = errData.message;
+                else if (errData && errData.error) errMsg = errData.error;
+            } catch (_) {}
+            throw new Error(errMsg);
         }
         
         return response;
@@ -116,7 +130,14 @@ async function apiCall(endpoint, options = {}, retryCount = 0) {
                 delete proxyOptions.__proxyTried;
                 return await apiCallViaProxy(endpoint, proxyOptions);
             } catch (proxyError) {
-                throw new Error(`Direct + proxy failed: ${proxyError.message}`);
+                // Surface the real message from whichever leg has more detail
+                const directMsg = error.message || '';
+                const proxyMsg = proxyError.message || '';
+                // Prefer proxy message when it's more descriptive than a CORS/network blur
+                const combined = (proxyMsg && !proxyMsg.startsWith('Direct'))
+                    ? proxyMsg
+                    : (directMsg || proxyMsg);
+                throw new Error(combined);
             }
         }
         

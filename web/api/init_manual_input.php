@@ -1,11 +1,10 @@
 <?php
 // web/api/init_manual_input.php
-session_start();
+require_once __DIR__ . '/auth_guard.php';
 header('Content-Type: application/json');
 
-if (!isset($_SESSION['user_id'])) {
-    die(json_encode(["status" => "error", "message" => "Unauthorized"]));
-}
+require_http_methods(['GET', 'POST']);
+require_authenticated_user();
 
 $type = $_GET['type'] ?? 'class';
 $filename = $type === 'exam' ? 'manual_exam_input.csv' : 'manual_course_input.csv';

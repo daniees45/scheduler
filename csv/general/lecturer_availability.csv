@@ -1,5 +1,5 @@
 lecturer_name,Mon,Tue,Wed,Thu,Fri
-"Oladipupo Abeeb",1,1,0,0,0
+"Oladipupo Abeeb",1,1,1,0,0
 "Dr. A. Adu-Sackey",1,1,1,1,1
 "Dr. G. Biney",1,1,1,1,1
 "E. Okoe",1,1,1,1,1
@@ -9,7 +9,7 @@ lecturer_name,Mon,Tue,Wed,Thu,Fri
 "M. Doe",1,1,1,1,1
 "O. Osei-Tutu",1,1,1,1,1
 "Prof. L. Asiedu",1,1,1,1,1
-"Prof. P. Yaw Owusu Amoako",1,1,0,1,1
+"Prof. P. Yaw Owusu Amoako",1,1,0,1,0
 "Prof. W. Oblitey",1,1,1,1,1
 "Prof. W. Ofoe Larkotey",1,1,1,1,1
 "R. Amponsah",1,1,1,1,1
@@ -17,7 +17,7 @@ lecturer_name,Mon,Tue,Wed,Thu,Fri
 "S. Ganu",1,1,1,1,1
 "S. Sebuabe",1,1,1,1,1
 TBA,1,1,1,1,1
-"Akua K. Amponsah",1,1,1,1,1
+"Akua K. Amponsah",1,0,1,1,1
 "Ama O. Karikari",1,1,1,1,1
 "C. Pokuaa",1,1,1,1,1
 "Dr. A. Oye",1,1,1,1,1
@@ -35,3 +35,7 @@ TBA,1,1,1,1,1
 "Ps. E. Takyi",1,1,1,1,1
 "Ps. I. Kyere",1,1,1,1,1
 "Ps. P. Obeng Manu",1,1,1,1,1
+"Dr. Jane Mensah",0,0,0,0,0
+"Mr. Samuel Boakye",0,0,0,0,0
+"Prof. Ama Owusu",0,0,0,0,0
+abeeb,1,1,0,1,1

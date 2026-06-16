@@ -3,17 +3,16 @@
 // Saves JSON data to a CSV file and triggers DB sync
 
 require_once 'db.php';
+require_once __DIR__ . '/auth_guard.php';
 require_once 'room_sync_helper.php';
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+
+ini_set('display_errors', '0');
 
 header('Content-Type: application/json');
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    echo json_encode(['status' => 'error', 'message' => 'Invalid request method.']);
-    exit;
-}
+require_http_methods('POST');
+require_authenticated_user();
+require_admin_user();
 
 $input = json_decode(file_get_contents('php://input'), true);
 $filename = $input['file'] ?? '';
@@ -37,10 +36,11 @@ if (!$filename || preg_match('/\.\./', $filename) || pathinfo($filename, PATHINF
     exit;
 }
 
-$file_path = realpath('../../') . '/' . $filename;
-// Ensure the file is within the vvu-scheduler directory
-$base_dir = realpath('../../../'); // Go up 3 levels from web/api/ to htdocs/
-if (strpos($file_path, $base_dir) !== 0) {
+$project_root = realpath(__DIR__ . '/../../');
+$file_path = $project_root !== false ? ($project_root . '/' . $normalized_filename) : null;
+
+// Ensure the file remains inside the deployed application root (within htdocs)
+if ($project_root === false || $file_path === null || strpos($file_path, $project_root . '/') !== 0) {
     echo json_encode(['status' => 'error', 'message' => 'Access denied. Outside project scope.']);
     exit;
 }
@@ -55,7 +55,7 @@ try {
     $csv_content = "";
     $f = fopen('php://temp', 'r+');
     foreach ($data as $row) {
-        fputcsv($f, $row);
+        fputcsv($f, $row, ',', '"', '\\');
     }
     rewind($f);
     $csv_content = stream_get_contents($f);
@@ -84,7 +84,7 @@ try {
     $result = $b2->uploadContent($csv_content, $key);
     
     if (!$result['success']) {
-        throw new Exception("B2 Upload Failed: " . $result['error']);
+        throw new Exception("Cloud Upload Failed: " . $result['error']);
     }
 
     // 2. Trigger DB Import Logic (Syncs B2/CSV data to active tables)

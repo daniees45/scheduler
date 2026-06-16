@@ -423,3 +423,46 @@
     color: #ef4444;
     padding: 20px;
 }
+
+/* ============================================================
+   my_schedule.css — Mobile responsive breakpoints
+   ============================================================ */
+
+@media (max-width: 768px) {
+    .panel-p15 {
+        padding: 1rem;
+    }
+    .panel-head-row {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+    .table-tools-row .maxw-260,
+    .table-tools-row .maxw-160 {
+        max-width: none !important;
+        width: 100%;
+    }
+}
+
+@media (max-width: 480px) {
+    .quick-actions-panel {
+        padding: 0.85rem;
+    }
+    .event-item-row {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    .suggestion-head-row {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    .row-between-wrap {
+        flex-direction: column;
+    }
+    .suggestion-actions {
+        flex-direction: column;
+    }
+    .suggestion-actions .glass-btn {
+        width: 100%;
+    }
+}

@@ -3,6 +3,12 @@
 // Create temporary test users for QA (localhost only)
 
 require_once 'db.php';
+require_once __DIR__ . '/auth_guard.php';
+
+header('Content-Type: application/json');
+
+require_http_methods('POST');
+require_admin_user();
 
 // Restrict to localhost for safety
 $client_ip = $_SERVER['REMOTE_ADDR'] ?? '';
@@ -11,8 +17,6 @@ if (!in_array($client_ip, ['127.0.0.1', '::1'])) {
     echo json_encode(['status' => 'error', 'message' => 'Forbidden']);
     exit;
 }
-
-header('Content-Type: application/json');
 
 $users = [
     [

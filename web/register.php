@@ -41,10 +41,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     // Hash password
     $hash = password_hash($password, PASSWORD_DEFAULT);
-    
+    $email = trim($_POST['email'] ?? '');
+    if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $error = 'Please provide a valid email address.';
+    } else {
     try {
-        $stmt = $conn->prepare("INSERT INTO users (username, full_name, role, department, password_hash, lecturer_id) VALUES (?, ?, ?, ?, ?, ?)");
-        $stmt->bind_param("sssssi", $username, $fullname, $role, $department, $hash, $lecturer_id);
+        $stmt = $conn->prepare("INSERT INTO users (username, full_name, role, department, password_hash, lecturer_id, email, email_verified) VALUES (?, ?, ?, ?, ?, ?, ?, 1)");
+        $stmt->bind_param("sssssis", $username, $fullname, $role, $department, $hash, $lecturer_id, $email);
         
         if ($stmt->execute()) {
             echo "<script>
@@ -59,7 +62,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } catch (Exception $e) {
         $error = "Error creating user: " . $e->getMessage(); 
     }
-}
+    } // end else (email valid)
+} // end if POST
 ?>
 
     <div class="glass-panel register-container">
@@ -67,9 +71,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     <?php if (isset($error)): ?>
         <div class="alert alert-danger"><?php echo htmlspecialchars($error); ?></div>
+            <script>
+                window.addEventListener('load', () => {
+                    showAlert(<?php echo json_encode((string)$error); ?>, 'Registration Error', 'error');
+                });
+            </script>
     <?php endif; ?>
 
-    <form method="POST" action="register.php">
+        <form method="POST" action="register.php" onsubmit="return handleAdminRegister(event)">
         <!-- Role Selection -->
         <div class="form-group">
             <label class="register-form-label">Role</label>
@@ -123,6 +132,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
         
         <div class="form-group" style="margin-top: 1rem;">
+            <label class="register-form-label">Email Address <span style="font-size:0.85em;color:#888;">(optional — for password reset)</span></label>
+            <input type="email" name="email" class="glass-input" placeholder="user@example.com">
+        </div>
+
+        <div class="form-group" style="margin-top: 1rem;">
             <label class="register-form-label">Username</label>
             <input type="text" name="username" class="glass-input" required>
         </div>
@@ -139,6 +153,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <script>
 // Lecturer data for search
 const lecturers = <?php echo json_encode($lecturers); ?>;
+
+async function handleAdminRegister(event) {
+    event.preventDefault();
+
+    const form = event.target;
+    const emailInput = form.querySelector('input[name="email"]');
+    const nameInput = form.querySelector('input[name="fullname"]');
+    const usernameInput = form.querySelector('input[name="username"]');
+
+    if (emailInput && !emailInput.value.trim()) {
+        const enteredEmail = await showPrompt(
+            'Enter an email address for password recovery, or leave it blank to skip:',
+            '',
+            'Optional Email Address'
+        );
+
+        if (enteredEmail !== null && String(enteredEmail).trim() !== '') {
+            emailInput.value = String(enteredEmail).trim();
+        }
+    }
+
+    const targetName = (nameInput && nameInput.value.trim())
+        ? nameInput.value.trim()
+        : (usernameInput && usernameInput.value.trim())
+            ? usernameInput.value.trim()
+            : 'this user';
+
+    const confirmed = await showConfirm(`Create the account for ${targetName}?`, 'Confirm User Creation');
+    if (!confirmed) {
+        return false;
+    }
+
+    form.submit();
+    return false;
+}
 
 function toggleFields() {
     const role = document.getElementById('roleSelect').value;

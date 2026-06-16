@@ -25,7 +25,7 @@ requireRole(['super_admin', 'faculty_admin']);
 
 $semester = (string)($_SESSION['semester'] ?? '1');
 $selected_schedule_id = (int)($_GET['schedule_id'] ?? 0);
-$available_snapshots = unified_schedule_available_snapshots($conn, $semester, 60);
+$available_snapshots = unified_schedule_available_snapshots($conn, $semester, '', 60);
 $active_snapshot = null;
 
 if ($selected_schedule_id > 0) {
@@ -84,9 +84,9 @@ catch (Exception $e) {
     <!-- Main Chart -->
     <div class="glass-panel panel-p15">
         <h3 class="heading-mb1">Room Utilization</h3>
-        <form method="GET" style="display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; margin-bottom: 1rem;">
-            <label for="schedule_id" style="color: var(--text-muted); font-size: 0.9rem;">Saved schedule:</label>
-            <select id="schedule_id" name="schedule_id" class="glass-input" style="min-width: 320px;">
+        <form method="GET" class="dashboard-filter-form" style="display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; margin-bottom: 1rem;">
+            <label for="schedule_id" style="color: var(--text-muted); font-size: 0.9rem; flex-shrink: 0;">Saved schedule:</label>
+            <select id="schedule_id" name="schedule_id" class="glass-input" style="flex: 1; min-width: 180px;">
                 <?php foreach ($available_snapshots as $snapshot): ?>
                 <?php $snapshot_id = (int)($snapshot['id'] ?? 0); ?>
                 <?php $snapshot_created_at = (string)($snapshot['created_at'] ?? ''); ?>
@@ -128,7 +128,7 @@ catch (Exception $e) {
 </div>
 
 <!-- Include Unified API client (with Safari-compatible proxy fallback) -->
-<script src="config.js"></script>
+<script src="config.js?v=<?php echo filemtime(__DIR__ . '/config.js'); ?>"></script>
 
 <script>
 let roomChartInstance = null;
@@ -157,7 +157,7 @@ async function loadHighestAIAccuracy() {
             
             if (!Number.isNaN(avgAccuracy)) {
                 valueEl.textContent = `${Math.round(Math.max(0, Math.min(100, avgAccuracy)))}%`;
-                hintEl.textContent = 'Average AI schedule quality (last 30 generations)';
+                hintEl.textContent = 'Average AI schedule quality';
                 return;
             }
         }

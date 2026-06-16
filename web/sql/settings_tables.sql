@@ -13,6 +13,8 @@ CREATE TABLE IF NOT EXISTS user_settings (
     time_format ENUM('12', '24') DEFAULT '12',
     profile_visibility ENUM('public', 'private', 'faculty') DEFAULT 'faculty',
     analytics_opt_in BOOLEAN DEFAULT TRUE,
+    productivity_pref ENUM('Detailed', 'Basic', 'Off') DEFAULT 'Detailed',
+    auto_suggest_free BOOLEAN DEFAULT TRUE,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

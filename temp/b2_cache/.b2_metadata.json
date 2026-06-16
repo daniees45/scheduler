@@ -30,16 +30,16 @@
     "downloaded_at": "2026-03-12T17:10:13.459108"
   },
   "csv/general/historical_schedule.csv": {
-    "etag": "9f143024e0a4a432faf621cbe2335f20",
-    "last_modified": "2026-03-13T09:21:30+00:00",
-    "size": 220003,
-    "downloaded_at": "2026-03-13T17:19:47.983577"
+    "etag": "ab8644b90435780070583d3439b5dae0",
+    "last_modified": "2026-05-08T20:40:53+00:00",
+    "size": 345505,
+    "downloaded_at": "2026-05-08T20:47:17.593475"
   },
   "csv/general/lecturer_availability.csv": {
-    "etag": "b7af410eb00543dacc2269b3bd1a4fd0",
-    "last_modified": "2026-03-12T18:25:16+00:00",
+    "etag": "bf8320e53b013f1481b931a822e22501",
+    "last_modified": "2026-04-11T03:29:17+00:00",
     "size": 1064,
-    "downloaded_at": "2026-03-12T18:25:37.831775"
+    "downloaded_at": "2026-04-11T03:29:21.958062"
   },
   "csv/general/level_100.csv": {
     "etag": "7008fc59750e20da71e181c1e50fc32f",
@@ -85,9 +85,9 @@
   },
   "csv/general/special_rooms.csv": {
     "etag": "f39a2e3e02e91a312cd8c12219a5c89a",
-    "last_modified": "2026-03-12T18:25:20+00:00",
+    "last_modified": "2026-04-11T03:29:20+00:00",
     "size": 119,
-    "downloaded_at": "2026-03-12T18:25:47.556784"
+    "downloaded_at": "2026-04-11T03:29:23.859625"
   },
   "csv/history/exam_historical_exam_schedule_20260221_142039.csv": {
     "etag": "2025ca63f41a520d0f98be1b9b9a025a",
@@ -150,15 +150,21 @@
     "downloaded_at": "2026-03-13T09:08:24.332305"
   },
   "csv/department/departmental_courses.csv": {
-    "etag": "7ff06f8c43d3059cabf5c0a9669e5030",
-    "last_modified": "2026-03-13T09:31:38+00:00",
-    "size": 501,
-    "downloaded_at": "2026-03-13T17:19:44.562396"
+    "etag": "465e07a35c0abbbdd9a5977e1e7d0d8c",
+    "last_modified": "2026-05-08T04:12:43+00:00",
+    "size": 563,
+    "downloaded_at": "2026-05-08T19:11:32.391254"
   },
   "csv/department/computing_science_rooms.csv": {
-    "etag": "b1cdbce52c017beef7272cc88120692f",
-    "last_modified": "2026-02-20T13:17:22+00:00",
-    "size": 78,
-    "downloaded_at": "2026-03-14T07:36:10.412447"
+    "etag": "995767365e90a8387c35c65fdb2e5675",
+    "last_modified": "2026-05-09T15:19:39+00:00",
+    "size": 86,
+    "downloaded_at": "2026-05-09T15:54:24.750670"
+  },
+  "csv/final/schedule_general_2026sem1.csv": {
+    "etag": "1e0f690c4bf6b67c4236de02f554f45c",
+    "last_modified": "2026-05-08T20:10:10+00:00",
+    "size": 4764,
+    "downloaded_at": "2026-05-08T20:47:45.560022"
   }
 }

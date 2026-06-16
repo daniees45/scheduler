@@ -413,12 +413,20 @@ class B2Storage {
      * Fallback to local filesystem operations
      */
     private function fallbackToLocal($operation, ...$args) {
-        $localPath = $this->config['local_path'];
+        $localPath = rtrim($this->config['local_path'], '/');
+        
+        $resolvePath = function($key) use ($localPath) {
+            $key = ltrim($key, '/');
+            if (strpos($key, 'csv/') === 0) {
+                return $localPath . '/' . substr($key, 4);
+            }
+            return $localPath . '/' . $key;
+        };
         
         switch ($operation) {
             case 'upload':
                 // args: $filePath, $key
-                $destPath = $localPath . $args[1];
+                $destPath = $resolvePath($args[1]);
                 $destDir = dirname($destPath);
                 if (!is_dir($destDir)) {
                     mkdir($destDir, 0755, true);
@@ -433,7 +441,7 @@ class B2Storage {
                 
             case 'uploadContent':
                 // args: $content, $key
-                $destPath = $localPath . $args[1];
+                $destPath = $resolvePath($args[1]);
                 $destDir = dirname($destPath);
                 if (!is_dir($destDir)) {
                     mkdir($destDir, 0755, true);
@@ -448,34 +456,38 @@ class B2Storage {
                 
             case 'download':
                 // args: $key, $savePath
-                $sourcePath = $localPath . $args[0];
+                $sourcePath = $resolvePath($args[0]);
                 if (!file_exists($sourcePath)) {
-                    return ['success' => false, 'content' => null, 'error' => 'File not found locally'];
+                    return ['success' => false, 'content' => null, 'error' => 'File not found locally: ' . $sourcePath];
                 }
                 $content = file_get_contents($sourcePath);
-                if (isset($args[1])) {
+                if (isset($args[1]) && $args[1]) {
+                    $saveDir = dirname($args[1]);
+                    if (!is_dir($saveDir)) {
+                        mkdir($saveDir, 0755, true);
+                    }
                     file_put_contents($args[1], $content);
                 }
                 return ['success' => true, 'content' => $content, 'error' => null];
                 
             case 'delete':
                 // args: $key
-                $filePath = $localPath . $args[0];
+                $filePath = $resolvePath($args[0]);
                 $success = file_exists($filePath) ? unlink($filePath) : false;
                 return ['success' => $success, 'error' => $success ? null : 'File not found'];
                 
             case 'listFiles':
                 // args: $prefix, $maxKeys
-                $dirPath = $localPath . $args[0];
+                $dirPath = $resolvePath($args[0]);
                 $files = [];
                 if (is_dir($dirPath)) {
                     $items = scandir($dirPath);
                     foreach ($items as $item) {
                         if ($item === '.' || $item === '..') continue;
-                        $fullPath = $dirPath . $item;
+                        $fullPath = $dirPath . '/' . $item;
                         if (is_file($fullPath)) {
                             $files[] = [
-                                'key' => $args[0] . $item,
+                                'key' => rtrim($args[0], '/') . '/' . $item,
                                 'size' => filesize($fullPath),
                                 'modified' => filemtime($fullPath),
                                 'etag' => md5_file($fullPath),
@@ -490,7 +502,7 @@ class B2Storage {
                 
             case 'exists':
                 // args: $key
-                $filePath = $localPath . $args[0];
+                $filePath = $resolvePath($args[0]);
                 return ['success' => file_exists($filePath)];
                 
             default:

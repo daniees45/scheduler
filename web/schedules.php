@@ -71,7 +71,7 @@ async function loadSchedules() {
         const response = await fetch('api/list_b2_schedules.php');
         const data = await response.json();
         
-        console.log('B2 Schedules Response:', data); // Debug log
+        console.log(' Schedules Response:', data); // Debug log
         
         if (data.status === 'success') {
             allSchedules = data.schedules || [];
@@ -196,6 +196,7 @@ async function saveToDatabase(file, name, semester, department) {
                 schedule_name: name,
                 semester: semester,
                 department: department,
+                schedule_type: /exam/i.test(String(name || '')) ? 'exam' : 'class',
                 accuracy: '', // Can be extracted from filename or metadata
                 schedule_data: scheduleData.data
             })

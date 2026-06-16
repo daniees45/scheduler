@@ -9,6 +9,7 @@
  */
 
 header('Content-Type: application/json');
+ini_set('display_errors', 0);
 require_once 'db.php';
 require_once 'error_handler.php';
 require_once 'validate_csv.php';
@@ -601,7 +602,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (is_array($csv_content)) {
                 $handle = fopen($temp_path, 'w');
                 foreach ($csv_content as $row) {
-                    if (is_array($row)) fputcsv($handle, $row);
+                    if (is_array($row)) fputcsv($handle, $row, ',', '"', '\\');
                 }
                 fclose($handle);
             } else {
@@ -622,7 +623,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             echo json_encode([
                 'feasible' => false,
                 'score' => 0,
-                'errors' => ['Failed to download rooms file from B2 for exam validation.'],
+                'errors' => ['Failed to download rooms file from Cloud for exam validation.'],
                 'warnings' => [],
                 'checks' => []
             ]);
@@ -658,7 +659,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             echo json_encode([
                 'feasible' => false,
                 'score' => 0,
-                'errors' => ['Failed to download one or more source files from B2 for validation.'],
+                'errors' => ['Failed to download one or more source files from Cloud for validation.'],
                 'warnings' => [],
                 'checks' => []
             ]);

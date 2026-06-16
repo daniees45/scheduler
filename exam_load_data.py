@@ -1,6 +1,7 @@
 import os
 from typing import Dict, List
 import pandas as pd
+import re
 
 from data_model import Room, Course, ClassSection
 from load_data import load_level_data, day_to_index
@@ -18,6 +19,20 @@ DEFAULT_EXAM_CONFIG = {
     "single_room": True,
     "default_room_name": None
 }
+
+
+def _normalize_grouped_exam_title(raw_title: str) -> str:
+    """Strip section tags like [Sec A], (Section B), {sec c} from grouped exam titles."""
+    title = str(raw_title or "").strip()
+    if not title:
+        return title
+
+    # Remove common section markers wrapped in [], (), or {}
+    title = re.sub(r"\s*[\[\(\{]\s*sec(?:tion)?\s*[A-Za-z0-9]+\s*[\]\)\}]", "", title, flags=re.IGNORECASE)
+    # Remove trailing "- Sec A" or "/ Sec B" style patterns
+    title = re.sub(r"\s*[-/]\s*sec(?:tion)?\s*[A-Za-z0-9]+\s*$", "", title, flags=re.IGNORECASE)
+
+    return re.sub(r"\s{2,}", " ", title).strip()
 
 
 def _load_exam_config(config_path: str) -> dict:
@@ -228,7 +243,7 @@ def load_exam_data(paths: List[str],
                 level = 1
             level = _normalize_level(level)
             
-            title = str(first_row.get("course_title", course_code)).strip()
+            title = _normalize_grouped_exam_title(str(first_row.get("course_title", course_code)).strip())
             
             if course_code not in courses:
                 courses[course_code] = Course(

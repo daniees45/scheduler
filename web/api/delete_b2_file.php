@@ -1,20 +1,15 @@
 <?php
 // web/api/delete_b2_file.php
 // Delete file from B2 storage (super_admin only)
-session_start();
 require_once 'db.php';
 require_once '../../lib/B2Storage.php';
+require_once __DIR__ . '/auth_guard.php';
 
 header('Content-Type: application/json');
 
-// Check authentication and authorization
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'super_admin') {
-    die(json_encode(['status' => 'error', 'message' => 'Unauthorized - Admin access required']));
-}
-
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    die(json_encode(['status' => 'error', 'message' => 'Invalid request method']));
-}
+require_http_methods('POST');
+require_authenticated_user();
+require_super_admin_user();
 
 $input = json_decode(file_get_contents('php://input'), true);
 $file_key = $input['file'] ?? '';

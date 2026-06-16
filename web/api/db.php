@@ -45,7 +45,6 @@ catch (mysqli_sql_exception $e) {
             die("<div style='padding: 20px; color: red; text-align: center; font-family: sans-serif;'>
                     <h2>System Maintenance</h2>
                     <p>The database service is currently unavailable. Please check configuration.</p>
-                    <p><small>" . htmlspecialchars($lastException->getMessage()) . "</small></p>
                  </div>");
         }
 
@@ -56,7 +55,8 @@ catch (mysqli_sql_exception $e) {
 }
 // Check connection (legacy check)
 if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
+    error_log("DB Connection Failed (legacy check): " . $conn->connect_error);
+    die("Database connection failed.");
 }
 
 // Set charset
@@ -110,7 +110,7 @@ function trigger_b2_sync(): void
         curl_close($ch);
     }
     catch (Exception $e) {
-        error_log("B2 Sync Trigger Failed: " . $e->getMessage());
+        error_log("Cloud Sync Trigger Failed: " . $e->getMessage());
     }
 }
 

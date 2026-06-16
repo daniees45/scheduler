@@ -1,10 +1,24 @@
 <?php
 // web/api/sync.php
 // Exports MySQL tables to CSV files in B2 storage for the AI engine
+ini_set('display_errors', 0);
 header('Content-Type: application/json');
 
 require_once 'db.php';
+require_once __DIR__ . '/auth_guard.php';
 require_once __DIR__ . '/../../lib/B2Storage.php';
+
+require_http_methods(['GET', 'POST']);
+
+ensure_api_session();
+$client_ip = $_SERVER['REMOTE_ADDR'] ?? '';
+$is_local_request = in_array($client_ip, ['127.0.0.1', '::1'], true);
+
+if (isset($_SESSION['user_id'])) {
+    require_admin_user();
+} elseif (!$is_local_request) {
+    api_json_error('Unauthorized', 401);
+}
 
 $b2 = new B2Storage();
 
@@ -32,9 +46,9 @@ function get_department_from_code($course_code) {
 function export_to_csv_b2($filename, $headers, $data, $b2) {
     // Generate CSV content in memory
     $handle = fopen('php://temp', 'r+');
-    fputcsv($handle, $headers);
+    fputcsv($handle, $headers, ',', '"', '\\');
     foreach ($data as $row) {
-        fputcsv($handle, $row);
+        fputcsv($handle, $row, ',', '"', '\\');
     }
     rewind($handle);
     $content = stream_get_contents($handle);
@@ -144,7 +158,7 @@ try {
 
     echo json_encode([
         "status" => "success", 
-        "message" => "Database synced to B2 successfully",
+        "message" => "Database synced to Cloud successfully",
         "storage" => "B2"
     ]);
 

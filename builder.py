@@ -1,6 +1,7 @@
 from typing import Dict, List, Tuple, Any
 from data_model import Lecturer, Room, Course, ClassSection, TimeSlot
-
+import os
+import re
 Domain = Dict[str, List[Any]] # A mapping from entity type to list of entities e.g section_id -> List of (day, slot, room_id)
 
 def build_domain(data: dict, classifier=None, confidence_threshold=0.3) -> Domain:
@@ -37,13 +38,39 @@ def build_domain(data: dict, classifier=None, confidence_threshold=0.3) -> Domai
         print(f"[INFO] ML Classifier enabled - pruning domains below {confidence_threshold:.0%} success probability")
     
     special_rooms = data.get('special_rooms', {})
+    def _normalize_code(raw_code: str) -> str:
+        code = str(raw_code or "").strip().upper()
+        code = re.sub(r'\[SEC\s+.*?\]', '', code)
+        code = code.split(":")[0].strip()
+        return re.split(r'\s*/\s*', code)[0].strip()
+
+    normalized_special_rooms: Dict[str, Any] = {}
+    for code, info in (special_rooms or {}).items():
+        norm_code = _normalize_code(code)
+        if norm_code and norm_code not in normalized_special_rooms:
+            normalized_special_rooms[norm_code] = info
+
     if special_rooms:
         print(f"[INFO] Loaded {len(special_rooms)} special room assignment(s)")
         for code, info in special_rooms.items():
             room = info['room'] if isinstance(info, dict) else info
             print(f"  - {code} → {room}")
-    # Pre-calculate ID set for fast lookup to easily check if a room is reserved
+    # 1. READ RESERVED ROOMS DIRECTLY FROM B2 CACHE
+    # Requirement: "i want the reserved room should read directly from temp/b2_cache/csv/general/special_rooms.csv"
     reserved_room_ids = set()
+    b2_special_csv = os.path.join("temp", "b2_cache", "csv", "general", "special_rooms.csv")
+    if os.path.exists(b2_special_csv):
+        try:
+            import pandas as pd
+            sr_df = pd.read_csv(b2_special_csv)
+            for _, row in sr_df.iterrows():
+                r_name = str(row.get('room_name', '')).strip()
+                if r_name:
+                    reserved_room_ids.add(r_name.replace(" ", "_"))
+        except Exception as e:
+            print(f"[WARNING] Could not read direct B2 cache for special rooms: {e}")
+    
+    # Fallback/Merge with provided special_rooms data
     for info in special_rooms.values():
          if isinstance(info, dict):
              r_name = info['room']
@@ -51,12 +78,62 @@ def build_domain(data: dict, classifier=None, confidence_threshold=0.3) -> Domai
              r_name = info
          reserved_room_ids.add(r_name.replace(" ", "_"))
 
+    
+    # 2. ALSO reserve any room that is explicitly requested by a section (e.g. from Smart Lock block)
+    # This prevents OTHER courses from leaking into these pre-assigned rooms.
+    # Requirement: "no other courses which has no blocked courses or room should use it"
+    # Helper for room-to-department matching
+    def is_room_match(r_dept, c_grp):
+        # Explicit mapping for departmental aliases
+        alias_map = {
+            "computing science": "cs inft bbis",
+            "cs/it/bbis": "cs inft bbis",
+            "csitbbis": "cs inft bbis",
+            "computer science": "cs inft bbis",
+            "nursing": "nursing",
+            "business": "business",
+            "education": "education",
+            "development studies": "development studies",
+            "biomedical engineering": "biomedical engineering",
+            "theology": "theology"
+        }
+        
+        rd = str(r_dept).strip().lower().replace("/", " ").replace("-", " ").replace("_", " ")
+        cg = str(c_grp).strip().lower().replace("/", " ").replace("-", " ").replace("_", " ")
+        
+        # Apply aliases
+        rd = alias_map.get(rd, rd)
+        cg = alias_map.get(cg, cg)
+        
+        if rd in ("", "nan", "none", "null"): rd = "general"
+        if cg in ("", "nan", "none", "null"): cg = "general"
+        
+        return (rd == cg) or (rd in cg) or (cg in rd)
+
+    for sec in sections:
+        if sec.requested_room:
+             reserved_room_ids.add(sec.requested_room.replace(" ", "_"))
+
     for sec in sections:
         
-        #Pre-schedule locking remains a Hard Constraint
+        # Pre-schedule locking remains a Hard Constraint
         if sec.fixed_day is not None and sec.fixed_slot is not None:
-            req_room_id = sec.requested_room if sec.requested_room else next((iter(rooms)))
-            domains[sec.id] = [(sec.fixed_day, sec.fixed_slot, req_room_id)]
+            # Enforce locked room only when it exists in the active room pool.
+            if sec.requested_room and sec.requested_room in rooms:
+                domains[sec.id] = [(sec.fixed_day, sec.fixed_slot, sec.requested_room)]
+                continue
+
+            # If locked room is missing/out-of-scope, keep fixed day/slot and constrain room candidates.
+            fixed_slot_rooms = list(rooms.values())
+            if is_general_session:
+                general_rooms = [r for r in fixed_slot_rooms if str(r.department).strip().lower() == "general"]
+                fixed_slot_rooms = general_rooms if general_rooms else fixed_slot_rooms
+            elif strict_dept:
+                dept_rooms = [r for r in fixed_slot_rooms if is_room_match(r.department, sec.departmental_group)]
+                if dept_rooms:
+                    fixed_slot_rooms = dept_rooms
+
+            domains[sec.id] = [(sec.fixed_day, sec.fixed_slot, room.id) for room in fixed_slot_rooms]
             continue
         
         # lecturer = lecturers[sec.lecturer_id]
@@ -65,8 +142,9 @@ def build_domain(data: dict, classifier=None, confidence_threshold=0.3) -> Domai
         candidate_rooms = []
         
         # Rule 1: Special Course -> MUST use specific room
-        if sec.course_code in special_rooms:
-            info = special_rooms[sec.course_code]
+        sec_norm_code = _normalize_code(sec.course_code)
+        if sec_norm_code in normalized_special_rooms:
+            info = normalized_special_rooms[sec_norm_code]
             if isinstance(info, dict):
                 target_room_name = info['room']
                 forced_slot = info.get('slot')
@@ -96,41 +174,73 @@ def build_domain(data: dict, classifier=None, confidence_threshold=0.3) -> Domai
                 # Case 3: Only room specified (standard special room)
                 candidate_rooms = [rooms[target_room_id]]
             else:
-                print(f"[ERROR] Special room '{target_room_name}' for {sec.course_code} not found in room DB!")
-                candidate_rooms = [] 
+                # Use a temporary virtual room object for this external assignment
+                # This satisfies the special constraint without injecting it into the global pool for others.
+                print(f"[INFO] Using external special room '{target_room_name}' for {sec.course_code}")
+                candidate_rooms = [Room(id=target_room_id, name=target_room_name, capacity=30, 
+                                       room_type="lecture", department="General",
+                                       available_time_slots=[(d, s) for d in range(5) for s in range(slots_per_day)])]
         else:
             # Rule 2: Normal Course -> CANNOT use reserved rooms
             # AND: Prioritize departmental rooms
             
-            # 1. Start with all non-reserved rooms
-            all_available = [r for r in rooms.values() if r.id not in reserved_room_ids]
+            # 1. Start with all rooms
+            all_available = list(rooms.values())
+
+            # 2. Filter out reserved rooms UNLESS they belong to the same department as the current course
+            # Requirement: "if the CS LAB is in department pool room..it should use it while maintaining reserved room"
+            filtered_available = []
+            for r in all_available:
+                if r.id not in reserved_room_ids:
+                    filtered_available.append(r)
+                else:
+                    # It's a reserved room. Only allow it if it matches the current course's department pool.
+                    if not is_general_session:
+                        # Use the departmental_group to check if this room belongs in the course's candidate set
+                        if is_room_match(r.department, sec.departmental_group):
+                             filtered_available.append(r)
+                    else:
+                        # In general sessions, reserved rooms are strictly reserved for their targets
+                        pass
+
+
+            
+            all_available = filtered_available
+
+            if not is_general_session:
+                # Prevent ghost room leakage: Block-injected foreign rooms get "General" department.
+                # If we have actual departmental rooms, remove the ghost rooms from the available pool.
+                primary_rooms = [r for r in all_available if r.department != "General"]
+                if primary_rooms:
+                    all_available = primary_rooms
 
             if is_general_session:
-                candidate_rooms = all_available
+                # GENERAL SESSION: Use ONLY general department rooms
+                # Exclude departmental rooms (e.g., CS LAB for Computing Science)
+                general_only_rooms = [r for r in all_available if r.department == "General"]
+                candidate_rooms = general_only_rooms if general_only_rooms else all_available
+                if not general_only_rooms:
+                    print(f"[WARNING] No pure general rooms found. Using all available rooms as fallback.")
             else:
                 # --- NEW: Strict Departmental Enforcement ---
                 grp = sec.departmental_group
-                
-                # Define specific room pools for strict mode
-                def is_room_match(r_dept, c_grp):
-                    rd = str(r_dept).strip().lower().replace("/", " ").replace("-", " ")
-                    cg = str(c_grp).strip().lower().replace("/", " ").replace("-", " ")
-                    if rd in ("", "nan", "none", "null"):
-                        rd = "general"
-                    if cg in ("", "nan", "none", "null"):
-                        cg = "general"
-                    return (rd == cg) or (rd in cg) or (cg in rd)
-            
                 dept_priority_rooms = [r for r in all_available if is_room_match(r.department, grp)]
+
                 
                 if strict_dept:
                     if dept_priority_rooms:
                         # Departmental/General courses MUST use their matched rooms in strict mode
                         candidate_rooms = dept_priority_rooms
                     else:
-                        # If no specific pool found, fall back to all available (safety) but warn
-                        candidate_rooms = all_available
-                        print(f"[WARNING] Strict mode on but no room pool found for {grp}. Using all rooms.")
+                        # Fallback to the PRIMARY departmental pool instead of all rooms (which includes injected foreign rooms)
+                        primary_rooms = [r for r in all_available if r.department != "General"]
+                        if primary_rooms:
+                            candidate_rooms = primary_rooms
+                            print(f"[WARNING] No specific room pool found for {grp}. Using primary department pool.")
+                        else:
+                            # If absolutely no primary pool exists, fallback to all available as a last resort
+                            candidate_rooms = all_available
+                            print(f"[WARNING] Strict mode on but no primary room pool found. Using all rooms.")
                 else:
                     # Original logic: Prioritize but allow fallback
                     if dept_priority_rooms:

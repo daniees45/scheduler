@@ -171,4 +171,96 @@
 .action-link-center {
     text-align: center;
     text-decoration: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+/* ── Responsive breakpoints ─────────────────────────────── */
+
+/* Tablet: stack chart above quick actions */
+@media (max-width: 1024px) {
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+        gap: 1.25rem;
+    }
+
+    .dashboard-chart-wrap {
+        height: 280px;
+        min-height: 280px;
+        max-height: 280px;
+    }
+}
+
+/* Mobile: smaller chart, wrap footer/detail rows, fix filter form */
+@media (max-width: 768px) {
+    .dashboard-chart-wrap {
+        height: 230px;
+        min-height: 230px;
+        max-height: 230px;
+    }
+
+    /* Schedule filter form: let label+select+btn stack cleanly */
+    .dashboard-filter-form {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .dashboard-filter-form .glass-btn {
+        width: 100%;
+    }
+
+    /* Chart footer: allow wrap so badge doesn't overflow */
+    .room-chart-footer {
+        flex-wrap: wrap;
+        row-gap: 0.3rem;
+    }
+
+    .room-chart-footer .rcf-hint {
+        margin-left: 0;
+        width: 100%;
+    }
+
+    /* Room detail strip: stack label above stats on narrow screens */
+    .rdc-strip {
+        flex-direction: column;
+    }
+
+    .rdc-label {
+        max-width: none;
+        border-right: none;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.5rem 0.9rem;
+    }
+
+    .rdc-stats {
+        flex-wrap: wrap;
+    }
+
+    .rdc-stat {
+        flex: 1 1 calc(33.33% - 1px);
+        min-width: 70px;
+        padding: 0.45rem 0.5rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .dashboard-chart-wrap {
+        height: 190px;
+        min-height: 190px;
+        max-height: 190px;
+    }
+
+    .rdc-stat {
+        flex: 1 1 calc(50% - 1px);
+    }
+
+    .stat-card-warning {
+        border-right: none;
+        border-bottom: 4px solid var(--warning);
+    }
 }

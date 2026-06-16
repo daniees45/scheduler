@@ -4,6 +4,7 @@
 // Handles duplicate course codes by generating unique suffixes
 
 require_once 'db.php';
+require_once __DIR__ . '/auth_guard.php';
 require_once __DIR__ . '/../../lib/B2Storage.php';
 
 /**
@@ -145,7 +146,7 @@ function update_department_courses_in_b2($new_sections = null) {
         $upload_result = $b2->uploadContent($csv_key, $csv_content);
         
         if (!$upload_result['success']) {
-            throw new Exception("B2 upload failed: " . ($upload_result['message'] ?? 'Unknown error'));
+            throw new Exception("Cloud upload failed: " . ($upload_result['message'] ?? 'Unknown error'));
         }
         
         return [
@@ -165,13 +166,9 @@ function update_department_courses_in_b2($new_sections = null) {
 
 // If called directly via POST (for manual trigger)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    session_start();
-    
-    if (!isset($_SESSION['user_id'])) {
-        http_response_code(401);
-        echo json_encode(["status" => "error", "message" => "Unauthorized"]);
-        exit;
-    }
+    require_http_methods('POST');
+    require_authenticated_user();
+    require_admin_user();
     
     header('Content-Type: application/json');
     

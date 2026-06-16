@@ -29,7 +29,7 @@ $ready_session_id = $_SESSION['ready_for_scheduling']['id'] ?? '';
 ?>
 
 <!-- Include Unified API Configuration -->
-<script src="config.js"></script>
+<script src="config.js?v=<?php echo filemtime(__DIR__ . '/config.js'); ?>"></script>
 
 <div class="glass-panel generate-container">
     <div class="generate-hero-section">
@@ -763,8 +763,8 @@ endif; ?>
         }
 
         function editCurrentInputSource() {
-            const uploadedSessionId = <? php echo json_encode($uploaded_session_id); ?>;
-            const readySessionId = <? php echo json_encode($ready_session_id); ?>;
+            const uploadedSessionId = <?php echo json_encode($uploaded_session_id); ?>;
+            const readySessionId = <?php echo json_encode($ready_session_id); ?>;
 
             const sessionId = uploadedSessionId || readySessionId;
             if (sessionId) {
@@ -1018,7 +1018,7 @@ endif; ?>
         // ============================================================================
 
         document.getElementById('startBtn').addEventListener('click', async () => {
-            const dataReady = <? php echo $data_ready ? 'true' : 'false'; ?>;
+            const dataReady = <?php echo $data_ready ? 'true' : 'false'; ?>;
             const isExamMode = document.querySelector('input[name="scheduleType"]:checked')?.value === 'exam';
             const examSource = document.querySelector('input[name="examInputSource"]:checked')?.value || 'upload';
             let outputFilename = document.getElementById('outputFile')?.value?.trim() || 'schedule';

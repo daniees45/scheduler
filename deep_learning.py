@@ -12,6 +12,7 @@ Uses neural network to:
 import os
 import json
 import pickle
+import stat
 import numpy as np
 from datetime import datetime, time, timedelta
 from typing import List, Dict, Tuple, Optional
@@ -181,10 +182,36 @@ class ScheduleQualityClassifier:
         
         # Try to load existing model
         self._load_model()
+
+    def _is_trusted_model_file(self, model_path: str) -> bool:
+        if not os.path.exists(model_path):
+            return False
+
+        abs_path = os.path.realpath(model_path)
+        home_root = os.path.realpath(os.path.expanduser("~"))
+        workspace_root = os.path.realpath(os.path.dirname(__file__))
+        allowed_roots = (home_root + os.sep, workspace_root + os.sep)
+        if not abs_path.startswith(allowed_roots):
+            return False
+
+        st = os.stat(abs_path)
+        if not stat.S_ISREG(st.st_mode):
+            return False
+        if os.path.islink(model_path):
+            return False
+        if hasattr(os, "getuid") and st.st_uid != os.getuid():
+            return False
+        if st.st_mode & (stat.S_IWGRP | stat.S_IWOTH):
+            return False
+
+        return True
     
     def _load_model(self):
         """Load pre-trained model if available"""
         if os.path.exists(self.model_path):
+            if not self._is_trusted_model_file(self.model_path):
+                logger.warning(f"[NN] Refusing to load untrusted model path: {self.model_path}")
+                return
             try:
                 with open(self.model_path, 'rb') as f:
                     state = pickle.load(f)
@@ -319,7 +346,8 @@ class ScheduleQualityClassifier:
         try:
             completion_prob = float(self.probability_model.predict(X)[0])
             completion_prob = np.clip(completion_prob, 0.0, 1.0)
-        except:
+        except Exception as e:
+            logger.warning(f"[NN] Probability prediction failed: {e}")
             completion_prob = 0.5
         
         overall_score = self._quality_to_score(predicted_class)

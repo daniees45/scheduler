@@ -116,7 +116,6 @@ class AIUnifiedScheduler:
             code: info
             for code, info in all_special_room_constraints.items()
             if code in active_course_codes
-            and " ".join(str((info or {}).get('room_name', '')).strip().lower().split()) in available_room_names_normalized
         }
         # reserved_rooms must cover ALL rooms that appear in special_rooms.csv, not just
         # those for the currently-active courses. This prevents specialized rooms like
@@ -125,13 +124,40 @@ class AIUnifiedScheduler:
             info['room_name']
             for info in all_special_room_constraints.values()
             if isinstance(info, dict) and info.get('room_name')
-            and " ".join(str(info.get('room_name', '')).strip().lower().split()) in available_room_names_normalized
         )
         self.reserved_rooms_normalized = {
             self._normalize_room_name(name)
             for name in self.reserved_rooms
             if self._normalize_room_name(name)
         }
+        
+        # Ensure rooms in special constraints or fixed locks are in the room pool 
+        # so AI can assign them. They remain blocked for others via reserved_rooms.
+        for course in self.courses:
+            if not isinstance(course, dict): continue
+            
+            # Check special constraints
+            spec = self._get_special_constraint(course.get('code', ''))
+            fixed_r = course.get('fixed_room')
+            
+            target_rooms = []
+            if spec and spec.get('room_name'): target_rooms.append(spec['room_name'])
+            if fixed_r: target_rooms.append(fixed_r)
+            
+            for r_name in target_rooms:
+                norm_name = self._normalize_room_name(r_name)
+                if norm_name and norm_name not in available_room_names_normalized:
+                    if self.verbose:
+                        print(f"[INFO] AI: Adding external special room '{r_name}' to pool for course {course.get('code')}")
+                    self.rooms.append({
+                        'name': r_name,
+                        'capacity': 30, 
+                        'department': 'General',
+                        'is_external': True
+                    })
+                    available_room_names_normalized.add(norm_name)
+                    # Also ensure it's in reserved rooms so others don't use it
+                    self.reserved_rooms_normalized.add(norm_name)
         self.course_groups = course_groups or {}
         self.lecturer_availability = lecturer_availability or {}
         
@@ -180,6 +206,10 @@ class AIUnifiedScheduler:
             print(f"Ensemble ML: {'✓' if self.ensemble_predictor else '✗'}")
             print("="*70)
     
+    def _get_special_constraint(self, course_code: str) -> Dict[str, str]:
+        """Fetch special room constraint for course code (normalized)"""
+        return self.special_room_constraints.get(self._normalize_course_code(course_code), {})
+
     def _init_ga(self):
         """Initialize genetic algorithm scheduler"""
         try:
@@ -234,11 +264,10 @@ class AIUnifiedScheduler:
                 reserved_rooms=self.reserved_rooms
             )
             # Pre-train from history
-            history_file = "historical_data.csv"
-            # If it's exam mode, we might use exam_historical_data.csv
-            # For now, use the standard history
-            history_path = os.path.join(self.data_path, "history", history_file)
+            history_file = "csv/general/historical_schedule.csv"
+            history_path = os.path.join(self.data_path, history_file)
             self.rl_scheduler.pre_train_from_history(history_path)
+
             
             logger.info("Reinforcement Learning Scheduler initialized and pre-trained")
         except Exception as e:
@@ -469,12 +498,17 @@ class AIUnifiedScheduler:
         if not os.path.exists(path):
             path = os.path.join(self.data_path, "csv", "general", "special_rooms.csv")
         
-        # B2 / Temp support
+        # B2 / Temp support - Prioritize B2 cache as the absolute source of truth
+        if not os.path.exists(path):
+            # The B2 Cache Handler stores files in temp/b2_cache/...
+            path = "temp/b2_cache/csv/general/special_rooms.csv"
+        
         if not os.path.exists(path):
             path = "temp/csv/general/special_rooms.csv"
             
         if not os.path.exists(path):
             return special_rooms
+
 
         try:
             with open(path, 'r') as f:
@@ -998,6 +1032,24 @@ class AIUnifiedScheduler:
                     # NEW: Prevent non-special courses from using reserved rooms
                     if normalized_course_code not in self.special_room_constraints and self._normalize_room_name(room['name']) in self.reserved_rooms_normalized:
                         samples += 1; continue
+                    
+                    # NEW: Enforce Department match in Ensemble
+                    if self.strict_departmental and not course.get('is_general', False):
+                        # Bypass if room is explicitly fixed/requested
+                        is_fixed = (room.get('name') == course.get('fixed_room'))
+                        if not is_fixed:
+                            special_info = self._get_special_constraint(course_code)
+                            if special_info and special_info.get('room_name') == room.get('name'):
+                                is_fixed = True
+                        
+                        if not is_fixed:
+                            course_dept = course.get('departmental_group', course.get('department', "General"))
+                            room_dept = room.get('department', "General")
+                            rd = str(room_dept).lower().replace("/", " ").replace("-", " ")
+                            cg = str(course_dept).lower().replace("/", " ").replace("-", " ")
+                            is_match = (rd == cg) or (rd in cg) or (cg in rd)
+                            if not is_match:
+                                samples += 1; continue
                         
                     item = {
                         'course_code': course_code,
@@ -1056,6 +1108,23 @@ class AIUnifiedScheduler:
                                 if not self._day_matches_fixed_day(d, fixed_day): continue
                                 if fixed_time and not self._slot_matches_fixed_time(s, fixed_time): continue
                                 if normalized_course_code not in self.special_room_constraints and self._normalize_room_name(r['name']) in self.reserved_rooms_normalized: continue
+                                
+                                # NEW: Enforce Department match in Fallback Search
+                                if self.strict_departmental and not course.get('is_general', False):
+                                    # Bypass if room is explicitly fixed/requested
+                                    is_fixed = (r.get('name') == course.get('fixed_room'))
+                                    if not is_fixed:
+                                        special_info = self._get_special_constraint(course_code)
+                                        if special_info and special_info.get('room_name') == r.get('name'):
+                                            is_fixed = True
+                                            
+                                    if not is_fixed:
+                                        course_dept = course.get('departmental_group', course.get('department', "General"))
+                                        room_dept = r.get('department', "General")
+                                        rd = str(room_dept).lower().replace("/", " ").replace("-", " ")
+                                        cg = str(course_dept).lower().replace("/", " ").replace("-", " ")
+                                        is_match = (rd == cg) or (rd in cg) or (cg in rd)
+                                        if not is_match: continue
                                 
                                 best_item = {'course_code': course_code, 'lecturer': lecturer, 'room': r['name'], 'day': d, 'time_slot': s}
                                 found = True
@@ -1314,30 +1383,54 @@ class AIUnifiedScheduler:
              
         import re
         course_map = {c['code']: c for c in self.courses}
+        section_map = {c.get('section_id'): c for c in self.courses if c.get('section_id')}  # Map by section_id
         enriched = []
+        
+        # Debug logging
+        if self.verbose:
+            section_ids_in_schedule = sum(1 for item in schedule if item.get('section_id'))
+            print(f"[Enrichment] Processing {len(schedule)} schedule items")
+            print(f"[Enrichment] Section map size: {len(section_map)}")
+            print(f"[Enrichment] Items with section_id: {section_ids_in_schedule}")
+            
+            if section_ids_in_schedule > 0:
+                sample_item = next((item for item in schedule if item.get('section_id')), {})
+                print(f"[Enrichment] Sample item: code={sample_item.get('course_code')}, section_id={sample_item.get('section_id')}")
         
         for item in schedule:
             code = item['course_code']
-            # Try exact match first
-            course_info = course_map.get(code, {})
+            section_id = item.get('section_id')
+            
+            # First, try to find by section_id (if available)
+            course_info = section_map.get(section_id, {}) if section_id else {}
+            
+            # If no section_id or not found by section_id, try by course code
             if not course_info:
-                # Try lookup by first code in slashed list
-                lookup_code = re.split(r'\s*/\s*', code)[0]
-                lookup_code_no_sec = re.sub(r'\[Sec\s+.*?\]', '', lookup_code).split(":")[0].strip()
-                course_info = course_map.get(lookup_code, {}) or course_map.get(lookup_code_no_sec, {})
-                
-            if not course_info:
-                # Final attempt: search all courses for an alias match
-                for c_code, c_obj in course_map.items():
-                    if hasattr(c_obj, 'aliases') and (code in c_obj.aliases or lookup_code_no_sec in c_obj.aliases):
-                        course_info = c_obj
-                        break
+                # Try exact match first
+                course_info = course_map.get(code, {})
+                if not course_info:
+                    # Try lookup by first code in slashed list
+                    lookup_code = re.split(r'\s*/\s*', code)[0]
+                    lookup_code_no_sec = re.sub(r'\[Sec\s+.*?\]', '', lookup_code).split(":")[0].strip()
+                    course_info = course_map.get(lookup_code, {}) or course_map.get(lookup_code_no_sec, {})
+                    
+                if not course_info:
+                    # Final attempt: search all courses for an alias match
+                    for c_code, c_obj in course_map.items():
+                        if hasattr(c_obj, 'aliases') and (code in c_obj.aliases or lookup_code_no_sec in c_obj.aliases):
+                            course_info = c_obj
+                            break
             
             # Merge info — prefer course_title already on the item (set by individual schedulers
             # like NN which store the exact section identifier per course object) so that two
             # sections of the same course code (e.g. RELB 250 [Sec A] vs [Sec B]) are not both
             # collapsed to whichever section the dict-keyed lookup happens to return.
             enriched_item = item.copy()
+            
+            # DEBUG: Log for ENGL 111
+            if code == 'ENGL 111' and self.verbose:
+                print(f"[DEBUG] ENGL 111: section_id={section_id}, found_title={course_info.get('title', 'NOT_FOUND')}")
+            
             enriched_item.update({
                 'course_title': item.get('course_title') or course_info.get('title', ''),
                 'credits': str(course_info.get('credits', '')),
@@ -1363,8 +1456,9 @@ class AIUnifiedScheduler:
 
         try:
             # 1. Update Historical Data
-            history_path = os.path.join(self.data_path, "history", "historical_data.csv")
+            history_path = os.path.join(self.data_path, "csv", "general", "historical_schedule.csv")
             os.makedirs(os.path.dirname(history_path), exist_ok=True)
+
             
             # Use 'a' for append
             import csv
@@ -1736,10 +1830,11 @@ class AIUnifiedScheduler:
         except:
             return 0.85
 
-    def train_models(self, history_file: str = "historical_data.csv") -> Dict[str, Any]:
+    def train_models(self, history_file: str = "csv/general/historical_schedule.csv") -> Dict[str, Any]:
         """Pre-train all enabled models using historical data"""
         results = {}
-        history_path = os.path.join(self.data_path, "history", history_file)
+        history_path = os.path.join(self.data_path, history_file)
+
         
         if self.verbose:
             print("\n" + "="*70)

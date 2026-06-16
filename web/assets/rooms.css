@@ -81,6 +81,148 @@
     font-size: 0.9rem;
 }
 
+/* ── Loading Spinner ────────────────────────────────────── */
+.rooms-spinner-overlay {
+    display: none;
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    background: rgba(10, 15, 30, 0.75);
+    backdrop-filter: blur(4px);
+    border-radius: inherit;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+/* Make the panel the positioning context */
+.rooms-panel {
+    position: relative;
+}
+
+.rooms-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid rgba(255, 255, 255, 0.12);
+    border-top-color: var(--primary-color, #4f46e5);
+    border-radius: 50%;
+    animation: rooms-spin 0.75s linear infinite;
+}
+
+@keyframes rooms-spin {
+    to { transform: rotate(360deg); }
+}
+
+.rooms-spinner-label {
+    font-size: 0.85rem;
+    color: var(--text-muted, #94a3b8);
+    letter-spacing: 0.02em;
+}
+
+/* ── Responsive breakpoints ─────────────────────────────── */
+
+/* Tablet (≤1024px) */
+@media (max-width: 1024px) {
+    .rooms-panel {
+        padding: 1.5rem;
+    }
+
+    .rooms-capacity-col {
+        width: 130px;
+    }
+}
+
+/* Mobile (≤768px) ── card-mode overrides for rooms table -- */
+@media (max-width: 768px) {
+    .rooms-panel {
+        padding: 1rem;
+    }
+
+    /* Header: stack title block above save button */
+    .rooms-header-row {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.75rem;
+    }
+
+    .rooms-header-row > .glass-btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    /* Toolbar: stack selects and buttons */
+    .rooms-toolbar {
+        grid-template-columns: 1fr 1fr;
+        gap: 0.5rem;
+    }
+
+    .rooms-toolbar select {
+        grid-column: 1 / -1; /* source select spans full width */
+    }
+
+    /* ── Table card-mode fixes ── */
+
+    /* Each row is a card (from global style.css) — restore proper padding */
+    .rooms-table-row {
+        padding: 0.75rem !important;
+    }
+
+    /* td is display:flex from global style.css — label left, content right */
+    .rooms-body-cell {
+        padding: 0.45rem 0 !important;
+    }
+
+    /* Inputs inside td: shrink so label fits on the left */
+    .rooms-body-cell .rooms-input {
+        width: auto !important;
+        flex: 1;
+        max-width: 58%;
+        min-width: 0;
+        padding: 6px 8px;
+        font-size: 0.82rem;
+    }
+
+    /* Capacity column: same fix */
+    .rooms-capacity-col {
+        width: auto;
+    }
+
+    /* Action cell: don't let the trash button go full-width */
+    .rooms-action-cell {
+        justify-content: flex-end; /* push button to right side */
+    }
+
+    .rooms-action-btn {
+        width: auto !important;
+        min-height: unset !important;
+        padding: 6px 10px !important;
+        flex-shrink: 0;
+    }
+
+    /* Spinner: tighter on mobile */
+    .rooms-spinner {
+        width: 32px;
+        height: 32px;
+    }
+}
+
+/* Small phone (≤480px) */
+@media (max-width: 480px) {
+    .rooms-toolbar {
+        grid-template-columns: 1fr;
+    }
+
+    /* Input takes most of the row */
+    .rooms-body-cell .rooms-input {
+        max-width: 52%;
+    }
+
+    .rooms-panel {
+        padding: 0.75rem;
+    }
+}
+
 @media (max-width: 720px) {
     .rooms-toolbar {
         grid-template-columns: 1fr;

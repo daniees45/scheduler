@@ -3,18 +3,15 @@
  * API to save edited data (rooms, lecturers, courses)
  */
 
-session_start();
 header('Content-Type: application/json');
 require_once 'db.php';
+require_once __DIR__ . '/auth_guard.php';
 require_once __DIR__ . '/../../lib/B2Storage.php';
 require_once 'room_sync_helper.php';
 
-// Access control
-if (!isset($_SESSION['user_id'])) {
-    http_response_code(401);
-    echo json_encode(['status' => 'error', 'message' => 'Not authenticated']);
-    exit;
-}
+require_http_methods('POST');
+require_authenticated_user();
+require_admin_user();
 
 $data = json_decode(file_get_contents('php://input'), true);
 $action = $data['action'] ?? null;
@@ -189,67 +186,123 @@ elseif ($action === 'save_lecturer') {
     
     $avail_json = json_encode($avail);
     
-    if ($id) {
-        // Update
-        $stmt = $conn->prepare("UPDATE lecturers SET name = ?, availability_json = ? WHERE id = ?");
-        $stmt->bind_param("ssi", $name, $avail_json, $id);
-    } else {
-        // Insert
-        $stmt = $conn->prepare("INSERT INTO lecturers (name, availability_json) VALUES (?, ?)");
-        $stmt->bind_param("ss", $name, $avail_json);
-    }
-    
-    if ($stmt->execute()) {
-        // Export updated lecturers to CSV and B2 immediately
-        $newId = $id || $conn->insert_id;
-        include 'export_db_to_csv.php';
-        // Continue after export
-        echo json_encode([
-            'status' => 'success',
-            'message' => 'Lecturer saved and exported to B2',
-            'id' => $newId,
-            'exported' => true
-        ]);
-    } else {
-        echo json_encode(['status' => 'error', 'message' => 'Failed to save lecturer']);
+    try {
+        if ($id) {
+            // Update
+            $stmt = $conn->prepare("UPDATE lecturers SET name = ?, availability_json = ? WHERE id = ?");
+            $stmt->bind_param("ssi", $name, $avail_json, $id);
+        } else {
+            // Insert
+            $stmt = $conn->prepare("INSERT INTO lecturers (name, availability_json) VALUES (?, ?)");
+            $stmt->bind_param("ss", $name, $avail_json);
+        }
+        
+        if ($stmt->execute()) {
+            // Export updated lecturers to CSV and B2 immediately
+            $newId = $id || $conn->insert_id;
+            include 'export_db_to_csv.php';
+            // Continue after export
+            echo json_encode([
+                'status' => 'success',
+                'message' => 'Lecturer saved and exported to B2',
+                'id' => $newId,
+                'exported' => true
+            ]);
+        } else {
+            echo json_encode(['status' => 'error', 'message' => 'Failed to save lecturer: ' . $stmt->error]);
+        }
+    } catch (Exception $e) {
+        echo json_encode(['status' => 'error', 'message' => 'Database error: ' . $e->getMessage()]);
     }
 }
 elseif ($action === 'save_course') {
     $id = $data['id'] ?? null;
     $code = $data['course_code'] ?? '';
     $title = $data['course_title'] ?? '';
-    $semester = $data['semester'] ?? '1';
-    $level = $data['level'] ?? 100;
-    $credits = $data['credits'] ?? 3;
+    $semester = (string)($data['semester'] ?? '1');
+    $level = (int)($data['level'] ?? 100);
+    $credits = (int)($data['credits'] ?? 3);
     
     if (!$code || !$title) {
         echo json_encode(['status' => 'error', 'message' => 'Course code and title required']);
         exit;
     }
     
-    if ($id) {
-        // Update
-        $stmt = $conn->prepare("UPDATE courses SET course_code = ?, course_title = ?, semester = ?, level = ?, credit_hours = ? WHERE id = ?");
-        $stmt->bind_param("ssssii", $code, $title, $semester, $level, $credits, $id);
-    } else {
-        // Insert
-        $stmt = $conn->prepare("INSERT INTO courses (course_code, course_title, semester, type, level, credit_hours) VALUES (?, ?, ?, 'Departmental', ?, ?)");
-        $stmt->bind_param("sssii", $code, $title, $semester, $level, $credits);
+    try {
+        if ($id) {
+            // Update
+            $stmt = $conn->prepare("UPDATE courses SET course_code = ?, course_title = ?, semester = ?, level = ?, credit_hours = ? WHERE id = ?");
+            $stmt->bind_param("ssssii", $code, $title, $semester, $level, $credits, $id);
+        } else {
+            // Insert
+            $stmt = $conn->prepare("INSERT INTO courses (course_code, course_title, semester, type, level, credit_hours, department) VALUES (?, ?, ?, 'Departmental', ?, ?, 'General')");
+            $stmt->bind_param("sssii", $code, $title, $semester, $level, $credits);
+        }
+        
+        if ($stmt->execute()) {
+            // Export updated courses to CSV and B2 immediately
+            $newId = $id || $conn->insert_id;
+            include 'export_db_to_csv.php';
+            // Continue after export
+            echo json_encode([
+                'status' => 'success',
+                'message' => 'Course saved and exported to B2',
+                'id' => $newId,
+                'exported' => true
+            ]);
+        } else {
+            echo json_encode(['status' => 'error', 'message' => 'Failed to save course: ' . $stmt->error]);
+        }
+    } catch (Exception $e) {
+        echo json_encode(['status' => 'error', 'message' => 'Database error: ' . $e->getMessage()]);
     }
-    
-    if ($stmt->execute()) {
-        // Export updated courses to CSV and B2 immediately
-        $newId = $id || $conn->insert_id;
-        include 'export_db_to_csv.php';
-        // Continue after export
-        echo json_encode([
-            'status' => 'success',
-            'message' => 'Course saved and exported to B2',
-            'id' => $newId,
-            'exported' => true
-        ]);
-    } else {
-        echo json_encode(['status' => 'error', 'message' => 'Failed to save course']);
+}
+elseif ($action === 'delete_lecturer') {
+    $id = $data['id'] ?? null;
+    if (!$id) {
+        echo json_encode(['status' => 'error', 'message' => 'Lecturer ID required']);
+        exit;
+    }
+    try {
+        // Handle foreign keys: either delete or set to null
+        $stmt_sec = $conn->prepare("UPDATE sections SET lecturer_id = NULL WHERE lecturer_id = ?");
+        $stmt_sec->bind_param("i", $id);
+        $stmt_sec->execute();
+
+        $stmt = $conn->prepare("DELETE FROM lecturers WHERE id = ?");
+        $stmt->bind_param("i", $id);
+        if ($stmt->execute()) {
+            include 'export_db_to_csv.php';
+            echo json_encode(['status' => 'success', 'message' => 'Lecturer deleted']);
+        } else {
+            echo json_encode(['status' => 'error', 'message' => 'Failed to delete']);
+        }
+    } catch (Exception $e) {
+        echo json_encode(['status' => 'error', 'message' => 'Database error: ' . $e->getMessage()]);
+    }
+}
+elseif ($action === 'delete_course') {
+    $id = $data['id'] ?? null;
+    if (!$id) {
+        echo json_encode(['status' => 'error', 'message' => 'Course ID required']);
+        exit;
+    }
+    try {
+        // Handle foreign keys: delete associated sections
+        $stmt_sec = $conn->prepare("DELETE FROM sections WHERE course_id = ?");
+        $stmt_sec->bind_param("i", $id);
+        $stmt_sec->execute();
+
+        $stmt = $conn->prepare("DELETE FROM courses WHERE id = ?");
+        $stmt->bind_param("i", $id);
+        if ($stmt->execute()) {
+            include 'export_db_to_csv.php';
+            echo json_encode(['status' => 'success', 'message' => 'Course deleted']);
+        } else {
+            echo json_encode(['status' => 'error', 'message' => 'Failed to delete']);
+        }
+    } catch (Exception $e) {
+        echo json_encode(['status' => 'error', 'message' => 'Database error: ' . $e->getMessage()]);
     }
 }
 else {

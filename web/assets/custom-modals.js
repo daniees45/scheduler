@@ -23,66 +23,65 @@ document.addEventListener('DOMContentLoaded', function() {
 window.showAlert = function(message, title = 'Notice', type = 'info', buttons = null) {
     return new Promise((resolve) => {
         const container = document.getElementById('customModalContainer') || document.body;
-        
+
         const icons = {
-            'info': '<i class="fa-solid fa-circle-info" style="color: var(--primary-color);"></i>',
+            'info':    '<i class="fa-solid fa-circle-info" style="color: var(--primary-color);"></i>',
             'success': '<i class="fa-solid fa-check-circle" style="color: #10b981;"></i>',
-            'error': '<i class="fa-solid fa-circle-exclamation" style="color: #ef4444;"></i>',
+            'error':   '<i class="fa-solid fa-circle-exclamation" style="color: #ef4444;"></i>',
             'warning': '<i class="fa-solid fa-triangle-exclamation" style="color: #f59e0b;"></i>'
         };
-        
+        // Auto-close durations per type (ms). 0 = never auto-close.
+        const autoCloseDurations = { success: 2500, info: 3000, warning: 4000, error: 5000 };
+        const hasCustomButtons = buttons && Array.isArray(buttons) && buttons.length > 0;
+        const duration = hasCustomButtons ? 0 : (autoCloseDurations[type] ?? 3000);
+        const barColor = { success: '#10b981', info: 'var(--primary-color)', warning: '#f59e0b', error: '#ef4444' }[type] || 'var(--primary-color)';
+
         const modal = document.createElement('div');
         modal.className = 'custom-modal-overlay';
-        
+
         let footerHtml = '';
-        if (buttons && Array.isArray(buttons) && buttons.length > 0) {
+        if (hasCustomButtons) {
             buttons.forEach((btnLabel, idx) => {
-                const isPrimary = idx === 0;
-                footerHtml += `
-                    <button class="glass-btn ${isPrimary ? 'primary' : 'secondary'}" id="customAlertBtn_${idx}" style="min-width: 100px;">
-                        ${btnLabel}
-                    </button>
-                `;
+                footerHtml += `<button class="glass-btn ${idx === 0 ? 'primary' : 'secondary'}" id="customAlertBtn_${idx}" style="min-width:100px;">${btnLabel}</button>`;
             });
         } else {
-            footerHtml = `
-                <button class="glass-btn" id="customAlertOk" style="min-width: 100px;">
-                    <i class="fa-solid fa-check"></i> OK
-                </button>
-            `;
+            footerHtml = `<button class="glass-btn" id="customAlertOk" style="min-width:100px;"><i class="fa-solid fa-check"></i> OK</button>`;
         }
 
+        const timerBarHtml = duration > 0
+            ? `<div id="customAlertTimerBar" style="position:absolute;bottom:0;left:0;height:3px;width:100%;background:${barColor};border-radius:0 0 12px 12px;transform-origin:left;transition:none;"></div>`
+            : '';
+
         modal.innerHTML = `
-            <div class="custom-modal glass-panel" style="max-width: 450px; width: 90%;">
+            <div class="custom-modal glass-panel" style="max-width:450px;width:90%;position:relative;overflow:hidden;">
                 <div class="custom-modal-header">
-                    <h3 style="margin: 0; display: flex; align-items: center; gap: 12px;">
+                    <h3 style="margin:0;display:flex;align-items:center;gap:12px;">
                         ${icons[type] || icons.info} ${escapeHtml(title)}
                     </h3>
                 </div>
                 <div class="custom-modal-body">
-                    <p style="margin: 0; white-space: pre-wrap; line-height: 1.6;">${message.includes('<') ? message : escapeHtml(message)}</p>
+                    <p style="margin:0;white-space:pre-wrap;line-height:1.6;">${message.includes('<') ? message : escapeHtml(message)}</p>
                 </div>
-                <div class="custom-modal-footer">
-                    ${footerHtml}
-                </div>
+                <div class="custom-modal-footer">${footerHtml}</div>
+                ${timerBarHtml}
             </div>
         `;
-        
+
         container.appendChild(modal);
-        
+
         const closeModal = (result) => {
+            if (modal._closed) return;
+            modal._closed = true;
+            clearTimeout(modal._autoCloseTimer);
+            cancelAnimationFrame(modal._rafId);
             modal.style.opacity = '0';
             modal.querySelector('.custom-modal').style.transform = 'scale(0.95)';
-            setTimeout(() => {
-                modal.remove();
-                resolve(result);
-            }, 200);
+            setTimeout(() => { modal.remove(); resolve(result); }, 200);
         };
-        
-        if (buttons && Array.isArray(buttons)) {
+
+        if (hasCustomButtons) {
             buttons.forEach((_, idx) => {
-                const btn = modal.querySelector(`#customAlertBtn_${idx}`);
-                btn.addEventListener('click', () => closeModal(idx === 0)); // Match standard Boolean return or first index
+                modal.querySelector(`#customAlertBtn_${idx}`).addEventListener('click', () => closeModal(idx === 0));
             });
         } else {
             const okBtn = modal.querySelector('#customAlertOk');
@@ -91,13 +90,38 @@ window.showAlert = function(message, title = 'Notice', type = 'info', buttons = 
         }
 
         modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(false); });
-        
         document.addEventListener('keydown', function h(e) {
-            if (e.key === 'Escape') {
-                document.removeEventListener('keydown', h);
-                closeModal(false);
-            }
+            if (e.key === 'Escape') { document.removeEventListener('keydown', h); closeModal(false); }
         });
+
+        // ── Auto-close with animated drain bar ──────────────────────────────
+        if (duration > 0) {
+            const bar = modal.querySelector('#customAlertTimerBar');
+            let remaining = duration;
+            let lastTick = null;
+            let paused = false;
+
+            const tick = (ts) => {
+                if (modal._closed) return;
+                if (!paused) {
+                    if (lastTick !== null) remaining -= (ts - lastTick);
+                    lastTick = ts;
+                    const pct = Math.max(0, remaining / duration * 100);
+                    bar.style.width = pct + '%';
+                    if (remaining <= 0) { closeModal(true); return; }
+                } else {
+                    lastTick = ts; // reset delta while paused
+                }
+                modal._rafId = requestAnimationFrame(tick);
+            };
+
+            // Pause on hover so users have time to read without pressure
+            const inner = modal.querySelector('.custom-modal');
+            inner.addEventListener('mouseenter', () => { paused = true; });
+            inner.addEventListener('mouseleave', () => { paused = false; });
+
+            modal._rafId = requestAnimationFrame(tick);
+        }
     });
 };
 

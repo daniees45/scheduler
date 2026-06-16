@@ -14,9 +14,10 @@ class ScheduleHistoryLogger:
     
     def __init__(self, base_path: str = "."):
         self.base_path = base_path
-        self.history_dir = os.path.join(base_path, "history")
-        self.class_history_file = os.path.join(self.history_dir, "historical_data.csv")
-        self.exam_history_file = os.path.join(self.history_dir, "exam_historical_data.csv")
+        self.history_dir = os.path.join(base_path, "csv", "general")
+        self.class_history_file = os.path.join(self.history_dir, "historical_schedule.csv")
+        self.exam_history_file = os.path.join(base_path, "csv", "general", "historical_exam_schedule.csv")
+
         
         # Ensure history directory exists
         os.makedirs(self.history_dir, exist_ok=True)

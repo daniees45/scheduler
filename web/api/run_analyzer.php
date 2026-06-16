@@ -1,29 +1,24 @@
 <?php
 // as/api/run_analyzer.php
+require_once 'db.php';
+require_once __DIR__ . '/auth_guard.php';
 header('Content-Type: application/json');
 
+require_http_methods('POST');
+require_authenticated_user();
+require_admin_user();
+
 $root_dir = realpath('../../') . '/';
-
-$python_code = "
-import sys
-import os
-sys.path.append('.')
-try:
-    import analyzer
-    print('Starting analyzer...')
-    # Trigger training logic here if applicable
-    os.system('/usr/local/bin/python3 analyzer.py') 
-    print('Analyzer finished')
-except Exception as e:
-    print(f'Python Error: {str(e)}')
-";
-
-// EXPLICITLY USE /usr/local/bin/python3
-$cmd = "cd " . escapeshellarg($root_dir) . " && /usr/local/bin/python3 -c " . escapeshellarg($python_code) . " 2>&1";
-$output = shell_exec($cmd);
+$analyzer_path = $root_dir . 'analyzer.py';
+$venv_python = $root_dir . '.venv/bin/python';
+$python_bin = file_exists($venv_python) ? $venv_python : '/usr/local/bin/python3';
+$cmd = "cd " . escapeshellarg($root_dir) . " && " . escapeshellarg($python_bin) . " " . escapeshellarg($analyzer_path) . " 2>&1";
+$output_lines = [];
+$exit_code = 0;
+exec($cmd, $output_lines, $exit_code);
 
 echo json_encode([
-    'status' => 'success',
-    'message' => 'AI Analysis triggered.',
-    'output' => $output
+    'status' => $exit_code === 0 ? 'success' : 'error',
+    'message' => $exit_code === 0 ? 'AI Analysis completed.' : 'AI Analysis failed. Check server logs.',
+    'output' => implode("\n", array_slice($output_lines, -40))
 ]);

@@ -41,6 +41,10 @@ try {
             $period = $_GET['period'] ?? 'week'; // day, week, month
             echo json_encode(getProductivityStatistics($user_id, $period, $conn));
             break;
+
+        case 'get_weekly_activities':
+            echo json_encode(getWeeklyActivities($user_id, $conn));
+            break;
         
         case 'update_metrics':
             echo json_encode(updateProductivityMetrics($user_id, $conn));
@@ -339,6 +343,54 @@ function getProductivityStatistics($user_id, $period, $conn) {
             'hour' => intval($best_time['hour']),
             'score' => floatval($best_time['score'])
         ] : null
+    ];
+}
+
+function getWeeklyActivities($user_id, $conn) {
+    $stmt = $conn->prepare("
+        SELECT task_name, task_category, day, start_time, end_time, duration_minutes,
+               quality_rating, completion_status, productivity_score, notes, logged_at
+        FROM productivity_log
+        WHERE user_id = ? AND logged_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+        ORDER BY logged_at DESC, day ASC, start_time ASC
+    ");
+    $stmt->bind_param("i", $user_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    $activities = [];
+    $total_minutes = 0;
+    $completed = 0;
+
+    while ($row = $result->fetch_assoc()) {
+        $total_minutes += (int)($row['duration_minutes'] ?? 0);
+        if (($row['completion_status'] ?? '') === 'completed') {
+            $completed++;
+        }
+
+        $activities[] = [
+            'task_name' => $row['task_name'],
+            'task_category' => $row['task_category'],
+            'day' => $row['day'],
+            'start_time' => $row['start_time'],
+            'end_time' => $row['end_time'],
+            'duration_minutes' => (int)($row['duration_minutes'] ?? 0),
+            'quality_rating' => (int)($row['quality_rating'] ?? 0),
+            'completion_status' => $row['completion_status'],
+            'productivity_score' => (float)($row['productivity_score'] ?? 0),
+            'notes' => $row['notes'],
+            'logged_at' => $row['logged_at'],
+        ];
+    }
+
+    return [
+        'success' => true,
+        'activities' => $activities,
+        'summary' => [
+            'activity_count' => count($activities),
+            'completed_count' => $completed,
+            'total_hours' => round($total_minutes / 60, 2),
+        ]
     ];
 }
 

@@ -35,7 +35,49 @@ try {
 
     // 2. Dispatch Email if requested
     if ($email) {
-        $mail_success = simulate_email_send($email, $title, $message);
+        require_once __DIR__ . '/../../vendor/autoload.php';
+        $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
+        try {
+            $mail->isSMTP();
+            $mail->SMTPAuth   = true;
+            $gmailEmail = trim((string)(getenv('GMAIL_APP_EMAIL') ?: ''));
+            $gmailAppPassword = trim((string)(getenv('GMAIL_APP_PASSWORD') ?: ''));
+
+            if ($gmailEmail !== '' && $gmailAppPassword !== '') {
+                $mail->Host = 'smtp.gmail.com';
+                $mail->Username = $gmailEmail;
+                $mail->Password = $gmailAppPassword;
+                $mail->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
+                $mail->Port = 587;
+            } else {
+                $mail->Host = getenv('SMTP_HOST') ?: 'smtp.mailtrap.io';
+                $mail->Username = getenv('SMTP_USER') ?: '';
+                $mail->Password = getenv('SMTP_PASS') ?: '';
+
+                $port = (int)(getenv('SMTP_PORT') ?: 465);
+                if ($port === 587) {
+                    $mail->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
+                } elseif ($port === 465) {
+                    $mail->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS;
+                }
+                $mail->Port = $port;
+            }
+
+            $mail->setFrom(getenv('SMTP_FROM') ?: ($gmailEmail !== '' ? $gmailEmail : 'noreply@vvuscheduler.local'), 'VVU Scheduler');
+            $mail->addAddress($email);
+
+            $mail->isHTML(true);
+            $mail->Subject = $title;
+            $mail->Body    = nl2br(htmlspecialchars($message));
+            $mail->AltBody = $message;
+
+            $mail->send();
+            $mail_success = true;
+        } catch (Exception $e) {
+            error_log("Email sending failed in send_notification.php: {$mail->ErrorInfo}");
+            $mail_success = false;
+        }
+
         $results['email'] = $mail_success ? 'sent' : 'failed';
 
         if ($mail_success) {
@@ -48,25 +90,4 @@ try {
 }
 catch (Exception $e) {
     echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
-}
-
-/**
- * Simulation function for email delivery.
- * In a real environment, replace with PHP mail() or PHPMailer.
- */
-function simulate_email_send($to, $subject, $body)
-{
-    $log_file = __DIR__ . '/../../logs/email_notifications.log';
-    $log_dir = dirname($log_file);
-    if (!is_dir($log_dir))
-        mkdir($log_dir, 0777, true);
-
-    $timestamp = date('Y-m-d H:i:s');
-    $log_entry = "[{$timestamp}] To: {$to} | Subject: {$subject}\nContent: {$body}\n" . str_repeat("-", 40) . "\n";
-
-    // Simulate latency
-    // usleep(200000); 
-
-    // Log to file as simulation of "Sending"
-    return file_put_contents($log_file, $log_entry, FILE_APPEND) !== false;
 }

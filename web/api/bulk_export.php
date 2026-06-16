@@ -9,6 +9,7 @@
  * - Generates department-specific schedules
  */
 
+ini_set('display_errors', 0);
 header('Content-Type: application/json');
 require_once 'db.php';
 require_once 'error_handler.php';
@@ -82,11 +83,11 @@ function export_department_csv($department) {
     
     // Headers
     $headers = array_keys($schedule[0]);
-    fputcsv($output, $headers);
+    fputcsv($output, $headers, ',', '"', '\\');
     
     // Rows
     foreach ($schedule as $row) {
-        fputcsv($output, $row);
+        fputcsv($output, $row, ',', '"', '\\');
     }
     
     rewind($output);

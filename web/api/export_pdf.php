@@ -34,7 +34,7 @@ if ($from_b2) {
         $csv_path = $temp_dir . 'export_csv_' . time() . '.csv';
         file_put_contents($csv_path, $csv_result['content']);
     } catch (Exception $e) {
-        die("B2 download error: " . $e->getMessage());
+        die("Cloud download error: " . $e->getMessage());
     }
 } else {
     // Use local file

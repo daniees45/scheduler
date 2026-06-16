@@ -22,8 +22,20 @@ $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 10;
 if ($limit < 1) $limit = 1;
 if ($limit > 20) $limit = 20;
 
+$academic_year = trim((string)($_GET['academic_year'] ?? ''));
+$schedule_kind = strtolower(trim((string)($_GET['type'] ?? 'class')));
+if (!in_array($schedule_kind, ['class', 'exam', 'all'], true)) {
+    $schedule_kind = 'class';
+}
+
 $schedules = [];
 $seen_paths = [];
+
+function has_generated_schedule_column(mysqli $conn, string $column): bool {
+    $safe = $conn->real_escape_string($column);
+    $res = $conn->query("SHOW COLUMNS FROM generated_schedules LIKE '{$safe}'");
+    return $res && $res->num_rows > 0;
+}
 
 function normalize_schedule_path($name) {
     $name = trim((string)$name);
@@ -55,16 +67,37 @@ function local_line_count_for_path($relative_path) {
     return max(0, $line_count - 1);
 }
 
-// 1) Primary source: generated_schedules table filtered to GENERAL schedules  WHERE department IS NULL
-          // OR TRIM(department) = ''
-           //OR LOWER(TRIM(department)) = 'general'
-$sql = "SELECT id, schedule_name, created_at, schedule_data, department
-        FROM generated_schedules
-        ORDER BY created_at DESC
-        LIMIT ?";
+// 1) Primary source: generated_schedules table, optionally filtered by academic year.
+$has_academic_year = has_generated_schedule_column($conn, 'academic_year');
+$has_schedule_type = has_generated_schedule_column($conn, 'schedule_type');
+
+$sql = "SELECT id, schedule_name, created_at, schedule_data, department"
+    . ($has_academic_year ? ", academic_year" : "")
+    . ($has_schedule_type ? ", schedule_type" : "")
+    . " FROM generated_schedules WHERE 1=1";
+
+if ($has_schedule_type) {
+    if ($schedule_kind === 'exam') {
+        $sql .= " AND (LOWER(TRIM(schedule_type)) = 'exam' OR LOWER(TRIM(schedule_name)) LIKE 'exam%')";
+    } elseif ($schedule_kind === 'class') {
+        $sql .= " AND (schedule_type IS NULL OR TRIM(schedule_type) = '' OR LOWER(TRIM(schedule_type)) = 'class')";
+    }
+} elseif ($schedule_kind === 'exam') {
+    $sql .= " AND LOWER(TRIM(schedule_name)) LIKE 'exam%'";
+}
+
+if ($academic_year !== '' && $has_academic_year) {
+    $sql .= " AND academic_year = ?";
+}
+
+$sql .= " ORDER BY created_at DESC LIMIT ?";
 
 if ($stmt = $conn->prepare($sql)) {
-    $stmt->bind_param('i', $limit);
+    if ($academic_year !== '' && $has_academic_year) {
+        $stmt->bind_param('si', $academic_year, $limit);
+    } else {
+        $stmt->bind_param('i', $limit);
+    }
     $stmt->execute();
     $res = $stmt->get_result();
 
@@ -82,6 +115,7 @@ if ($stmt = $conn->prepare($sql)) {
             $line_count = max(0, count($decoded) - 1);
         } else {
             $line_count = local_line_count_for_path($path);
+            $decoded = [];
         }
 
         $schedules[] = [
@@ -91,6 +125,9 @@ if ($stmt = $conn->prepare($sql)) {
             'generated_at' => $created_ts ? date('M d, Y h:i A', $created_ts) : 'Unknown date',
             'timestamp' => $created_ts,
             'department' => $row['department'] ?? 'General',
+            'academic_year' => $row['academic_year'] ?? '',
+            'schedule_type' => $row['schedule_type'] ?? 'class',
+            'csv_content' => $decoded,
             'source' => 'db'
         ];
 

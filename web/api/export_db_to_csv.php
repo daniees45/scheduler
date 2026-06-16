@@ -64,9 +64,9 @@ try {
             
             if ($b2->isEnabled()) {
                 if ($b2->uploadContent($csvContent, 'csv/general/lecturers.csv')) {
-                    $exported['lecturers.csv'] = 'Exported to B2 and local';
+                    $exported['lecturers.csv'] = 'Exported to Cloud storage and local';
                 } else {
-                    $errors['lecturers.csv'] = 'Local OK, B2 upload failed';
+                    $errors['lecturers.csv'] = 'Local OK, Cloud upload failed';
                 }
             }
         }
@@ -90,9 +90,9 @@ try {
             
             if ($b2->isEnabled()) {
                 if ($b2->uploadContent($csvContent, 'csv/general/courses.csv')) {
-                    $exported['courses.csv'] = 'Exported to B2 and local';
+                    $exported['courses.csv'] = 'Exported to Cloud storage and local';
                 } else {
-                    $errors['courses.csv'] = 'Local OK, B2 upload failed';
+                    $errors['courses.csv'] = 'Local OK, Cloud Storage upload failed';
                 }
             }
         }

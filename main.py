@@ -160,26 +160,24 @@ def select_semester_interactive():
 
 def select_general_schedule_path_interactive(default_path: str) -> str | None:
     """
-    Prompt user to choose which General schedule CSV to use for blocking.
-    Returns a path or None to skip general blocking.
+    Prompt user to choose which General schedule CSV(s) to use for blocking.
+    Returns a comma-separated string of paths or None.
     """
     print("\n" + "=" * 70)
-    print("GENERAL SCHEDULE SOURCE")
+    print("BLOCK SCHEDULE SOURCES")
     print("=" * 70)
-    print("Which General schedule should be used to block time slots?")
+    print("Which schedules should be used to block time slots? (e.g. for cross-department sync)")
     print("1. Use default: vvu_general_schedule.csv")
-    print("2. Provide a different CSV path")
-    print("3. Skip General blocking (no blocks applied)")
+    print("2. Provide specific CSV path(s) (separate multiple with commas)")
+    print("3. Skip blocking (no blocks applied)")
     print("=" * 70)
     while True:
         choice = input("Select option (1, 2, or 3): ").strip()
         if choice == "1":
             return default_path
         if choice == "2":
-            custom_path = input("Enter path to General schedule CSV: ").strip()
-            if custom_path and not custom_path.endswith(".csv"):
-                custom_path += ".csv"
-            return custom_path
+            custom_paths = input("Enter path(s) to schedule CSVs (e.g. csv/final/comp.csv, csv/final/gen.csv): ").strip()
+            return custom_paths
         if choice == "3":
             return None
         print("[ERROR] Invalid choice. Enter 1, 2, or 3.")
@@ -352,13 +350,10 @@ def main(input_file=None, output_file=None, interactive=True, availability_mode=
         elif selected_semester is None:
             print("[INFO] All semesters selected: no filtering applied.")
     else:
-        # Try to infer semester from input if available
+        # In non-interactive mode (e.g., from web UI), process all courses in the input file.
+        # Do not infer a single semester, as the input might contain multiple semesters.
         selected_semester = None
-        if 'Semester' in input_df.columns:
-            semester_series = input_df['Semester'].dropna().astype(str)
-            if not semester_series.empty:
-                selected_semester = semester_series.mode().iloc[0]
-    
+
     # Auto-detection of departments in filtered data
     print(f"\n[INFO] Analyzing input file for departments...")
     departments = set()
@@ -400,32 +395,32 @@ def main(input_file=None, output_file=None, interactive=True, availability_mode=
                 else:
                     return False
 
-            if not general_schedule_path:
-                return False
-
-            if not os.path.exists(general_schedule_path):
-                print(f"[WARNING] General schedule file '{general_schedule_path}' not found.")
+            # Handle multiple paths
+            all_paths = [p.strip() for p in general_schedule_path.split(',') if p.strip()]
+            valid_paths = []
+            for path in all_paths:
+                if os.path.exists(path):
+                    valid_paths.append(path)
+                else:
+                    print(f"[WARNING] Block file '{path}' not found.")
+            
+            if not valid_paths:
+                print(f"[ALERT] No valid block files found.")
                 attempts += 1
                 if attempts >= 2 or not interactive:
-                    print("[ALERT] Unable to load a valid General schedule after 2 attempts. Stopping.")
                     return False
                 general_schedule_path = select_general_schedule_path_interactive(default_gen_path)
                 continue
 
             try:
                 from load_data import load_general_schedule_blocks
-                blocked_blocks = load_general_schedule_blocks(general_schedule_path, semester=selected_semester)
-                print(f"[INFO] Loaded general schedule from '{general_schedule_path}'. {len(blocked_blocks)} blocks applied.")
+                blocked_blocks = load_general_schedule_blocks(valid_paths, semester=selected_semester)
+                print(f"[INFO] Applied {len(blocked_blocks)} blocks from {len(valid_paths)} files.")
+                
                 if len(blocked_blocks) == 0:
-                    print("\n" + "=" * 70)
-                    print("[ALERT] General Schedule Missing Semester Blocks")
-                    print("=" * 70)
-                    print(f"No General blocks found for Semester {selected_semester}.")
-                    print("Please ensure the General timetable includes this semester.")
-                    print("=" * 70 + "\n")
+                    print(f"[ALERT] No blocks found for Semester {selected_semester} in the provided files.")
                     attempts += 1
                     if attempts >= 2 or not interactive:
-                        print("[ALERT] No semester blocks after 2 attempts. Stopping.")
                         return False
                     general_schedule_path = select_general_schedule_path_interactive(default_gen_path)
                     continue

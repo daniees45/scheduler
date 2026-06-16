@@ -1,6 +1,7 @@
 <?php
 $page_title = 'Conflict Dashboard';
 include 'includes/header.php';
+requireRole(['super_admin', 'faculty_admin']);
 ?>
 
 <div class="glass-panel" style="padding: 2rem; max-width: 900px; margin: 0 auto;">
@@ -11,6 +12,30 @@ include 'includes/header.php';
         </div>
         <button onclick="loadConflicts()" class="glass-btn secondary"><i class="fa-solid fa-rotate"></i> Refresh
             Analysis</button>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:0.75rem;margin-bottom:1rem;">
+        <div class="glass-panel" style="padding:0.9rem; border-left: 4px solid #ef4444;">
+            <div style="font-size:0.8rem;color:var(--text-muted)">High Severity</div>
+            <div id="summaryHigh" style="font-size:1.5rem;font-weight:700;">0</div>
+        </div>
+        <div class="glass-panel" style="padding:0.9rem; border-left: 4px solid #f59e0b;">
+            <div style="font-size:0.8rem;color:var(--text-muted)">Medium Severity</div>
+            <div id="summaryMedium" style="font-size:1.5rem;font-weight:700;">0</div>
+        </div>
+        <div class="glass-panel" style="padding:0.9rem; border-left: 4px solid #22c55e;">
+            <div style="font-size:0.8rem;color:var(--text-muted)">Total</div>
+            <div id="summaryTotal" style="font-size:1.5rem;font-weight:700;">0</div>
+        </div>
+    </div>
+
+    <div style="display:flex; gap:0.75rem; flex-wrap:wrap; margin-bottom: 1rem;">
+        <input id="searchConflicts" type="text" class="glass-input" placeholder="Search conflict text..." style="flex:1; min-width:220px;" oninput="renderConflicts()">
+        <select id="severityFilter" class="glass-input" style="min-width:170px;" onchange="renderConflicts()">
+            <option value="">All Severities</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+        </select>
     </div>
 
     <div id="loading" style="text-align: center; padding: 3rem;">
@@ -53,6 +78,81 @@ include 'includes/header.php';
 <script>
     let currentConflicts = [];
 
+    function normalizeSeverity(value) {
+        const v = String(value || '').toLowerCase();
+        if (v.includes('high') || v.includes('critical')) return 'high';
+        return 'medium';
+    }
+
+    function updateSummary(items) {
+        const high = items.filter(c => normalizeSeverity(c.severity) === 'high').length;
+        const medium = items.length - high;
+        document.getElementById('summaryHigh').innerText = String(high);
+        document.getElementById('summaryMedium').innerText = String(medium);
+        document.getElementById('summaryTotal').innerText = String(items.length);
+    }
+
+    function renderConflicts() {
+        const list = document.getElementById('conflict-list');
+        const empty = document.getElementById('no-conflicts');
+        const q = (document.getElementById('searchConflicts').value || '').toLowerCase().trim();
+        const severity = document.getElementById('severityFilter').value;
+
+        let filtered = currentConflicts.filter(c => {
+            const text = [c.type, c.description, (c.entities || []).join(' ')].join(' ').toLowerCase();
+            const queryOk = !q || text.includes(q);
+            const sevOk = !severity || normalizeSeverity(c.severity) === severity;
+            return queryOk && sevOk;
+        });
+
+        list.innerHTML = '';
+        if (filtered.length === 0) {
+            list.style.display = 'none';
+            empty.style.display = 'block';
+            return;
+        }
+
+        empty.style.display = 'none';
+        list.style.display = 'flex';
+        filtered.forEach((c) => {
+            const severityClass = normalizeSeverity(c.severity);
+            const severityColor = severityClass === 'high' ? 'var(--danger)' : 'var(--warning)';
+            const entities = Array.isArray(c.entities) ? c.entities : [];
+            const entityLabel = entities.length > 0 ? entities.join(', ') : 'N/A';
+            const conflictIdx = Number.isInteger(c.index) ? c.index : currentConflicts.indexOf(c);
+
+            const el = document.createElement('div');
+            el.className = 'conflict-card';
+            el.style = `
+                background: rgba(255,255,255,0.03);
+                padding: 1.5rem;
+                border-radius: 8px;
+                border-left: 4px solid ${severityColor};
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                gap: 1rem;
+            `;
+            el.innerHTML = `
+                <div>
+                    <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.35rem;">
+                        <span style="font-weight:600;color:${severityColor};"><i class="fa-solid fa-bolt"></i> ${c.type || 'Conflict'}</span>
+                        <span style="font-size:0.72rem;padding:0.15rem 0.5rem;border-radius:999px;background:rgba(255,255,255,0.12);text-transform:uppercase;">${severityClass}</span>
+                    </div>
+                    <div style="font-size: 0.95rem; margin-bottom: 0.5rem;">${c.description || ''}</div>
+                    <div style="font-size: 0.85rem; color: var(--text-muted);">
+                        Affecting: <span style="color: white;">${entityLabel}</span>
+                    </div>
+                </div>
+                <div style="text-align: right; display: flex; flex-direction: column; gap: 0.5rem; min-width: 140px;">
+                    <a href="view_schedule.php?day=${encodeURIComponent((c.details && c.details.day) || '')}" class="glass-btn secondary small">View</a>
+                    <button onclick="showRelaxations(${conflictIdx})" class="glass-btn primary small" style="background: linear-gradient(135deg, #818cf8, #c084fc);">Suggest Fix</button>
+                </div>
+            `;
+            list.appendChild(el);
+        });
+    }
+
     async function loadConflicts() {
         const list = document.getElementById('conflict-list');
         const loading = document.getElementById('loading');
@@ -71,40 +171,8 @@ include 'includes/header.php';
 
             if (data.status === 'success') {
                 currentConflicts = data.conflicts || [];
-                if (data.count === 0) {
-                    empty.style.display = 'block';
-                } else {
-                    list.style.display = 'flex';
-                    data.conflicts.forEach((c, idx) => {
-                        const el = document.createElement('div');
-                        el.className = 'conflict-card';
-                        el.style = `
-                        background: rgba(255,255,255,0.03); 
-                        padding: 1.5rem; 
-                        border-radius: 8px; 
-                        border-left: 4px solid var(--danger);
-                        display: flex;
-                        justify-content: space-between;
-                        align-items: center;
-                    `;
-                        el.innerHTML = `
-                        <div>
-                            <div style="font-weight: 600; color: var(--danger); margin-bottom: 0.25rem;">
-                                <i class="fa-solid fa-bolt"></i> ${c.type}
-                            </div>
-                            <div style="font-size: 0.95rem; margin-bottom: 0.5rem;">${c.description}</div>
-                            <div style="font-size: 0.85rem; color: var(--text-muted);">
-                                Affecting: <span style="color: white;">${c.entities.join(', ')}</span>
-                            </div>
-                        </div>
-                        <div style="text-align: right; display: flex; flex-direction: column; gap: 0.5rem;">
-                           <a href="view_schedule.php?day=${c.details.day}" class="glass-btn secondary small">View</a>
-                           <button onclick="showRelaxations(${c.index})" class="glass-btn primary small" style="background: linear-gradient(135deg, #818cf8, #c084fc);">Suggest Fix</button>
-                        </div>
-                    `;
-                        list.appendChild(el);
-                    });
-                }
+                updateSummary(currentConflicts);
+                renderConflicts();
             } else {
                 await customAlert('Analysis Error', data.message, 'error');
             }
@@ -177,9 +245,28 @@ include 'includes/header.php';
         const proceed = await customConfirm('Apply Fix', `Apply this change to ${courseCode}? This will modify the schedule data.`);
         if (!proceed) return;
 
-        // For Phase 2, we just alert and refresh. In a real system, this would call update_schedule_row.php
-        // which we will implement next.
-        await customAlert('AI Fix', `Successfully applied adjustment for ${courseCode}. The schedule has been updated.`, 'success');
+        try {
+            const response = await fetch('api/update_schedule_row.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                    course_code: courseCode,
+                    action: action,
+                    new_value: newValue
+                })
+            });
+            const result = await response.json();
+            if (result.status !== 'success') {
+                await customAlert('AI Fix', result.message || 'Unable to apply change.', 'error');
+                return;
+            }
+            await customAlert('AI Fix', result.message || `Successfully applied adjustment for ${courseCode}.`, 'success');
+        } catch (err) {
+            await customAlert('AI Fix', 'Failed to apply adjustment due to a network/server error.', 'error');
+            return;
+        }
+
         closeModal();
         loadConflicts();
     }

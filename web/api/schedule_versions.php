@@ -1,5 +1,6 @@
 <?php
 // as/api/schedule_versions.php
+ini_set('display_errors', 0);
 header('Content-Type: application/json');
 require_once 'db.php';
 require_once __DIR__ . '/../../lib/B2Storage.php';
@@ -25,7 +26,7 @@ function schedule_array_to_csv($rows) {
     $csv = '';
     foreach ($rows as $row) {
         $f = fopen('php://temp', 'r+');
-        fputcsv($f, $row);
+        fputcsv($f, $row, ',', '"', '\\');
         rewind($f);
         $csv .= stream_get_contents($f);
         fclose($f);
@@ -176,14 +177,35 @@ try {
                 $rows[] = str_getcsv($line);
             }
             $schedule_json = json_encode($rows);
-            $stmt2 = $conn->prepare("INSERT INTO generated_schedules (schedule_name, semester, department, accuracy, schedule_data, generated_by)
-                                     VALUES (?, ?, ?, ?, ?, ?)");
+            $check_col = $conn->query("SHOW COLUMNS FROM generated_schedules LIKE 'academic_year'");
+            $has_academic_year = $check_col && $check_col->num_rows > 0;
+
+            $academic_year = '';
+            $set_res = $conn->query("SELECT setting_value FROM system_settings WHERE setting_key = 'current_academic_year' LIMIT 1");
+            if ($set_res && ($set_row = $set_res->fetch_assoc())) {
+                $academic_year = trim((string)($set_row['setting_value'] ?? ''));
+            }
+            if (!preg_match('/^\d{4}\/\d{4}$/', $academic_year)) {
+                $academic_year = date('Y') . '/' . (date('Y') + 1);
+            }
+
+            if ($has_academic_year) {
+                $stmt2 = $conn->prepare("INSERT INTO generated_schedules (schedule_name, semester, academic_year, department, accuracy, schedule_data, generated_by)
+                                         VALUES (?, ?, ?, ?, ?, ?, ?)");
+            } else {
+                $stmt2 = $conn->prepare("INSERT INTO generated_schedules (schedule_name, semester, department, accuracy, schedule_data, generated_by)
+                                         VALUES (?, ?, ?, ?, ?, ?)");
+            }
             $schedule_name = 'Loaded Version #' . $id;
             $semester = $_POST['semester'] ?? '';
             $department = $_POST['department'] ?? '';
             $accuracy = '';
             $gen_by = $_SESSION['user_id'] ?? 0;
-            $stmt2->bind_param("sssssi", $schedule_name, $semester, $department, $accuracy, $schedule_json, $gen_by);
+            if ($has_academic_year) {
+                $stmt2->bind_param("ssssssi", $schedule_name, $semester, $academic_year, $department, $accuracy, $schedule_json, $gen_by);
+            } else {
+                $stmt2->bind_param("sssssi", $schedule_name, $semester, $department, $accuracy, $schedule_json, $gen_by);
+            }
             $stmt2->execute();
 
             echo json_encode(['status' => 'success', 'message' => 'Version loaded successfully.']);

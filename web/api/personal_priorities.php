@@ -4,6 +4,7 @@
  * Manages user priorities, goals, and time allocation preferences
  */
 require_once 'db.php';
+require_once __DIR__ . '/ai_learning.php';
 
 header('Content-Type: application/json');
 
@@ -185,6 +186,7 @@ function deletePriority($user_id, $id, $conn) {
     $stmt->bind_param("ii", $id, $user_id);
     
     if ($stmt->execute() && $stmt->affected_rows > 0) {
+        ai_learning_sync_user_profile($conn, $user_id);
         return ['success' => true, 'message' => 'Priority deleted successfully'];
     }
     
@@ -249,6 +251,7 @@ function addGoal($user_id, $data, $conn) {
     );
     
     if ($stmt->execute()) {
+        ai_learning_sync_user_profile($conn, $user_id);
         return [
             'success' => true, 
             'message' => 'Goal added successfully',
@@ -287,6 +290,7 @@ function updateGoal($user_id, $data, $conn) {
     );
     
     if ($stmt->execute() && $stmt->affected_rows > 0) {
+        ai_learning_sync_user_profile($conn, $user_id);
         return ['success' => true, 'message' => 'Goal updated successfully'];
     }
     
@@ -308,6 +312,7 @@ function updateGoalProgress($user_id, $id, $progress, $conn) {
     $stmt->bind_param("iiii", $progress, $progress, $id, $user_id);
     
     if ($stmt->execute()) {
+        ai_learning_sync_user_profile($conn, $user_id);
         return ['success' => true, 'message' => 'Progress updated successfully'];
     }
     
@@ -323,6 +328,7 @@ function deleteGoal($user_id, $id, $conn) {
     $stmt->bind_param("ii", $id, $user_id);
     
     if ($stmt->execute() && $stmt->affected_rows > 0) {
+        ai_learning_sync_user_profile($conn, $user_id);
         return ['success' => true, 'message' => 'Goal deleted successfully'];
     }
     

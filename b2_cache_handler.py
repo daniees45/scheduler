@@ -54,7 +54,7 @@ class B2CacheHandler:
             print(f"[INFO] Cache directory: {self.cache_dir}")
         except Exception as e:
             print(f"[ERROR] Failed to initialize B2 client: {e}")
-            self.s3 = None
+            self.s3 = "fallback"
 
     def _load_metadata(self):
         """Load cached file metadata from disk"""
@@ -76,7 +76,7 @@ class B2CacheHandler:
 
     def _get_b2_file_info(self, key):
         """Get file metadata from B2 without downloading"""
-        if not self.s3:
+        if not self.s3 or self.s3 == "fallback":
             return None
         try:
             response = self.s3.head_object(Bucket=self.bucket_name, Key=key)
@@ -88,6 +88,9 @@ class B2CacheHandler:
         except ClientError as e:
             if e.response['Error']['Code'] == '404':
                 print(f"[WARNING] File not found in B2: {key}")
+            return None
+        except Exception as e:
+            print(f"[WARNING] B2 Head Object exception: {e}")
             return None
 
     def _is_file_cached(self, key, b2_info):
@@ -121,6 +124,39 @@ class B2CacheHandler:
         
         return False
 
+    def _fallback_to_local_download(self, key, download_path):
+        try:
+            if os.path.abspath(key) == os.path.abspath(download_path):
+                return True
+            if not os.path.exists(key):
+                print(f"[WARNING] Local fallback source file not found: {key}")
+                return False
+            dirname = os.path.dirname(download_path)
+            if dirname:
+                os.makedirs(dirname, exist_ok=True)
+            import shutil
+            shutil.copy2(key, download_path)
+            print(f"[LOCAL FALLBACK] Cache Handler Downloaded {key} to {download_path}")
+            return True
+        except Exception as e:
+            print(f"[ERROR] Local fallback download failed for {key}: {e}")
+            return False
+
+    def _fallback_to_local_upload(self, local_path, key):
+        try:
+            if os.path.abspath(local_path) == os.path.abspath(key):
+                return True
+            dirname = os.path.dirname(key)
+            if dirname:
+                os.makedirs(dirname, exist_ok=True)
+            import shutil
+            shutil.copy2(local_path, key)
+            print(f"[LOCAL FALLBACK] Uploaded {local_path} to {key}")
+            return True
+        except Exception as e:
+            print(f"[ERROR] Local fallback upload failed for {key}: {e}")
+            return False
+
     def download_file(self, key, download_path, force=False):
         """
         Download a file from B2 with caching.
@@ -133,14 +169,15 @@ class B2CacheHandler:
         Returns:
             tuple: (success: bool, from_cache: bool)
         """
-        if not self.s3:
-            return False, False
+        if not self.s3 or self.s3 == "fallback":
+            return self._fallback_to_local_download(key, download_path), False
         
         try:
             # Get file info from B2
             b2_info = self._get_b2_file_info(key)
             if not b2_info:
-                return False, False
+                print(f"[INFO] B2 Cache info not found/accessible for {key}. Falling back to local.")
+                return self._fallback_to_local_download(key, download_path), False
             
             # Check if we can use cached version
             if not force and self._is_file_cached(key, b2_info):
@@ -192,12 +229,15 @@ class B2CacheHandler:
                 print(f"[WARNING] File not found in B2: {key}")
             else:
                 print(f"[ERROR] B2 Download error for {key}: {e}")
-            return False, False
+            return self._fallback_to_local_download(key, download_path), False
+        except Exception as e:
+            print(f"[ERROR] B2 Download exception for {key}: {e}")
+            return self._fallback_to_local_download(key, download_path), False
 
     def upload_file(self, local_path, key):
         """Upload a file to B2 and update cache"""
-        if not self.s3:
-            return False
+        if not self.s3 or self.s3 == "fallback":
+            return self._fallback_to_local_upload(local_path, key)
         try:
             self.s3.upload_file(local_path, self.bucket_name, key)
             print(f"[INFO] Uploaded {local_path} to {key}")
@@ -224,7 +264,7 @@ class B2CacheHandler:
             return True
         except Exception as e:
             print(f"[ERROR] B2 Upload error for {key}: {e}")
-            return False
+            return self._fallback_to_local_upload(local_path, key)
 
     def download_folder(self, prefix, local_dir, force=False):
         """
@@ -238,8 +278,8 @@ class B2CacheHandler:
         Returns:
             dict: Statistics about the download operation
         """
-        if not self.s3:
-            return {'success': False, 'total': 0, 'downloaded': 0, 'cached': 0}
+        if not self.s3 or self.s3 == "fallback":
+            return self._fallback_to_local_folder(prefix, local_dir, force)
         
         try:
             paginator = self.s3.get_paginator('list_objects_v2')
@@ -267,7 +307,42 @@ class B2CacheHandler:
             return stats
             
         except Exception as e:
-            print(f"[ERROR] B2 Download Folder error: {e}")
+            print(f"[ERROR] B2 Download Folder error: {e}. Falling back to local.")
+            return self._fallback_to_local_folder(prefix, local_dir, force)
+
+    def _fallback_to_local_folder(self, prefix, local_dir, force=False):
+        stats = {'success': True, 'total': 0, 'downloaded': 0, 'cached': 0}
+        try:
+            if os.path.exists(prefix):
+                if os.path.isdir(prefix):
+                    for root, dirs, files in os.walk(prefix):
+                        for file in files:
+                            if file.startswith('.'):
+                                continue
+                            file_path = os.path.join(root, file)
+                            key = file_path
+                            local_file_path = os.path.join(local_dir, key)
+                            success, from_cache = self.download_file(key, local_file_path, force)
+                            if success:
+                                stats['total'] += 1
+                                if from_cache:
+                                    stats['cached'] += 1
+                                else:
+                                    stats['downloaded'] += 1
+                elif os.path.isfile(prefix):
+                    key = prefix
+                    local_file_path = os.path.join(local_dir, key)
+                    success, from_cache = self.download_file(key, local_file_path, force)
+                    if success:
+                        stats['total'] += 1
+                        if from_cache:
+                            stats['cached'] += 1
+                        else:
+                            stats['downloaded'] += 1
+            print(f"[LOCAL FALLBACK] Cache Handler synchronized {stats['total']} files for prefix '{prefix}'")
+            return stats
+        except Exception as e:
+            print(f"[ERROR] Local fallback folder download failed: {e}")
             return {'success': False, 'total': 0, 'downloaded': 0, 'cached': 0}
 
     def clear_cache(self, key=None):

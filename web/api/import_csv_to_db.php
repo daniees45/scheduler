@@ -1,19 +1,14 @@
 <?php
 // web/api/import_csv_to_db.php
 // Imports CSV data into the database (courses and sections tables)
-session_start();
 require_once 'db.php';
+require_once __DIR__ . '/auth_guard.php';
 
 header('Content-Type: application/json');
 
-if (!isset($_SESSION['user_id'])) {
-    die(json_encode(["status" => "error", "message" => "Unauthorized"]));
-}
-
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    echo json_encode(['status' => 'error', 'message' => 'Invalid request method.']);
-    exit;
-}
+require_http_methods('POST');
+require_authenticated_user();
+require_admin_user();
 
 $input = json_decode(file_get_contents('php://input'), true);
 $filename = $input['file'] ?? '';
@@ -97,6 +92,7 @@ try {
                                       type = VALUES(type),
                                       level = VALUES(level),
                                       credit_hours = VALUES(credit_hours)");
+        $course_lookup_stmt = $conn->prepare("SELECT id FROM courses WHERE course_code = ? LIMIT 1");
         
         $section_stmt = $conn->prepare("INSERT INTO sections (course_id, lecturer_id, room_id, assigned_day, assigned_time, schedule_time) 
                                         VALUES (?, ?, ?, ?, ?, ?)");
@@ -129,8 +125,10 @@ try {
                 $stats['courses']++;
             } else {
                 // Get existing course ID
-                $res = $conn->query("SELECT id FROM courses WHERE course_code = '$code' LIMIT 1");
-                if ($res && $r = $res->fetch_assoc()) {
+                $course_lookup_stmt->bind_param("s", $code);
+                $course_lookup_stmt->execute();
+                $res = $course_lookup_stmt->get_result();
+                if ($res && ($r = $res->fetch_assoc())) {
                     $course_id = $r['id'];
                 } else {
                     continue;

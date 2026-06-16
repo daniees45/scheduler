@@ -1,5 +1,6 @@
 <?php
-$cmd = "/usr/local/bin/python3 -c 'import sys; print(sys.executable); print(sys.path); import dateutil; print(\"dateutil imported successfully\")' 2>&1";
-$output = shell_exec($cmd);
-echo "<pre>$output</pre>";
+http_response_code(404);
+header('Content-Type: application/json');
+echo json_encode(['status' => 'error', 'message' => 'Not found']);
+exit;
 ?>

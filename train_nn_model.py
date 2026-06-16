@@ -29,7 +29,7 @@ class NNModelTrainer:
     def load_training_data(self, csv_path: str = None) -> Tuple[pd.DataFrame, Dict]:
         """Load historical schedule data for training"""
         if csv_path is None:
-            csv_path = os.path.join(self.data_path, "temp/b2_cache/csv/general", "historical_schedule.csv")
+            csv_path = os.path.join(self.data_path, "csv/general", "historical_schedule.csv")
         
         if not os.path.exists(csv_path):
             print(f"❌ Training data not found: {csv_path}")

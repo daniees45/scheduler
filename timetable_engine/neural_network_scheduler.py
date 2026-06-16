@@ -101,7 +101,6 @@ class NeuralNetworkScheduler:
             self._normalize_course_code(code): info
             for code, info in all_special_constraints.items()
             if isinstance(info, dict)
-            and " ".join(str(info.get('room_name', '')).strip().lower().split()) in available_room_names_normalized
         }
         
         # Build normalized reserved rooms set
@@ -292,11 +291,22 @@ class NeuralNetworkScheduler:
         if room['capacity'] < course.get('enrollment', 30): return False
 
         if self.strict_departmental and not course.get('is_general', False):
-            course_grp = course.get('departmental_group', course.get('department', "General"))
-            room_dept = room.get('department', "General")
-            if room_dept != "General":
-                rd, cg = str(room_dept).lower(), str(course_grp).lower()
-                if not (("comput" in rd and "comput" in cg) or rd == cg or rd in cg or cg in rd): return False
+            # Bypass if room is explicitly fixed/requested
+            if room.get('name') == course.get('fixed_room'):
+                pass
+            else:
+                special = self._get_special_constraint(course_code)
+                if special and special.get('room_name') == room.get('name'):
+                    pass
+                else:
+                    course_grp = course.get('departmental_group', course.get('department', "General"))
+                    room_dept = room.get('department', "General")
+                    
+                    rd = str(room_dept).lower().replace("/", " ").replace("-", " ")
+                    cg = str(course_grp).lower().replace("/", " ").replace("-", " ")
+                    is_match = (rd == cg) or (rd in cg) or (cg in rd)
+                    if not is_match:
+                        return False
 
         slot_key = f"{day}_{slot}"
         for occupant in room_occupancy.get(room['name'], {}).get(slot_key, []):
@@ -489,9 +499,21 @@ class NeuralNetworkScheduler:
             fixed_room = course.get('fixed_room')
 
             # Pre-calculate valid index ranges for fixed courses
-            valid_days = [i for i, d in enumerate(self.days) if d == fixed_day] if fixed_day in self.days else range(len(self.days))
-            valid_ts = [i for i, s in enumerate(self.time_slots) if s == fixed_time] if fixed_time in self.time_slots else range(len(self.time_slots))
-            valid_rooms = [i for i, r in enumerate(self.rooms) if r['name'] == fixed_room] if fixed_room else range(len(self.rooms))
+            spec = self._get_special_constraint(code)
+            f_day = fixed_day or spec.get('fixed_day')
+            f_time = fixed_time or spec.get('fixed_time')
+            f_room = fixed_room or spec.get('room_name')
+
+            valid_days = [i for i, d in enumerate(self.days) if d == f_day] if f_day in self.days else range(len(self.days))
+            
+            # For time slots, use normalized matching as they might be ranges
+            if f_time:
+                valid_ts = [i for i, s in enumerate(self.time_slots) if self._slot_matches_fixed_time(s, f_time)]
+                if not valid_ts: valid_ts = range(len(self.time_slots)) # Fallback if no match
+            else:
+                valid_ts = range(len(self.time_slots))
+                
+            valid_rooms = [i for i, r in enumerate(self.rooms) if self._room_matches(r['name'], f_room)] if f_room else range(len(self.rooms))
 
             for _ in range(100):
                 l_idx = np.random.randint(0, self.num_lecturers)
@@ -513,14 +535,21 @@ class NeuralNetworkScheduler:
             if candidates:
                 best = max(candidates, key=lambda x: x[0])[1]
             else:
+                # Robust fallback for hard cases - but MUST still respect valid indices
                 for _ in range(500):
-                    l_idx, r_idx, s_idx = np.random.randint(0, self.num_lecturers), np.random.randint(0, self.num_rooms), np.random.randint(0, self.num_slots)
-                    d_i, t_i = s_idx // self.num_slots_per_day, s_idx % self.num_slots_per_day
-                    if d_i >= len(self.days) or t_i >= len(self.time_slots): continue
-                    l, r, d, s = self.lecturers[l_idx], self.rooms[r_idx], self.days[d_i], self.time_slots[t_i]
+                    l_idx = np.random.randint(0, self.num_lecturers)
+                    r_idx = np.random.choice(valid_rooms)
+                    d_idx = np.random.choice(valid_days)
+                    t_idx = np.random.choice(valid_ts)
+                    
+                    s_idx = d_idx * self.num_slots_per_day + t_idx
+                    if d_idx >= len(self.days) or t_idx >= len(self.time_slots): continue
+                    
+                    l, r, d, s = self.lecturers[l_idx], self.rooms[r_idx], self.days[d_idx], self.time_slots[t_idx]
                     if self._assignment_valid(course, l, r, d, s, room_occ, lect_occ, lvl_occ, grp_slots):
                         best = {'lecturer': l, 'room': r['name'], 'day': d, 'time_slot': s, 'confidence': 0.5}
                         break
+
             
             if not best: best = {'lecturer': course.get('lecturer', self.lecturers[0]), 'room': self.rooms[0]['name'], 'day': self.days[0], 'time_slot': self.time_slots[0], 'confidence': 0.1}
             
@@ -537,7 +566,7 @@ class NeuralNetworkScheduler:
             
             # Preserve the original course title (with section identifier like [Sec A] / [Sec B]).
             # Storing it here avoids the later dict-keyed lookup which collapses same-code sections.
-            schedule.append({'course_code': code, 'course_title': course.get('title', ''), 'lecturer': best['lecturer'], 'room': best['room'], 'day': best['day'], 'time_slot': best['time_slot']})
+            schedule.append({'course_code': code, 'section_id': course.get('section_id'), 'course_title': course.get('title', ''), 'lecturer': best['lecturer'], 'room': best['room'], 'day': best['day'], 'time_slot': best['time_slot']})
             quality += best['confidence']
             if self.verbose and (c_idx+1) % 20 == 0: print(f"  [NN] {int((c_idx+1)/len(self.courses)*100)}% complete")
 

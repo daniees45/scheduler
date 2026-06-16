@@ -1,15 +1,15 @@
 {
   "model_name": "nn_scheduler",
-  "last_trained": "20260312_215547",
+  "last_trained": "20260501_045147",
   "backend": "tensorflow",
   "model_file": "models/nn/nn_scheduler.h5",
   "training_stats": {
-    "final_loss": 0.0016433808486908674,
+    "final_loss": 0.003767613787204027,
     "final_accuracy": 1.0,
-    "epochs_trained": 50
+    "epochs_trained": 30
   },
   "data_metadata": {
-    "num_records": 224,
+    "num_records": 333,
     "unique_courses": 0,
     "unique_lecturers": 0,
     "unique_rooms": 0,

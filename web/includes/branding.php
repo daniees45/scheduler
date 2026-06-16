@@ -11,6 +11,7 @@ function get_branding($conn) {
         'site_color' => '#2563eb',
         'site_secondary_color' => '#3f83f8',
         'site_color_strength' => 100,
+        'site_text_color' => '#f8fafc',
         'site_bg_color' => '#0f172a',
         'site_logo' => null,
         'site_icon' => null
@@ -42,6 +43,7 @@ if (!defined('SITE_TITLE')) define('SITE_TITLE', $branding['site_title']);
 if (!defined('PRIMARY_COLOR')) define('PRIMARY_COLOR', $branding['site_color']);
 if (!defined('SECONDARY_COLOR')) define('SECONDARY_COLOR', $branding['site_secondary_color'] ?? '#3f83f8');
 if (!defined('COLOR_STRENGTH')) define('COLOR_STRENGTH', (int)($branding['site_color_strength'] ?? 100));
+if (!defined('TEXT_COLOR')) define('TEXT_COLOR', $branding['site_text_color'] ?? '#f8fafc');
 
 // Set global constants if needed or just use $branding
 ?>

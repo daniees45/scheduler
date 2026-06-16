@@ -71,7 +71,6 @@ function get_ai_status()
 
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
 
     if ($httpCode === 200 && $response !== false) {
         return json_decode($response, true);
@@ -246,14 +245,13 @@ function get_generation_stats()
 
     if (isset($conn) && $conn instanceof mysqli) {
         try {
-            // Primary source of truth: last 30 saved schedules (actual generated outcomes)
+            // Primary source of truth: all saved schedules (actual generated outcomes)
             // A saved schedule with meaningful accuracy is treated as a successful generation outcome.
             // For success-rate classification we use an accuracy floor of 70%.
             $saved_acc_query = "SELECT accuracy, created_at
                                FROM generated_schedules
                                WHERE (schedule_name NOT LIKE 'exam_%' OR schedule_name IS NULL)
-                               ORDER BY created_at DESC
-                               LIMIT 30";
+                               ORDER BY created_at DESC";
             $saved_acc_result = $conn->query($saved_acc_query);
             $saved_acc_sum = 0;
             $saved_acc_count = 0;
@@ -320,13 +318,13 @@ function get_generation_stats()
                 // Fallback: use audit logs only when no saved schedules are available
                 // Count generation attempts from audit_log (actual DB table)
                 // A "start" is an attempt. A "success" or "error/failure" is the outcome.
-                $query = "SELECT 
-                            COUNT(CASE WHEN action = 'SCHEDULE_GEN_START' THEN 1 END) as total,
-                            SUM(CASE WHEN action = 'SCHEDULE_GEN_SUCCESS' THEN 1 ELSE 0 END) as successful,
-                            SUM(CASE WHEN action IN ('SCHEDULE_GEN_FAILURE', 'SCHEDULE_GEN_ERROR') THEN 1 ELSE 0 END) as failed
-                          FROM audit_log 
-                          WHERE action LIKE 'SCHEDULE_GEN_%' 
-                          AND log_time >= DATE_SUB(NOW(), INTERVAL 30 DAY)";
+                                $query = "SELECT 
+                                                        COUNT(CASE WHEN action IN ('SCHEDULE_GEN_START','EXAM_GEN_START','EXAM_COMBINED_START') THEN 1 END) as total,
+                                                        SUM(CASE WHEN action IN ('SCHEDULE_GEN_SUCCESS','EXAM_GEN_SUCCESS','EXAM_COMBINED_SUCCESS') THEN 1 ELSE 0 END) as successful,
+                                                        SUM(CASE WHEN action IN ('SCHEDULE_GEN_FAILURE', 'SCHEDULE_GEN_ERROR', 'EXAM_GEN_FAILURE', 'EXAM_GEN_ERROR', 'EXAM_COMBINED_FAILURE', 'EXAM_COMBINED_ERROR') THEN 1 ELSE 0 END) as failed
+                                                    FROM audit_log 
+                                                    WHERE action IN ('SCHEDULE_GEN_START','SCHEDULE_GEN_SUCCESS','SCHEDULE_GEN_FAILURE','SCHEDULE_GEN_ERROR','EXAM_GEN_START','EXAM_GEN_SUCCESS','EXAM_GEN_FAILURE','EXAM_GEN_ERROR','EXAM_COMBINED_START','EXAM_COMBINED_SUCCESS','EXAM_COMBINED_FAILURE','EXAM_COMBINED_ERROR')
+                                                    AND log_time >= DATE_SUB(NOW(), INTERVAL 30 DAY)";
 
                 $result = $conn->query($query);
                 if ($result && $row = $result->fetch_assoc()) {
@@ -339,7 +337,7 @@ function get_generation_stats()
                 }
 
                 // Extract accuracy from logs if no saved schedules yet
-                $acc_query = "SELECT details FROM audit_log WHERE action IN ('SCHEDULE_GEN_SUCCESS', 'SCHEDULE_GEN_FAILURE') AND log_time >= DATE_SUB(NOW(), INTERVAL 30 DAY)";
+                $acc_query = "SELECT details FROM audit_log WHERE action IN ('SCHEDULE_GEN_SUCCESS', 'SCHEDULE_GEN_FAILURE', 'EXAM_GEN_SUCCESS', 'EXAM_GEN_FAILURE', 'EXAM_COMBINED_SUCCESS', 'EXAM_COMBINED_FAILURE') AND log_time >= DATE_SUB(NOW(), INTERVAL 30 DAY)";
                 $acc_result = $conn->query($acc_query);
                 $acc_sum = 0;
                 $acc_count = 0;
@@ -356,14 +354,15 @@ function get_generation_stats()
                 }
 
                 // Get last 7 days trend from database
-                $trend_query = "SELECT 
-                                    DATE(log_time) as log_date,
-                                    COUNT(CASE WHEN action = 'SCHEDULE_GEN_START' THEN 1 END) as daily_total,
-                                    SUM(CASE WHEN action = 'SCHEDULE_GEN_SUCCESS' THEN 1 ELSE 0 END) as daily_success
-                                FROM audit_log 
-                                WHERE action LIKE 'SCHEDULE_GEN_%' AND log_time >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-                                GROUP BY DATE(log_time)
-                                ORDER BY log_date ASC";
+                                $trend_query = "SELECT 
+                                                                        DATE(log_time) as log_date,
+                                                                        COUNT(CASE WHEN action IN ('SCHEDULE_GEN_START','EXAM_GEN_START','EXAM_COMBINED_START') THEN 1 END) as daily_total,
+                                                                        SUM(CASE WHEN action IN ('SCHEDULE_GEN_SUCCESS','EXAM_GEN_SUCCESS','EXAM_COMBINED_SUCCESS') THEN 1 ELSE 0 END) as daily_success
+                                                                FROM audit_log 
+                                                                WHERE action IN ('SCHEDULE_GEN_START','SCHEDULE_GEN_SUCCESS','SCHEDULE_GEN_FAILURE','SCHEDULE_GEN_ERROR','EXAM_GEN_START','EXAM_GEN_SUCCESS','EXAM_GEN_FAILURE','EXAM_GEN_ERROR','EXAM_COMBINED_START','EXAM_COMBINED_SUCCESS','EXAM_COMBINED_FAILURE','EXAM_COMBINED_ERROR')
+                                                                    AND log_time >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+                                                                GROUP BY DATE(log_time)
+                                                                ORDER BY log_date ASC";
 
                 $trend_result = $conn->query($trend_query);
                 if ($trend_result && $trend_result->num_rows > 0) {
@@ -383,7 +382,7 @@ function get_generation_stats()
             }
 
             // Extract duration from logs
-            $time_query = "SELECT details FROM audit_log WHERE action IN ('SCHEDULE_GEN_SUCCESS', 'SCHEDULE_GEN_FAILURE') AND log_time >= DATE_SUB(NOW(), INTERVAL 30 DAY)";
+            $time_query = "SELECT details FROM audit_log WHERE action IN ('SCHEDULE_GEN_SUCCESS', 'SCHEDULE_GEN_FAILURE', 'EXAM_GEN_SUCCESS', 'EXAM_GEN_FAILURE', 'EXAM_COMBINED_SUCCESS', 'EXAM_COMBINED_FAILURE') AND log_time >= DATE_SUB(NOW(), INTERVAL 30 DAY)";
             $time_result = $conn->query($time_query);
             $time_sum = 0;
             $time_count = 0;
@@ -436,8 +435,8 @@ function get_early_gen_time_from_audit()
     if (!($conn instanceof mysqli)) return null;
     try {
         $res = $conn->query(
-            "SELECT details FROM audit_log
-              WHERE action = 'SCHEDULE_GEN_SUCCESS'
+                        "SELECT details FROM audit_log
+                            WHERE action IN ('SCHEDULE_GEN_SUCCESS','EXAM_GEN_SUCCESS','EXAM_COMBINED_SUCCESS')
               ORDER BY log_time ASC LIMIT 20"
         );
         if (!$res) return null;
@@ -463,8 +462,8 @@ function get_early_success_rate_from_audit()
     if (!($conn instanceof mysqli)) return null;
     try {
         $res = $conn->query(
-            "SELECT action FROM audit_log
-              WHERE action IN ('SCHEDULE_GEN_SUCCESS','SCHEDULE_GEN_FAILURE','SCHEDULE_GEN_ERROR')
+                        "SELECT action FROM audit_log
+                            WHERE action IN ('SCHEDULE_GEN_SUCCESS','SCHEDULE_GEN_FAILURE','SCHEDULE_GEN_ERROR','EXAM_GEN_SUCCESS','EXAM_GEN_FAILURE','EXAM_GEN_ERROR','EXAM_COMBINED_SUCCESS','EXAM_COMBINED_FAILURE','EXAM_COMBINED_ERROR')
               ORDER BY log_time ASC LIMIT 30"
         );
         if (!$res) return null;
@@ -472,7 +471,7 @@ function get_early_success_rate_from_audit()
         $total     = 0;
         while ($row = $res->fetch_assoc()) {
             $total++;
-            if ($row['action'] === 'SCHEDULE_GEN_SUCCESS') $successes++;
+            if (in_array($row['action'], ['SCHEDULE_GEN_SUCCESS','EXAM_GEN_SUCCESS','EXAM_COMBINED_SUCCESS'], true)) $successes++;
         }
         return $total >= 10 ? round(($successes / $total) * 100, 1) : null;
     } catch (Exception $e) {

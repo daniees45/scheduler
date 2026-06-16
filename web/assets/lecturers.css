@@ -143,3 +143,17 @@
         width: 100%;
     }
 }
+
+@media (max-width: 480px) {
+    .lecturers-panel {
+        padding: 1rem;
+    }
+    .lecturers-pagination {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+    .lecturers-modal-panel {
+        padding: 1.25rem;
+        margin: 0 0.75rem;
+    }
+}

@@ -24,10 +24,10 @@ class ChromosomeStats:
 class Chromosome:
     """Represents a schedule solution as a chromosome"""
     
-    def __init__(self, schedule_items: List[Tuple[str, str, str, str]] = None):
+    def __init__(self, schedule_items: List[Tuple] = None):
         """
         Initialize chromosome
-        schedule_items: List of (course, lecturer, room, slot) tuples
+        schedule_items: List of (course_code, lecturer, room, day, slot) or (course_code, lecturer, room, day, slot, section_id) tuples
         """
         self.schedule_items = schedule_items or []
         self.fitness = 0.0
@@ -100,7 +100,20 @@ class GeneticAlgorithmScheduler:
         self.time_slots = time_slots
         self.days = days or ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
         self.enforce_lecturer_assignment = enforce_lecturer_assignment
-        self.course_lookup = {c.get('code'): c for c in self.courses}
+        # Create lookups: primary by section_id (if available), fallback by code for backward compatibility
+        self.course_lookup = {c.get('section_id'): c for c in self.courses if c.get('section_id')}
+        # Also create code-based lookup for backward compatibility
+        self.course_lookup_by_code = {c.get('code'): c for c in self.courses}
+        
+        # Debug: check if section_id is present in courses
+        if verbose:
+            section_ids_found = sum(1 for c in self.courses if c.get('section_id'))
+            print(f"[GA] Initialized with {len(self.courses)} courses")
+            print(f"[GA] {section_ids_found} courses have section_id")
+            if section_ids_found > 0:
+                sample_course = next((c for c in self.courses if c.get('section_id')), {})
+                print(f"[GA] Sample course with section_id: code={sample_course.get('code')}, section_id={sample_course.get('section_id')}, title={sample_course.get('title')}")
+        
         self.course_groups = course_groups or {}
         self.lecturer_availability = lecturer_availability or {}
         self.shared_course_aliases = {
@@ -296,6 +309,13 @@ class GeneticAlgorithmScheduler:
         """Create a random valid schedule chromosome"""
         schedule_items = []
         room_occupancy = {room['name']: {} for room in self.rooms}
+        # Ensure special/reserved rooms are tracked even if not in the general pool
+        for special in self.special_room_constraints.values():
+            if isinstance(special, dict):
+                r_name = special.get('room_name')
+                if r_name and r_name not in room_occupancy:
+                    room_occupancy[r_name] = {}
+        
         lecturer_schedule = {lecturer: {} for lecturer in self.lecturers}
         level_semester_slots = {}
         
@@ -319,17 +339,28 @@ class GeneticAlgorithmScheduler:
                     # Priority 1: Use course-level fixed fields (smart locking)
                     day = fixed_day or random.choice(self.days)
                     slot = fixed_time or random.choice(self.time_slots)
-                    room_name = fixed_room or (next((r for r in self.rooms if r['name'] == special.get('room_name')), None)['name'] if special.get('room_name') else random.choice(self.rooms)['name'])
-                    room = next((r for r in self.rooms if r['name'] == room_name), random.choice(self.rooms))
+                    
+                    target_name = fixed_room or special.get('room_name')
+                    if target_name:
+                        room = next((r for r in self.rooms if r['name'] == target_name), None)
+                        if room is None:
+                            room = {'name': target_name, 'capacity': 30, 'department': 'General'}
+                    else:
+                        room = random.choice(self.rooms)
                 elif special:
                     # Priority 2: Use special_rooms.csv constraints
-                    room = next((r for r in self.rooms if r['name'] == special.get('room_name')), None)
-                    if room is None:
+                    target_name = special.get('room_name')
+                    if target_name:
+                        room = next((r for r in self.rooms if r['name'] == target_name), None)
+                        if room is None:
+                            room = {'name': target_name, 'capacity': 30, 'department': 'General'}
+                    else:
                         room = random.choice(self.rooms)
+                        
                     slot = special.get('fixed_time') or random.choice(self.time_slots)
                     day = special.get('fixed_day') or random.choice(self.days)
                 else:
-                    # Priority 3: Random
+                    # Priority 3: Random (Strictly from general pool)
                     room = random.choice(self.rooms)
                     slot = random.choice(self.time_slots)
                     day = random.choice(self.days)
@@ -344,11 +375,14 @@ class GeneticAlgorithmScheduler:
                         lecturer,
                         room['name'],
                         day,
-                        slot
+                        slot,
+                        course.get('section_id')  # Include section_id if available
                     ))
                     
                     # Update occupancy tracking
                     room_key = f"{day}_{slot}"
+                    if room['name'] not in room_occupancy:
+                        room_occupancy[room['name']] = {}
                     room_occupancy[room['name']][room_key] = room_occupancy[room['name']].get(room_key, 0) + 1
                     if room_key not in lecturer_schedule[lecturer]:
                         lecturer_schedule[lecturer][room_key] = 0
@@ -445,16 +479,22 @@ class GeneticAlgorithmScheduler:
         
         # Constraint 5: Departmental room enforcement (Strict)
         if self.strict_departmental:
+            # Bypass if room is explicitly fixed/requested
+            if room.get('name') == course.get('fixed_room'):
+                return True
+            special = self._get_special_constraint(course.get('code'))
+            if special and special.get('room_name') == room.get('name'):
+                return True
+                
             course_grp = course.get('departmental_group', course.get('department', "General"))
             room_dept = room.get('department', "General")
             
-            if room_dept != "General":
-                # Token-based check
-                rd = str(room_dept).lower().replace("/", " ").replace("-", " ")
-                cg = str(course_grp).lower().replace("/", " ").replace("-", " ")
-                is_match = (rd == cg) or (rd in cg) or (cg in rd)
-                if not is_match:
-                    return False
+            # Token-based check
+            rd = str(room_dept).lower().replace("/", " ").replace("-", " ")
+            cg = str(course_grp).lower().replace("/", " ").replace("-", " ")
+            is_match = (rd == cg) or (rd in cg) or (cg in rd)
+            if not is_match:
+                return False
         
         return True
     
@@ -534,7 +574,13 @@ class GeneticAlgorithmScheduler:
         penalty += num_missing * self.constraint_weights['missing_course_penalty']
         stats['conflicts'] += num_missing
 
-        for course_code, lecturer, room, day, slot in chromosome.schedule_items:
+        for item in chromosome.schedule_items:
+            # Handle both 5-tuple (old format) and 6-tuple (with section_id) formats
+            if len(item) >= 6:
+                course_code, lecturer, room, day, slot, section_id = item[0], item[1], item[2], item[3], item[4], item[5]
+            else:
+                course_code, lecturer, room, day, slot = item[0], item[1], item[2], item[3], item[4]
+            
             key = f"{room}_{day}_{slot}"
             course = self._get_course(course_code)
 
@@ -695,7 +741,11 @@ class GeneticAlgorithmScheduler:
             return 0
         
         room_slots = {}
-        for _, _, room, day, slot in chromosome.schedule_items:
+        for item in chromosome.schedule_items:
+            # Handle both 5-tuple and 6-tuple formats
+            room = item[2]  # room is always at index 2
+            day = item[3]   # day is always at index 3
+            slot = item[4]  # slot is always at index 4
             key = f"{room}_{day}_{slot}"
             room_slots[key] = room_slots.get(key, 0) + 1
         
@@ -714,7 +764,9 @@ class GeneticAlgorithmScheduler:
             return 0
         
         lecturer_loads = {}
-        for _, lecturer, _, _, _ in chromosome.schedule_items:
+        for item in chromosome.schedule_items:
+            # Handle both 5-tuple and 6-tuple formats
+            lecturer = item[1]  # lecturer is always at index 1
             lecturer_loads[lecturer] = lecturer_loads.get(lecturer, 0) + 1
         
         if not lecturer_loads:
@@ -742,7 +794,10 @@ class GeneticAlgorithmScheduler:
         
         # Track occupied slots
         student_schedule_slots = set()
-        for _, _, _, day, slot in chromosome.schedule_items:
+        for item in chromosome.schedule_items:
+            # Handle both 5-tuple and 6-tuple formats
+            day = item[3]   # day is always at index 3
+            slot = item[4]  # slot is always at index 4
             student_schedule_slots.add(f"{day}_{slot}")
 
         total_slots = len(self.time_slots) * len(self.days)
@@ -801,44 +856,74 @@ class GeneticAlgorithmScheduler:
         # Choose mutation type
         mutation_type = random.choice(['swap', 'modify', 'remove_add'])
         
+        def is_hard_locked(code):
+            c = self._get_course(code)
+            if not c: return False
+            # Check for special_rooms.csv OR smart locking fields
+            if self._get_special_constraint(code): return True
+            if c.get('fixed_day') or c.get('fixed_time') or c.get('fixed_room'): return True
+            return False
+
         if mutation_type == 'swap' and len(mutated.schedule_items) >= 2:
             # Swap two items (respecting special constraints)
             i, j = random.sample(range(len(mutated.schedule_items)), 2)
-            # Don't swap if either has a special room constraint
-            code_i = mutated.schedule_items[i][0]
-            code_j = mutated.schedule_items[j][0]
-            if not self._get_special_constraint(code_i) and not self._get_special_constraint(code_j):
+            # Don't swap if either has a special room constraint or smart lock
+            if not is_hard_locked(mutated.schedule_items[i][0]) and not is_hard_locked(mutated.schedule_items[j][0]):
                 mutated.schedule_items[i], mutated.schedule_items[j] = \
                     mutated.schedule_items[j], mutated.schedule_items[i]
         
         elif mutation_type == 'modify' and mutated.schedule_items:
             # Modify a single assignment (respect special constraints)
             idx = random.randint(0, len(mutated.schedule_items) - 1)
-            course_code, lecturer, room, day, slot = mutated.schedule_items[idx]
+            item = mutated.schedule_items[idx]
+            # Handle both 5-tuple and 6-tuple formats
+            course_code, lecturer = item[0], item[1]
+            section_id = item[5] if len(item) >= 6 else None
             
-            # Don't modify if it has special room constraint
-            special = self._get_special_constraint(course_code)
-            if not special:
+            # Don't modify if it has special room constraint or smart lock
+            if not is_hard_locked(course_code):
                 # Change room or slot
                 available_rooms = [
-                    r['name'] for r in self.rooms
+                    r for r in self.rooms
                     if self._normalize_room_name(r['name']) not in self.reserved_rooms_normalized
                 ]
-                new_room = random.choice(available_rooms) if available_rooms else random.choice([r['name'] for r in self.rooms])
+                
+                # Apply departmental filtering in strict mode
+                if self.strict_departmental:
+                    course_info = self._get_course(course_code)
+                    course_grp = course_info.get('departmental_group', course_info.get('department', "General"))
+                    cg = str(course_grp).lower().replace("/", " ").replace("-", " ")
+                    
+                    filtered = []
+                    for r in available_rooms:
+                        rd = str(r.get('department', 'General')).lower().replace("/", " ").replace("-", " ")
+                        if (rd == cg) or (rd in cg) or (cg in rd):
+                            filtered.append(r)
+                    
+                    if filtered:
+                        available_rooms = filtered
+                
+                new_room_obj = random.choice(available_rooms) if available_rooms else random.choice(self.rooms)
+                new_room = new_room_obj['name']
                 new_slot = random.choice(self.time_slots)
                 new_day = random.choice(self.days)
                 course_info = self._get_course(course_code)
                 fixed_lecturer = self._get_course_lecturer(course_info) or lecturer
                 
-                mutated.schedule_items[idx] = (course_code, fixed_lecturer, new_room, new_day, new_slot)
+                # Preserve section_id if present
+                if section_id:
+                    mutated.schedule_items[idx] = (course_code, fixed_lecturer, new_room, new_day, new_slot, section_id)
+                else:
+                    mutated.schedule_items[idx] = (course_code, fixed_lecturer, new_room, new_day, new_slot)
         
         elif mutation_type == 'remove_add' and mutated.schedule_items:
             # Remove one and add another
             idx = random.randint(0, len(mutated.schedule_items) - 1)
             removed_code = mutated.schedule_items[idx][0]
             
-            # Don't remove if it has a special room constraint
-            if not self._get_special_constraint(removed_code):
+            # Don't remove if it has a special room constraint or smart lock
+            if not is_hard_locked(removed_code):
+
                 mutated.schedule_items.pop(idx)
                 
                 # Try to add a new valid assignment
@@ -848,10 +933,26 @@ class GeneticAlgorithmScheduler:
                     course = random.choice(available_courses)
                     lecturer = course.get('lecturer') if self.enforce_lecturer_assignment else random.choice(self.lecturers)
                     available_rooms = [
-                        r['name'] for r in self.rooms
+                        r for r in self.rooms
                         if self._normalize_room_name(r['name']) not in self.reserved_rooms_normalized
                     ]
-                    room = random.choice(available_rooms) if available_rooms else random.choice([r['name'] for r in self.rooms])
+                    
+                    # Apply departmental filtering in strict mode
+                    if self.strict_departmental:
+                        course_grp = course.get('departmental_group', course.get('department', "General"))
+                        cg = str(course_grp).lower().replace("/", " ").replace("-", " ")
+                        
+                        filtered = []
+                        for r in available_rooms:
+                            rd = str(r.get('department', 'General')).lower().replace("/", " ").replace("-", " ")
+                            if (rd == cg) or (rd in cg) or (cg in rd):
+                                filtered.append(r)
+                        
+                        if filtered:
+                            available_rooms = filtered
+                    
+                    room_obj = random.choice(available_rooms) if available_rooms else random.choice(self.rooms)
+                    room = room_obj['name']
                     day = random.choice(self.days)
                     slot = random.choice(self.time_slots)
                     mutated.schedule_items.append((course['code'], lecturer, room, day, slot))
@@ -871,7 +972,11 @@ class GeneticAlgorithmScheduler:
         lecturer_occupancy = {} # (lecturer, day, slot) -> count
         level_sem_occupancy = {} # (level, sem, day, slot) -> count
         
-        for code, l, r, d, s in chromosome.schedule_items:
+        for item in chromosome.schedule_items:
+            # Handle both 5-tuple and 6-tuple formats
+            code, l, r, d, s = item[0], item[1], item[2], item[3], item[4]
+            section_id = item[5] if len(item) >= 6 else None
+            
             norm_r = self._normalize_room_name(r)
             rk = (norm_r, d, s)
             lk = (l, d, s)
@@ -884,7 +989,11 @@ class GeneticAlgorithmScheduler:
 
         # 2. Fix conflicts
         new_items = []
-        for code, l, r, d, s in chromosome.schedule_items:
+        for item in chromosome.schedule_items:
+            # Handle both 5-tuple and 6-tuple formats
+            code, l, r, d, s = item[0], item[1], item[2], item[3], item[4]
+            section_id = item[5] if len(item) >= 6 else None
+            
             course = self._get_course(code)
             norm_r = self._normalize_room_name(r)
             rk = (norm_r, d, s)
@@ -895,7 +1004,10 @@ class GeneticAlgorithmScheduler:
             special = self._get_special_constraint(code)
             if special:
                 # Keep special room constraints locked
-                new_items.append((code, l, r, d, s))
+                if section_id:
+                    new_items.append((code, l, r, d, s, section_id))
+                else:
+                    new_items.append((code, l, r, d, s))
                 continue
             
             # If conflict exists, try to find a free slot
@@ -903,6 +1015,15 @@ class GeneticAlgorithmScheduler:
                 repaired = False
                 for _ in range(50): # 50 attempts to find a free spot
                     new_room_obj = random.choice(self.rooms)
+                    
+                    # Apply departmental filtering in strict mode
+                    if self.strict_departmental:
+                        course_grp = course.get('departmental_group', course.get('department', "General"))
+                        cg = str(course_grp).lower().replace("/", " ").replace("-", " ")
+                        rd = str(new_room_obj.get('department', 'General')).lower().replace("/", " ").replace("-", " ")
+                        if not ((rd == cg) or (rd in cg) or (cg in rd)):
+                            continue
+
                     new_r = new_room_obj['name']
                     new_d = random.choice(self.days)
                     new_s = random.choice(self.time_slots)
@@ -927,14 +1048,23 @@ class GeneticAlgorithmScheduler:
                         lecturer_occupancy[new_lk] = 1
                         level_sem_occupancy[new_sk] = 1
                         
-                        new_items.append((code, l, new_r, new_d, new_s))
+                        if section_id:
+                            new_items.append((code, l, new_r, new_d, new_s, section_id))
+                        else:
+                            new_items.append((code, l, new_r, new_d, new_s))
                         repaired = True
                         break
                 
                 if not repaired:
-                    new_items.append((code, l, r, d, s)) # Keep original if can't repair
+                    if section_id:
+                        new_items.append((code, l, r, d, s, section_id)) # Keep original if can't repair
+                    else:
+                        new_items.append((code, l, r, d, s)) # Keep original if can't repair
             else:
-                new_items.append((code, l, r, d, s))
+                if section_id:
+                    new_items.append((code, l, r, d, s, section_id))
+                else:
+                    new_items.append((code, l, r, d, s))
                 
         return Chromosome(new_items)
 
@@ -1058,14 +1188,31 @@ class GeneticAlgorithmScheduler:
             return []
         
         schedule = []
-        for course_code, lecturer, room, day, slot in self.generation_best_chromosome.schedule_items:
-            schedule.append({
+        section_id_count = 0
+        for item in self.generation_best_chromosome.schedule_items:
+            # Handle both old format (5-tuple) and new format (6-tuple with section_id)
+            if len(item) >= 6:
+                course_code, lecturer, room, day, slot, section_id = item[0], item[1], item[2], item[3], item[4], item[5]
+            else:
+                course_code, lecturer, room, day, slot = item[0], item[1], item[2], item[3], item[4]
+                section_id = None
+                
+            schedule_dict = {
                 'course_code': course_code,
                 'lecturer': lecturer,
                 'room': room,
                 'day': day,
                 'time_slot': slot
-            })
+            }
+            if section_id:
+                schedule_dict['section_id'] = section_id
+                section_id_count += 1
+            schedule.append(schedule_dict)
+        
+        if self.verbose and section_id_count > 0:
+            print(f"[GA] Schedule includes {section_id_count} items with section_id")
+        elif self.verbose:
+            print(f"[GA] Warning: No section_id found in schedule items")
         
         return schedule
     

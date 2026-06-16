@@ -4,7 +4,10 @@
 <?php endif; ?>
 
 <!-- Core Scripts -->
-<script src="assets/script.js"></script>
+<?php
+$footer_asset_prefix = isset($asset_prefix) ? $asset_prefix : 'assets';
+?>
+<script src="<?php echo htmlspecialchars($footer_asset_prefix . '/script.js'); ?>"></script>
 
 <!-- Chart.js for Dashboard -->
 <?php if (basename($_SERVER['PHP_SELF']) == 'dashboard.php'): ?>

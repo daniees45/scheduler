@@ -1,9 +1,7 @@
-----AI Solver Session Started at 2026-03-14 07:36:13.098988----
-07:36:13 [INFO] Starting CSP solver...
+----AI Solver Session Started at 2026-06-03 11:50:35.330999----
+11:50:35 [INFO] Starting CSP solver...
 
-07:36:13 [INFO] Flexibility Management Active: 41 sections, 17 lecturers, avg flexibility score: 10.43
+11:50:35 [INFO] Flexibility Management Active: 4 sections, 1 lecturers, avg flexibility score: 5.00
 
-07:36:13 [INFO] [MULTIPROCESSING] Spawning 8 processes for 70 top-level branches of var 'CSCD 119_20'...
-
-07:36:29 [INFO] CSP solver found a solution (via parallel searching).
+11:50:35 [INFO] CSP solver found a solution.
 

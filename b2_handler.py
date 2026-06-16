@@ -52,7 +52,40 @@ class B2Handler:
             print(f"[INFO] B2 Handler initialized for bucket: {self.bucket_name}")
         except Exception as e:
             print(f"[ERROR] Failed to initialize B2 client: {e}")
-            self.s3 = None
+            self.s3 = "fallback"
+
+    def _fallback_to_local_download(self, key, download_path):
+        try:
+            if os.path.abspath(key) == os.path.abspath(download_path):
+                return True
+            if not os.path.exists(key):
+                print(f"[WARNING] Local fallback source file not found: {key}")
+                return False
+            dirname = os.path.dirname(download_path)
+            if dirname:
+                os.makedirs(dirname, exist_ok=True)
+            import shutil
+            shutil.copy2(key, download_path)
+            print(f"[LOCAL FALLBACK] Downloaded {key} to {download_path}")
+            return True
+        except Exception as e:
+            print(f"[ERROR] Local fallback download failed for {key}: {e}")
+            return False
+
+    def _fallback_to_local_upload(self, local_path, key):
+        try:
+            if os.path.abspath(local_path) == os.path.abspath(key):
+                return True
+            dirname = os.path.dirname(key)
+            if dirname:
+                os.makedirs(dirname, exist_ok=True)
+            import shutil
+            shutil.copy2(local_path, key)
+            print(f"[LOCAL FALLBACK] Uploaded {local_path} to {key}")
+            return True
+        except Exception as e:
+            print(f"[ERROR] Local fallback upload failed for {key}: {e}")
+            return False
 
     def download_file(self, key, download_path, force=False):
         # Use cache handler if enabled - passes through force parameter
@@ -66,9 +99,8 @@ class B2Handler:
                 print(f"[ERROR] B2CacheHandler error for {key}: {type(e).__name__}: {e}")
                 # Fall through to direct download
         
-        if not self.s3:
-            print(f"[ERROR] B2 client not initialized, cannot download {key}")
-            return False
+        if not self.s3 or self.s3 == "fallback":
+            return self._fallback_to_local_download(key, download_path)
         try:
             # Create parent dirs if needed
             dirname = os.path.dirname(download_path)
@@ -82,18 +114,24 @@ class B2Handler:
                 print(f"[WARNING] File not found in B2: {key}")
             else:
                 print(f"[ERROR] B2 Download error for {key}: {e}")
-            return False
+            print(f"[INFO] Falling back to local file for key: {key}")
+            return self._fallback_to_local_download(key, download_path)
+        except Exception as e:
+            print(f"[ERROR] B2 Download exception for {key}: {e}")
+            print(f"[INFO] Falling back to local file for key: {key}")
+            return self._fallback_to_local_download(key, download_path)
 
     def upload_file(self, local_path, key):
-        if not self.s3:
-            return False
+        if not self.s3 or self.s3 == "fallback":
+            return self._fallback_to_local_upload(local_path, key)
         try:
             self.s3.upload_file(local_path, self.bucket_name, key)
             print(f"[INFO] Uploaded {local_path} to {key}")
             return True
         except Exception as e:
             print(f"[ERROR] B2 Upload error for {key}: {e}")
-            return False
+            print(f"[INFO] Falling back to local file for upload: {key}")
+            return self._fallback_to_local_upload(local_path, key)
 
     def download_folder(self, prefix, local_dir, force=False):
         """Downloads all files with a prefix to a local directory, preserving structure."""
@@ -112,9 +150,8 @@ class B2Handler:
                 print(f"[ERROR] B2CacheHandler folder download failed for '{prefix}': {type(e).__name__}: {e}")
                 # Fall through to direct download
         
-        if not self.s3:
-            print(f"[ERROR] B2 client not initialized, cannot download folder {prefix}")
-            return False
+        if not self.s3 or self.s3 == "fallback":
+            return self._fallback_to_local_folder(prefix, local_dir, force)
         try:
             paginator = self.s3.get_paginator('list_objects_v2')
             pages = paginator.paginate(Bucket=self.bucket_name, Prefix=prefix)
@@ -124,14 +161,6 @@ class B2Handler:
                 if 'Contents' in page:
                     for obj in page['Contents']:
                         key = obj['Key']
-                        # Calculate local path
-                        # If prefix is 'csv/', we want 'csv/general/rooms.csv' -> 'local_dir/csv/general/rooms.csv'
-                        # Or if we want to flatten? No, preserve structure relative to bucket root is safest usually,
-                        # but standard usage here seems to simply map bucket/key to local/key
-                        
-                        # However, user wants to remove local storage.
-                        # We are downloading to a TEMP directory likely.
-                        
                         relative_path = key
                         local_file_path = os.path.join(local_dir, relative_path)
                         
@@ -140,6 +169,31 @@ class B2Handler:
             print(f"[INFO] Downloaded {count} files from B2 prefix '{prefix}'")
             return True
         except Exception as e:
-            print(f"[ERROR] B2 Download Folder error: {e}")
+            print(f"[ERROR] B2 Download Folder error: {e}. Falling back to local.")
+            return self._fallback_to_local_folder(prefix, local_dir, force)
+
+    def _fallback_to_local_folder(self, prefix, local_dir, force=False):
+        count = 0
+        try:
+            if os.path.exists(prefix):
+                if os.path.isdir(prefix):
+                    for root, dirs, files in os.walk(prefix):
+                        for file in files:
+                            if file.startswith('.'):
+                                continue
+                            file_path = os.path.join(root, file)
+                            key = file_path
+                            local_file_path = os.path.join(local_dir, key)
+                            if self.download_file(key, local_file_path, force):
+                                count += 1
+                elif os.path.isfile(prefix):
+                    key = prefix
+                    local_file_path = os.path.join(local_dir, key)
+                    if self.download_file(key, local_file_path, force):
+                        count = 1
+            print(f"[LOCAL FALLBACK] Synchronized {count} files for prefix '{prefix}'")
+            return True
+        except Exception as e:
+            print(f"[ERROR] Local fallback folder download failed: {e}")
             return False
             

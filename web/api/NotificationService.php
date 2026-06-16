@@ -4,6 +4,11 @@
  * Supports Email, SMS, and In-App notifications with user preferences
  */
 
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\Exception;
+
+require_once __DIR__ . '/../../vendor/autoload.php';
+
 class NotificationService {
     
     private $conn;
@@ -31,16 +36,20 @@ class NotificationService {
      * Get default configuration
      */
     private function getDefaultConfig() {
+        $gmailEmail = getenv('GMAIL_APP_EMAIL') ?: '';
+        $gmailAppPassword = getenv('GMAIL_APP_PASSWORD') ?: '';
+        $useGmail = $gmailEmail !== '' && $gmailAppPassword !== '';
+
         return [
-            'smtp_host' => getenv('SMTP_HOST') ?: 'smtp.mailtrap.io',
-            'smtp_port' => getenv('SMTP_PORT') ?: 465,
-            'smtp_user' => getenv('SMTP_USER') ?: '',
-            'smtp_pass' => getenv('SMTP_PASS') ?: '',
-            'smtp_from' => getenv('SMTP_FROM') ?: 'noreply@vvuscheduler.local',
+            'smtp_host' => $useGmail ? 'smtp.gmail.com' : (getenv('SMTP_HOST') ?: 'smtp.mailtrap.io'),
+            'smtp_port' => $useGmail ? 587 : (getenv('SMTP_PORT') ?: 465),
+            'smtp_user' => $useGmail ? $gmailEmail : (getenv('SMTP_USER') ?: ''),
+            'smtp_pass' => $useGmail ? $gmailAppPassword : (getenv('SMTP_PASS') ?: ''),
+            'smtp_from' => getenv('SMTP_FROM') ?: ($useGmail ? $gmailEmail : 'noreply@vvuscheduler.local'),
             'sms_api_key' => getenv('SMS_API_KEY') ?: '',
             'sms_provider' => getenv('SMS_PROVIDER') ?: 'twilio',
-            'enable_email' => (bool)getenv('ENABLE_EMAIL_NOTIFICATIONS', true),
-            'enable_sms' => (bool)getenv('ENABLE_SMS_NOTIFICATIONS', false),
+            'enable_email' => getenv('ENABLE_EMAIL_NOTIFICATIONS') !== false ? filter_var(getenv('ENABLE_EMAIL_NOTIFICATIONS'), FILTER_VALIDATE_BOOLEAN) : true,
+            'enable_sms' => getenv('ENABLE_SMS_NOTIFICATIONS') !== false ? filter_var(getenv('ENABLE_SMS_NOTIFICATIONS'), FILTER_VALIDATE_BOOLEAN) : false,
             'enable_in_app' => true
         ];
     }
@@ -152,7 +161,7 @@ class NotificationService {
     }
     
     /**
-     * Send email notification
+     * Send email notification using PHPMailer
      */
     private function sendEmailNotification($user_id, $subject, $message, $notification_id) {
         try {
@@ -165,13 +174,8 @@ class NotificationService {
             $user = $result->fetch_assoc();
             
             if (!$user || !filter_var($user['email'], FILTER_VALIDATE_EMAIL)) {
-                throw new Exception('Invalid email address');
+                throw new \Exception('Invalid email address');
             }
-            
-            // Build email
-            $headers = "MIME-Version: 1.0\r\n";
-            $headers .= "Content-type: text/html; charset=UTF-8\r\n";
-            $headers .= "From: " . $this->config['smtp_from'] . "\r\n";
             
             $html_message = "
             <html><body>
@@ -192,18 +196,47 @@ class NotificationService {
                 </div>
             </body></html>";
             
-            // Send email using PHP mail() or configured SMTP
-            $success = mail($user['email'], $subject, $html_message, $headers);
+            $mail = new PHPMailer(true);
             
-            // Log result
-            $this->logNotificationAttempt($notification_id, self::CHANNEL_EMAIL, $user['email'], 
-                $success ? 'sent' : 'failed', $success ? null : 'mail() function failed');
+            try {
+                // Server settings
+                $mail->isSMTP();
+                $mail->Host       = $this->config['smtp_host'];
+                $mail->SMTPAuth   = true;
+                $mail->Username   = $this->config['smtp_user'];
+                $mail->Password   = $this->config['smtp_pass'];
+                // Use STARTTLS if port is 587, else SSL for 465, or none for 25.
+                if ($this->config['smtp_port'] == 587) {
+                    $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+                } elseif ($this->config['smtp_port'] == 465) {
+                    $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
+                }
+                $mail->Port       = $this->config['smtp_port'];
+
+                // Recipients
+                $mail->setFrom($this->config['smtp_from'], 'VVU Scheduler');
+                $mail->addAddress($user['email']);
+
+                // Content
+                $mail->isHTML(true);
+                $mail->Subject = $subject;
+                $mail->Body    = $html_message;
+                $mail->AltBody = strip_tags(str_replace(['<br>', '<br/>', '<br />'], "\n", $html_message));
+
+                $success = $mail->send();
+                
+                $this->logNotificationAttempt($notification_id, self::CHANNEL_EMAIL, $user['email'], 'sent');
+                return ['success' => true];
+            } catch (Exception $e) {
+                // PHPMailer Exception
+                throw new \Exception("Mailer Error: {$mail->ErrorInfo}");
+            }
             
-            return ['success' => $success];
-            
-        } catch (Exception $e) {
-            error_log("Email notification error: " . $e->getMessage());
-            return ['success' => false, 'error' => $e->getMessage()];
+        } catch (\Exception $e) {
+            $error_message = $e->getMessage();
+            error_log("Email notification error: " . $error_message);
+            $this->logNotificationAttempt($notification_id, self::CHANNEL_EMAIL, $user['email'] ?? 'unknown', 'failed', $error_message);
+            return ['success' => false, 'error' => $error_message];
         }
     }
     

@@ -1,6 +1,7 @@
 course_code,course_title,lecturer_name,Semester,day,start_time,end_time,room_name,source_type,course_level,credit_hours
-"AFST 205","Introduction to African Music [Sec A]",,1,,,,,General,100,3
+"AFST 205","Introduction to African Music [Sec A]",,2,,,,,General,200,3
 "AFST 243","Chieftaincy and Development [Sec B]",,1,,,,,General,100,1
 "FREN 121","French for General Communication I [Sec A]",,1,,,,,General,100,2
 "ENGL 112","Language and Writing Skills II [Sec B] (FOS & SOB)",,1,,,,,General,100,2
 "BBIS 260","Web and Social Management Tools [Sec A]",,1,,,,,CS/IT/BBIS,200,3
+"INFT 364","Research Methods [Sec A]",,1,,,,,CS/IT/BBIS,100,3

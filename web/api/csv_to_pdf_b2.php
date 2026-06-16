@@ -96,7 +96,6 @@ if ($csv_key === '') {
 }
 
 $temp_csv = null;
-$temp_pdf = null;
 
 try {
     $b2 = new B2Storage();
@@ -143,41 +142,65 @@ try {
         $h4 = (string)($input['h4'] ?? 'TEACHING TIMETABLE');
     }
 
-    // Generate PDF
-    $temp_pdf = create_temp_file_path('pdf', '.pdf');
-
-    $py_script = realpath(__DIR__ . '/../../csv_to_pdf.py');
-    if ($py_script === false || !is_file($py_script)) {
-        throw new RuntimeException('PDF generator script not found');
+    // Generate PDF via Render AI backend (InfinityFree cannot run local Python)
+    $csv_content = file_get_contents($temp_csv);
+    if ($csv_content === false || trim($csv_content) === '') {
+        throw new RuntimeException('Failed to read CSV temp file for Render conversion');
     }
 
-    $python_cmd = '/usr/local/bin/python3';
-    if (!is_file($python_cmd)) {
-        $python_cmd = 'python3';
+    $endpoint = scheduler_url_join(scheduler_ai_base_url(), 'tools/csv-to-pdf');
+    $payload = json_encode([
+        'csv_content' => $csv_content,
+        'h1' => $h1,
+        'h2' => $h2,
+        'h3' => $h3,
+        'h4' => $h4,
+    ], JSON_UNESCAPED_SLASHES);
+
+    if ($payload === false) {
+        throw new RuntimeException('Failed to encode Render conversion payload');
     }
 
-    $cmd = $python_cmd . ' ' . escapeshellarg($py_script)
-        . ' --input ' . escapeshellarg($temp_csv)
-        . ' --output ' . escapeshellarg($temp_pdf)
-        . ' --h1 ' . escapeshellarg($h1)
-        . ' --h2 ' . escapeshellarg($h2)
-        . ' --h3 ' . escapeshellarg($h3)
-        . ' --h4 ' . escapeshellarg($h4)
-        . ' 2>&1';
+    $ch = curl_init($endpoint);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 15);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 180);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        'Content-Type: application/json',
+        'Accept: application/pdf, application/json',
+    ]);
 
-    error_log('CSV to PDF command: ' . $cmd);
-    $output = shell_exec($cmd);
-    error_log('CSV to PDF output: ' . (string)$output);
+    $response_body = curl_exec($ch);
+    $curl_error = curl_error($ch);
+    $http_code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $content_type = (string)curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+    curl_close($ch);
 
-    if (!is_file($temp_pdf) || filesize($temp_pdf) === 0) {
-        throw new RuntimeException('PDF generation failed: ' . trim((string)$output));
+    if ($response_body === false) {
+        throw new RuntimeException('Render PDF request failed: ' . $curl_error);
     }
 
-    $pdf_content = file_get_contents($temp_pdf);
-    if ($pdf_content === false) {
-        throw new RuntimeException('Failed to read generated PDF');
+    if ($http_code >= 400) {
+        $response_json = json_decode($response_body, true);
+        $remote_message = is_array($response_json)
+            ? (string)($response_json['message'] ?? $response_json['error'] ?? 'Render service error')
+            : trim((string)$response_body);
+        throw new RuntimeException('Render PDF generation failed: ' . $remote_message);
     }
-    $pdf_size = filesize($temp_pdf);
+
+    $pdf_content = (string)$response_body;
+    if ($pdf_content === '' || strncmp($pdf_content, '%PDF', 4) !== 0) {
+        $response_json = json_decode($pdf_content, true);
+        if (is_array($response_json)) {
+            $remote_message = (string)($response_json['message'] ?? $response_json['error'] ?? 'Invalid PDF response');
+            throw new RuntimeException('Render PDF generation failed: ' . $remote_message);
+        }
+        throw new RuntimeException('Render returned non-PDF response (Content-Type: ' . $content_type . ')');
+    }
+
+    $pdf_size = strlen($pdf_content);
 
     // Optional upload to B2
     $b2_pdf_key = null;
@@ -190,7 +213,7 @@ try {
         $b2_pdf_key = 'pdf/' . $pdf_filename;
         $upload_result = $b2->uploadContent($b2_pdf_key, $pdf_content);
         if (empty($upload_result['success'])) {
-            error_log('B2 upload failed: ' . ($upload_result['message'] ?? 'Unknown error'));
+            error_log('Cloud upload failed: ' . ($upload_result['message'] ?? 'Unknown error'));
         }
     }
 
@@ -211,7 +234,6 @@ try {
         echo $pdf_content;
 
         @unlink($temp_csv);
-        @unlink($temp_pdf);
         exit;
     }
 
@@ -229,7 +251,6 @@ try {
     ]);
 
     @unlink($temp_csv);
-    @unlink($temp_pdf);
     exit;
 
 } catch (Throwable $e) {
@@ -239,10 +260,6 @@ try {
     if ($temp_csv && is_file($temp_csv)) {
         @unlink($temp_csv);
     }
-    if ($temp_pdf && is_file($temp_pdf)) {
-        @unlink($temp_pdf);
-    }
-
     json_error($e->getMessage(), 500, [
         'file' => basename($e->getFile()),
         'line' => $e->getLine(),

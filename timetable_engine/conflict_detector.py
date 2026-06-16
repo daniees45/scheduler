@@ -63,10 +63,9 @@ class ConflictDetector:
             ConflictType.BUILDING_DISTANCE: ConstraintSeverity.LOW,
         }
     
-    def detect_all_conflicts(self, schedule: List[ScheduleItem]) -> List[ConflictRecord]:
-        """Run all conflict detection checks on a schedule"""
+    def detect_all_conflicts(self, schedule: List[ScheduleItem], semester: str = None) -> List[ConflictRecord]:
+        """Run all conflict detection checks on a schedule, including student feedback."""
         self.conflicts = []
-        
         self.detect_room_conflicts(schedule)
         self.detect_lecturer_conflicts(schedule)
         self.detect_level_conflicts(schedule)
@@ -75,10 +74,39 @@ class ConflictDetector:
         self.detect_credit_hour_violations(schedule)
         self.detect_department_mismatches(schedule)
         self.detect_group_separations(schedule)
-        
+        self.detect_student_feedback_conflicts(schedule, semester)
         return self.conflicts
+
+    def detect_student_feedback_conflicts(self, schedule: List[ScheduleItem], semester: str = None) -> None:
+        """Detect conflicts reported by students (from csv/general/student_clashes.csv)."""
+        try:
+            import sys
+            import os
+            sys.path.append('.')  # Ensure root import
+            from student_feedback import get_student_clash_constraints
+            feedback_clashes = get_student_clash_constraints(semester) if semester else []
+            # Build lookup: (course, day, slot) for all scheduled items
+            course_times = {}
+            for item in schedule:
+                course_times.setdefault(item.course_code, []).append((item.day, item.time_slot, item))
+            for _, c1, c2 in feedback_clashes:
+                for t1 in course_times.get(c1, []):
+                    for t2 in course_times.get(c2, []):
+                        if t1[0] == t2[0] and t1[1] == t2[1]:
+                            conflict = ConflictRecord(
+                                conflict_type=ConflictType.STUDENT_LEVEL_CONFLICT,
+                                severity=ConstraintSeverity.CRITICAL,
+                                involved_schedules=[t1[2], t2[2]],
+                                involved_courses=[c1, c2],
+                                description=f"Student-reported clash: {c1} and {c2} overlap on {t1[0]} slot {t1[1]}",
+                                resolution_suggestions=[f"Move {c1} or {c2} to a different time slot"]
+                            )
+                            self.conflicts.append(conflict)
+        except Exception:
+            pass
+
     
-    def detect_room_conflicts(self, schedule: List[ScheduleItem]) -> None:
+def detect_room_conflicts(self, schedule: List[ScheduleItem]) -> None:
         """Detect same room double-bookings"""
         room_slots = {}
         
@@ -106,7 +134,7 @@ class ConflictDetector:
                     self._add_suggestions(conflict)
                     self.conflicts.append(conflict)
     
-    def detect_lecturer_conflicts(self, schedule: List[ScheduleItem]) -> None:
+def detect_lecturer_conflicts(self, schedule: List[ScheduleItem]) -> None:
         """Detect lecturer double-bookings"""
         lecturer_slots = {}
         
@@ -134,7 +162,7 @@ class ConflictDetector:
                     self._add_suggestions(conflict)
                     self.conflicts.append(conflict)
     
-    def detect_level_conflicts(self, schedule: List[ScheduleItem]) -> None:
+def detect_level_conflicts(self, schedule: List[ScheduleItem]) -> None:
         """Detect when same level/semester courses overlap"""
         level_slots = {}
         
@@ -163,7 +191,7 @@ class ConflictDetector:
                 self._add_suggestions(conflict)
                 self.conflicts.append(conflict)
     
-    def detect_lecturer_availability_conflicts(self, schedule: List[ScheduleItem]) -> None:
+def detect_lecturer_availability_conflicts(self, schedule: List[ScheduleItem]) -> None:
         """Detect lecturers scheduled when unavailable"""
         for item in schedule:
             lecturer = self.lecturers.get(item.lecturer)
@@ -181,7 +209,7 @@ class ConflictDetector:
                 self._add_suggestions(conflict)
                 self.conflicts.append(conflict)
     
-    def detect_friday_restrictions(self, schedule: List[ScheduleItem]) -> None:
+def detect_friday_restrictions(self, schedule: List[ScheduleItem]) -> None:
         """Detect courses on Friday afternoon"""
         friday_afternoon_slots = ["2:00pm - 4:30pm", "5:00pm - 6:00pm"]
         
@@ -200,7 +228,7 @@ class ConflictDetector:
                 self._add_suggestions(conflict)
                 self.conflicts.append(conflict)
     
-    def detect_credit_hour_violations(self, schedule: List[ScheduleItem]) -> None:
+def detect_credit_hour_violations(self, schedule: List[ScheduleItem]) -> None:
         """Detect high-credit courses in evening slot"""
         for item in schedule:
             course = next((c for c in self.courses if c.code == item.course_code), None)
@@ -218,7 +246,7 @@ class ConflictDetector:
                 self._add_suggestions(conflict)
                 self.conflicts.append(conflict)
     
-    def detect_department_mismatches(self, schedule: List[ScheduleItem], rooms_dept_map: Dict[str, str] = None) -> None:
+def detect_department_mismatches(self, schedule: List[ScheduleItem], rooms_dept_map: Dict[str, str] = None) -> None:
         """Detect department course/room mismatches"""
         if not rooms_dept_map:
             return
@@ -255,7 +283,7 @@ class ConflictDetector:
                     self._add_suggestions(conflict)
                     self.conflicts.append(conflict)
     
-    def detect_group_separations(self, schedule: List[ScheduleItem]) -> None:
+def detect_group_separations(self, schedule: List[ScheduleItem]) -> None:
         """Detect grouped courses scheduled at different times"""
         group_slots = {}
         
@@ -288,7 +316,7 @@ class ConflictDetector:
                     self._add_suggestions(conflict)
                     self.conflicts.append(conflict)
 
-    def _is_intentional_pairing(self, items: List[ScheduleItem]) -> bool:
+def _is_intentional_pairing(self, items: List[ScheduleItem]) -> bool:
         """Check if multiple assignments in the same slot are an intentional pairing"""
         if len(items) <= 1:
             return True
@@ -327,13 +355,13 @@ class ConflictDetector:
                     
         return True
 
-    def _extract_numeric_code(self, code: str) -> Optional[str]:
+def _extract_numeric_code(self, code: str) -> Optional[str]:
         """Extract the numeric part of a course code (e.g., 'COSC 370' -> '370')"""
         import re
         match = re.search(r'\d+', code)
         return match.group(0) if match else None
 
-    def _calculate_title_similarity(self, title1: str, title2: str) -> float:
+def _calculate_title_similarity(self, title1: str, title2: str) -> float:
         """Calculate weighted title similarity (Logic mirrored from CSPSolver)"""
         import re
         if not title1 or not title2: return 0.0
@@ -353,7 +381,7 @@ class ConflictDetector:
         union = len(s1 | s2)
         return intersection / union if union > 0 else 0.0
     
-    def _add_suggestions(self, conflict: ConflictRecord) -> None:
+def _add_suggestions(self, conflict: ConflictRecord) -> None:
         """Add resolution suggestions based on conflict type"""
         suggestions = {
             ConflictType.ROOM_DOUBLE_BOOKING: [
@@ -381,19 +409,19 @@ class ConflictDetector:
         
         conflict.resolution_suggestions = suggestions.get(conflict.conflict_type, ["Review conflict manually"])
     
-    def get_critical_conflicts(self) -> List[ConflictRecord]:
+def get_critical_conflicts(self) -> List[ConflictRecord]:
         """Return only critical (hard constraint) conflicts"""
         return [c for c in self.conflicts if c.severity == ConstraintSeverity.CRITICAL]
     
-    def get_conflicts_by_severity(self, severity: ConstraintSeverity) -> List[ConflictRecord]:
+def get_conflicts_by_severity(self, severity: ConstraintSeverity) -> List[ConflictRecord]:
         """Filter conflicts by severity level"""
         return [c for c in self.conflicts if c.severity == severity]
     
-    def get_conflicts_by_type(self, conflict_type: ConflictType) -> List[ConflictRecord]:
+def get_conflicts_by_type(self, conflict_type: ConflictType) -> List[ConflictRecord]:
         """Filter conflicts by type"""
         return [c for c in self.conflicts if c.conflict_type == conflict_type]
     
-    def calculate_overall_quality_score(self) -> float:
+def calculate_overall_quality_score(self) -> float:
         """Calculate schedule quality 0-100 (100 = perfect)"""
         if not self.conflicts:
             return 100.0
@@ -404,7 +432,7 @@ class ConflictDetector:
         quality = max(0, 100 - (total_impact / max_possible_impact * 100))
         return round(quality, 2)
     
-    def generate_conflict_report(self) -> Dict:
+def generate_conflict_report(self) -> Dict:
         """Generate comprehensive conflict report"""
         return {
             "total_conflicts": len(self.conflicts),

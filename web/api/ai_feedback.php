@@ -6,6 +6,7 @@
 
 require_once __DIR__ . '/../../config/bootstrap.php';
 
+ini_set('display_errors', 0);
 session_start();
 header('Content-Type: application/json');
 
@@ -65,9 +66,9 @@ $needsHeader = !file_exists($feedbackCsv) || filesize($feedbackCsv) === 0;
 $fp = fopen($feedbackCsv, 'a');
 if ($fp) {
     if ($needsHeader) {
-        fputcsv($fp, $header);
+        fputcsv($fp, $header, ',', '"', '\\');
     }
-    fputcsv($fp, $row);
+    fputcsv($fp, $row, ',', '"', '\\');
     fclose($fp);
 }
 

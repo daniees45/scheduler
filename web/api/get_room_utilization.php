@@ -11,7 +11,6 @@
 
 header('Content-Type: application/json');
 require_once 'db.php';
-require_once __DIR__ . '/../../lib/B2Storage.php';
 require_once __DIR__ . '/../includes/unified_schedule_service.php';
 
 function room_utilization_schedule_rows_from_generated(mysqli $conn, int $schedule_id = 0, string $saved_at = ''): array {
@@ -67,32 +66,6 @@ function room_utilization_schedule_rows_from_generated(mysqli $conn, int $schedu
     ];
 }
 
-function room_utilization_rows_from_csv_content(string $schedule_csv_content): array {
-    $rows = [];
-    $lines = preg_split('/\r\n|\r|\n/', trim($schedule_csv_content));
-    if (!$lines || empty($lines)) {
-        return $rows;
-    }
-
-    $headers = array_map(static function ($header) {
-        return strtolower(trim((string)$header, "\" "));
-    }, str_getcsv(array_shift($lines)));
-
-    foreach ($lines as $line) {
-        if (trim($line) === '') {
-            continue;
-        }
-        $row = str_getcsv($line);
-        $assoc = [];
-        foreach ($headers as $index => $header) {
-            $assoc[$header] = $row[$index] ?? '';
-        }
-        $rows[] = $assoc;
-    }
-
-    return $rows;
-}
-
 function room_utilization_normalize_row(array $row): array {
     $normalized = [];
     foreach ($row as $key => $value) {
@@ -134,20 +107,11 @@ function room_utilization_parse_enrollment($raw): int {
 /**
  * Analyze room utilization
  */
-function analyze_room_utilization($schedule_csv_content = null, array $schedule_rows = [], array $source_meta = []) {
+function analyze_room_utilization(array $schedule_rows = [], array $source_meta = []) {
     global $conn;
-    
-    if (empty($schedule_rows) && !$schedule_csv_content) {
-        $b2 = new B2Storage();
-        $result = $b2->download('csv/final/final_web_schedule.csv');
-        if (!$result['success']) {
-            return ['success' => false, 'error' => 'Schedule CSV not found in B2'];
-        }
-        $schedule_csv_content = $result['content'];
-    }
 
-    if (empty($schedule_rows) && $schedule_csv_content) {
-        $schedule_rows = room_utilization_rows_from_csv_content((string)$schedule_csv_content);
+    if (empty($schedule_rows)) {
+        return ['success' => false, 'error' => 'No saved generated schedule data found in database'];
     }
     
     $analysis = [
@@ -347,31 +311,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
     
     if ($action === 'analyze') {
-        $schedule_csv = $_POST['schedule_csv'] ?? null;
         $schedule_id = (int)($_POST['schedule_id'] ?? 0);
         $saved_at = trim((string)($_POST['saved_at'] ?? ''));
         $schedule_rows = [];
         $source_meta = [];
-        
-        if ($schedule_csv) {
-            $safe_path = realpath('../../' . $schedule_csv);
-            if (!$safe_path || strpos($safe_path, realpath('../../')) !== 0) {
-                http_response_code(403);
-                echo json_encode(['success' => false, 'error' => 'Invalid file path']);
-                exit;
-            }
-        } elseif ($schedule_id > 0 || $saved_at !== '') {
-            $selected = room_utilization_schedule_rows_from_generated($conn, $schedule_id, $saved_at);
-            if (!$selected['success']) {
-                http_response_code(404);
-                echo json_encode($selected);
-                exit;
-            }
-            $schedule_rows = $selected['rows'] ?? [];
-            $source_meta = $selected['meta'] ?? [];
+
+        $selected = room_utilization_schedule_rows_from_generated($conn, $schedule_id, $saved_at);
+        if (!($selected['success'] ?? false)) {
+            $status_code = ($schedule_id > 0 || $saved_at !== '') ? 404 : 400;
+            http_response_code($status_code);
+            echo json_encode($selected);
+            exit;
         }
-        
-        $result = analyze_room_utilization($safe_path ?? null, $schedule_rows, $source_meta);
+
+        $schedule_rows = $selected['rows'] ?? [];
+        $source_meta = $selected['meta'] ?? [];
+
+        $result = analyze_room_utilization($schedule_rows, $source_meta);
         echo json_encode($result);
         
     } else {

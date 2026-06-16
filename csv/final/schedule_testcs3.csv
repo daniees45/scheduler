@@ -1,0 +1,20 @@
+Course Code,Course Title,Credit Hrs,Lecturer Name,Room Name,Day,Time,course_level,Semester,start_time,no_of_students,enrollment
+COSC 370 / INFT 370,Operations Research [Sec A] / Management Science [Sec A],3.0,Dr. A. Adu-Sackey,CS LAB,Tuesday,10:00 AM - 12:30 PM,300,1,10:00 AM,30,30
+COSC 130,Digital Electronics [Sec A],3.0,E. Okoe,American High,Thursday,02:00 PM - 04:30 PM,100,1,02:00 PM,30,30
+COSC 117,Fundamentals of Computing Skills [Sec B],3.0,G. Preprah Tanoah,CS3,Friday,10:00 AM - 12:30 PM,100,1,10:00 AM,30,30
+BBIS 213,IT for Business (MOS) [Sec A],3.0,G. Preprah Tanoah,CS2,Thursday,07:00 AM - 09:30 AM,200,1,07:00 AM,30,30
+COSC 470,/ INFT 470 Computer & Cyber Forensics,3.0,M. Asare,American High,Friday,07:00 AM - 09:30 AM,400,1,07:00 AM,30,30
+INFT 459 / COSC 352,Enterprise Information Security [Sec A] / Computer Security [Sec A],3.0,M. Doe,CS1,Monday,02:00 PM - 04:30 PM,400,1,02:00 PM,30,30
+CSCD 119,Introduction to Computer Science [Sec A],3.0,Prof. P. Yaw Owusu Amoako,CS2,Tuesday,07:00 AM - 09:30 AM,100,1,07:00 AM,30,30
+COSC 224,Object-Oriented Programming [Sec A],3.0,Prof. P. Yaw Owusu Amoako,CS1,Wednesday,10:00 AM - 12:30 PM,200,1,10:00 AM,30,30
+COCS 364 / INFT 364,Research Methods [Sec A],3.0,Prof. P. Yaw Owusu Amoako,CS2,Monday,02:00 PM - 04:30 PM,300,1,02:00 PM,30,30
+COSC 480,Compiler Design [Sec A],3.0,Prof. P. Yaw Owusu Amoako,CS LAB,Tuesday,02:00 PM - 04:30 PM,400,1,02:00 PM,30,30
+BBIS 226,Business Process Modeling and Workflow [Sec A],3.0,Prof. W. Ofoe Larkotey,CS2,Monday,07:00 AM - 09:30 AM,200,1,07:00 AM,30,30
+COSC 346 / INFT 346,Software Engineering [Sec A] / Software Development Life Cycle [Sec A],3.0,R. Amponsah,CS3,Tuesday,07:00 AM - 09:30 AM,300,1,07:00 AM,30,30
+COSC 113,Elements of Programming [Sec A],3.0,R. Amponsah,CS LAB,Friday,07:00 AM - 09:30 AM,100,1,07:00 AM,30,30
+INFT 281 / COSC 280 / BBIS 110,Management Information Systems [Sec A] / Information Systems [Sec A] / Introduction to Business Information Systems [Sec A],3.0,R. W. Ambeh-Doh,CS2,Wednesday,07:00 AM - 09:30 AM,200,1,07:00 AM,30,30
+BBIS 338,Enterprise Systems [Sec A],3.0,R. W. Ambeh-Doh,GEN. LAB,Wednesday,02:00 PM - 04:30 PM,300,1,02:00 PM,30,30
+INFT 115,Information Technology Foundation [Sec A],3.0,R. W. Ambeh-Doh,GEN. LAB,Tuesday,10:00 AM - 12:30 PM,100,1,10:00 AM,30,30
+COSC 240 / INFT 346,Systems Programming {Sec A] / DotNet Programming [Sec A],3.0,S. Ganu,CS LAB,Friday,10:00 AM - 12:30 PM,200,1,10:00 AM,30,30
+INFT 410,Internet-Enabled Applications Systems Development,3.0,S. Sebuabe,CS2,Monday,10:00 AM - 12:30 PM,400,1,10:00 AM,30,30
+COSC 250 / BBIS 203,Computer Ethics [Sec A] / IT Professional Ethics and Practice [Sec A],3.0,S. Sebuabe,CS3,Wednesday,02:00 PM - 04:30 PM,200,1,02:00 PM,30,30

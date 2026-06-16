@@ -8,7 +8,7 @@ requireRole(['super_admin', 'faculty_admin']);
 ?>
 
 <!-- Include Unified API Configuration -->
-<script src="config.js"></script>
+<script src="config.js?v=<?php echo filemtime(__DIR__ . '/config.js'); ?>"></script>
 
 <div class="glass-panel" style="padding: 2rem; max-width: 1200px; margin: 0 auto;">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
@@ -31,7 +31,7 @@ requireRole(['super_admin', 'faculty_admin']);
                 Success Rate</p>
             <h3 style="margin: 0 0 0.5rem 0; font-size: 2rem; color: #10b981;" id="successRate"><i
                     class="fa-solid fa-spinner fa-spin"></i></h3>
-            <p style="color: var(--text-muted); font-size: 0.8rem; margin: 0;">Last 30 generations</p>
+            <p style="color: var(--text-muted); font-size: 0.8rem; margin: 0;">All saved generations</p>
         </div>
 
         <!-- Average Accuracy -->

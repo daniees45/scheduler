@@ -11,6 +11,9 @@ $role = $_SESSION['role'];
 $user_settings = $conn->query("SELECT * FROM user_settings WHERE user_id = $user_id")->fetch_assoc() ?? [];
 $notif_settings = $conn->query("SELECT * FROM notification_settings WHERE user_id = $user_id")->fetch_assoc() ?? [];
 $ai_settings = $conn->query("SELECT * FROM ai_settings WHERE user_id = $user_id")->fetch_assoc() ?? [];
+$ai_learning_snapshot = json_decode($ai_settings['priority_goals_json'] ?? 'null', true);
+$ai_priority_count = (int)($ai_learning_snapshot['summary']['priority_count'] ?? 0);
+$ai_goal_count = (int)($ai_learning_snapshot['summary']['goal_count'] ?? 0);
 $admin_settings = $conn->query("SELECT * FROM admin_settings WHERE user_id = $user_id")->fetch_assoc() ?? [];
 $admin_settings_json = json_decode($admin_settings['settings_json'] ?? '{}', true);
 $admin_default_priority = $admin_settings_json['default_priority'] ?? 'Medium';
@@ -56,13 +59,21 @@ $branding_secondary = normalize_settings_hex_color(
 );
 $branding_strength = (int)($branding_settings['site_color_strength'] ?? 100);
 $branding_strength = max(50, min(150, $branding_strength));
+$branding_text = normalize_settings_hex_color($branding_settings['site_text_color'] ?? '#f8fafc', '#f8fafc');
 ?>
 
 <div class="glass-panel settings-page-panel">
     <div class="settings-page-header">
-        <h2><i class="fa-solid fa-gears"></i> Account Settings</h2>
-        <p class="settings-page-subtitle">Manage your profile, preferences, and system configuration</p>
+        <h2><i class="fa-solid fa-gears"></i> <?php echo ($role == 'super_admin' || $role == 'faculty_admin') ? 'Site & Account Settings' : 'Account Settings'; ?></h2>
+        <p class="settings-page-subtitle">Manage your profile, preferences, and system configuration<?php echo ($role == 'super_admin' || $role == 'faculty_admin') ? ' for all pages' : ''; ?></p>
     </div>
+
+    <?php if ($role == 'super_admin' || $role == 'faculty_admin'): ?>
+    <div class="security-note-box settings-global-note">
+        <p class="security-note-title"><i class="fa-solid fa-globe"></i> Global scope enabled</p>
+        <p class="security-note-desc">Changes in Branding & Logo and System Config apply across landing, login, dashboard, student, and admin pages.</p>
+    </div>
+    <?php endif; ?>
 
     <!-- Settings Tabs -->
     <div class="settings-tabs settings-tabs-row">
@@ -80,6 +91,7 @@ $branding_strength = max(50, min(150, $branding_strength));
 
         <?php if ($role == 'super_admin' || $role == 'faculty_admin'): ?>
         <button class="tab-btn" onclick="showTab('branding')"><i class="fa-solid fa-palette"></i> Branding & Logo</button>
+        <button class="tab-btn" onclick="showTab('system')"><i class="fa-solid fa-server"></i> System Config</button>
         <?php endif; ?>
     </div>
 
@@ -293,6 +305,17 @@ $branding_strength = max(50, min(150, $branding_strength));
                         </label>
                         <span>Auto-suggest free time blocks for study</span>
                     </div>
+
+                    <div class="security-note-box" style="margin-top: 1.5rem;">
+                        <p class="security-note-title"><i class="fa-solid fa-brain"></i> AI learning snapshot</p>
+                        <p class="security-note-desc">
+                            The scheduler learns from your saved productivity preference, goals, and priorities.
+                            Saved items: <?php echo $ai_priority_count; ?> priorities and <?php echo $ai_goal_count; ?> goals.
+                        </p>
+                        <button type="button" class="glass-btn security-note-btn" onclick="window.location.href='priorities_goals.php'">
+                            Open Goals &amp; Priorities
+                        </button>
+                    </div>
                 </div>
                 <div class="settings-actions-row">
                     <button type="submit" class="glass-btn"><i class="fa-solid fa-graduation-cap"></i> Save Student Preferences</button>
@@ -333,11 +356,11 @@ $branding_strength = max(50, min(150, $branding_strength));
                             <input type="text" name="title" value="<?php echo htmlspecialchars($branding_settings['site_title'] ?? 'VVU Scheduler AI'); ?>" oninput="updatePreview('title', this.value)">
                         </div>
                         <div class="form-group">
-                            <label>Primary Brand Color (Buttons & Highlights)</label>
+                            <label>Primary Brand Color <span class="field-hint">(Buttons &amp; Highlights)</span></label>
                             <input type="color" name="color" class="settings-color-input" value="<?php echo htmlspecialchars($branding_settings['site_color'] ?? '#2563eb'); ?>" oninput="updatePreview('color', this.value)">
                         </div>
                         <div class="form-group">
-                            <label>Secondary Brand Color (Gradients & Accents)</label>
+                            <label>Secondary Brand Color <span class="field-hint">(Gradients &amp; Accents)</span></label>
                             <input type="color" name="secondary_color" class="settings-color-input" value="<?php echo htmlspecialchars($branding_secondary); ?>" oninput="updatePreview('secondary_color', this.value)">
                         </div>
                         <div class="form-group">
@@ -345,32 +368,115 @@ $branding_strength = max(50, min(150, $branding_strength));
                             <input type="range" name="color_strength" min="50" max="150" step="1" value="<?php echo $branding_strength; ?>" oninput="updatePreview('color_strength', this.value)">
                         </div>
                         <div class="form-group">
-                            <label>Secondary Background Color (App Background)</label>
+                            <label>Background Color <span class="field-hint">(App Background)</span></label>
                             <input type="color" name="bg_color" class="settings-color-input" value="<?php echo $branding_settings['site_bg_color'] ?? '#0f172a'; ?>" oninput="updatePreview('bg_color', this.value)">
                         </div>
                         <div class="form-group">
-                            <label>Update Website Logo (PNG/SVG preferred)</label>
-                            <input type="file" name="logo_file" class="glass-input" accept="image/*">
-                            <input type="hidden" name="logo" value="<?php echo htmlspecialchars($branding_settings['site_logo'] ?? ''); ?>">
+                            <label>Text Color <span class="field-hint">(Main readable text)</span></label>
+                            <input type="color" name="text_color" class="settings-color-input" value="<?php echo htmlspecialchars($branding_text); ?>" oninput="updatePreview('text_color', this.value)">
+                        </div>
+                        <div class="form-group">
+                            <label>Website Logo <span class="field-hint">(PNG, SVG, or WebP — shown in sidebar)</span></label>
                             <?php if (!empty($branding_settings['site_logo'])): ?>
-                                <p class="branding-logo-note">Current logo: <code><?php echo basename($branding_settings['site_logo']); ?></code></p>
+                            <div class="branding-current-logo-wrap" id="logoCurrentWrap">
+                                <img src="<?php echo htmlspecialchars($branding_settings['site_logo']); ?>"
+                                     alt="Current logo" class="branding-current-logo-img" id="brandingLogoImg">
+                                <div class="branding-current-logo-meta">
+                                    <span class="branding-logo-note"><code><?php echo basename($branding_settings['site_logo']); ?></code></span>
+                                    <label class="branding-remove-label">
+                                        <input type="checkbox" name="remove_logo" value="1" onchange="toggleLogoRemove(this)">
+                                        <i class="fa-solid fa-trash-can"></i> Remove
+                                    </label>
+                                </div>
+                            </div>
+                            <?php else: ?>
+                            <div class="branding-current-logo-wrap" id="logoCurrentWrap" style="display:none;">
+                                <img src="" alt="Logo preview" class="branding-current-logo-img" id="brandingLogoImg">
+                            </div>
                             <?php endif; ?>
+                            <input type="file" name="logo_file" id="logoFileInput" class="glass-input" accept="image/png,image/svg+xml,image/webp,image/jpeg">
+                            <input type="hidden" name="logo" value="<?php echo htmlspecialchars($branding_settings['site_logo'] ?? ''); ?>">
+                        </div>
+                        <div class="form-group">
+                            <label>Browser Favicon <span class="field-hint">(.ico, .png, or .svg — shown in browser tab)</span></label>
+                            <?php if (!empty($branding_settings['site_icon'])): ?>
+                            <div class="branding-current-logo-wrap" id="iconCurrentWrap">
+                                <img src="<?php echo htmlspecialchars($branding_settings['site_icon']); ?>"
+                                     alt="Current favicon" class="branding-favicon-img">
+                                <div class="branding-current-logo-meta">
+                                    <span class="branding-logo-note"><code><?php echo basename($branding_settings['site_icon']); ?></code></span>
+                                    <label class="branding-remove-label">
+                                        <input type="checkbox" name="remove_icon" value="1">
+                                        <i class="fa-solid fa-trash-can"></i> Remove
+                                    </label>
+                                </div>
+                            </div>
+                            <?php else: ?>
+                            <div class="branding-current-logo-wrap" id="iconCurrentWrap" style="display:none;">
+                                <img src="" alt="Favicon preview" class="branding-favicon-img" id="brandingIconImg">
+                            </div>
+                            <?php endif; ?>
+                            <input type="file" name="icon_file" id="iconFileInput" class="glass-input" accept="image/x-icon,image/png,image/svg+xml">
+                            <input type="hidden" name="icon" value="<?php echo htmlspecialchars($branding_settings['site_icon'] ?? ''); ?>">
                         </div>
                     </div>
                     <div class="glass-panel branding-preview-panel">
                         <h4 class="branding-preview-title">Live Preview</h4>
                         <div id="brandingPreview" class="branding-preview-box">
                             <div class="branding-preview-head">
-                                <div id="previewLogo" class="branding-preview-logo"></div>
+                                <div id="previewLogo" class="branding-preview-logo">
+                                    <?php if (!empty($branding_settings['site_logo'])): ?>
+                                    <img src="<?php echo htmlspecialchars($branding_settings['site_logo']); ?>"
+                                         alt="" id="previewLogoImg" class="branding-preview-logo-img">
+                                    <?php endif; ?>
+                                </div>
                                 <span id="previewTitle" class="branding-preview-text"><?php echo htmlspecialchars($branding_settings['site_title'] ?? 'VVU Scheduler AI'); ?></span>
                             </div>
                             <button type="button" class="glass-btn preview-btn branding-preview-btn">Sample Button</button>
                         </div>
-                        <p class="branding-preview-help">Changes to colors and title show immediately in preview but apply site-wide only after saving.</p>
+                        <p class="branding-preview-help">Colors and title update instantly. Logo and favicon apply after saving.</p>
                     </div>
                 </div>
                 <div class="settings-actions-row">
                     <button type="submit" class="glass-btn"><i class="fa-solid fa-wand-magic-sparkles"></i> Apply Site Branding</button>
+                </div>
+            </form>
+        </div>
+        <?php endif; ?>
+
+        <!-- System Config Panel (Admin) -->
+        <?php if ($role == 'faculty_admin' || $role == 'super_admin'): ?>
+        <?php
+            // Fetch current system settings for form
+            $sys_res = $conn->query("SELECT setting_key, setting_value FROM system_settings");
+            $sys_vals = [];
+            while($sv = $sys_res->fetch_assoc()) $sys_vals[$sv['setting_key']] = $sv['setting_value'];
+        ?>
+        <div id="systemPanel" class="tab-content tab-content-hidden">
+            <form id="systemForm" onsubmit="saveSettings(event, 'system')">
+                <div class="settings-max-600">
+                    <div class="form-group">
+                        <label>Current Semester</label>
+                        <select name="current_semester">
+                            <option value="1" <?php echo ($sys_vals['current_semester'] ?? '1') == '1' ? 'selected' : ''; ?>>Semester 1</option>
+                            <option value="2" <?php echo ($sys_vals['current_semester'] ?? '1') == '2' ? 'selected' : ''; ?>>Semester 2</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Current Academic Year</label>
+                        <input type="text" name="current_academic_year" value="<?php echo htmlspecialchars($sys_vals['current_academic_year'] ?? (date('Y') . '/' . (date('Y') + 1))); ?>" placeholder="2025/2026" pattern="^\d{4}/\d{4}$">
+                    </div>
+                    <div class="form-group">
+                        <label>Semester Start Date</label>
+                        <input type="date" name="semester_start_date" value="<?php echo htmlspecialchars($sys_vals['semester_start_date'] ?? ''); ?>">
+                    </div>
+                    <div class="form-group">
+                        <label>Semester End Date</label>
+                        <input type="date" name="semester_end_date" value="<?php echo htmlspecialchars($sys_vals['semester_end_date'] ?? ''); ?>">
+                    </div>
+                </div>
+                <div class="settings-actions-row">
+                    <button type="submit" class="glass-btn"><i class="fa-solid fa-save"></i> Save Global Settings</button>
                 </div>
             </form>
         </div>
@@ -483,6 +589,10 @@ function updatePreview(key, value) {
         document.documentElement.style.setProperty('--site-bg', value);
         document.documentElement.style.setProperty('--bg-dark', value);
         document.getElementById('brandingPreview').style.backgroundColor = value;
+    } else if (key === 'text_color') {
+        document.documentElement.style.setProperty('--site-text', value);
+        document.documentElement.style.setProperty('--text-main', value);
+        document.getElementById('previewTitle').style.color = value;
     }
 }
 
@@ -537,6 +647,64 @@ function presetAI(preset) {
         form.elements['max_load'].value = 8;
         form.elements['learning_toggle'].checked = true;
     }
+}
+
+// --- Logo & Favicon file preview ---
+document.addEventListener('DOMContentLoaded', function () {
+    const logoInput = document.getElementById('logoFileInput');
+    if (logoInput) {
+        logoInput.addEventListener('change', function () {
+            const file = this.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                // Update current-logo wrap
+                const wrap = document.getElementById('logoCurrentWrap');
+                const img = document.getElementById('brandingLogoImg');
+                if (wrap && img) {
+                    img.src = e.target.result;
+                    wrap.style.display = 'flex';
+                }
+                // Update live preview logo
+                let previewImg = document.getElementById('previewLogoImg');
+                if (!previewImg) {
+                    previewImg = document.createElement('img');
+                    previewImg.id = 'previewLogoImg';
+                    previewImg.alt = '';
+                    previewImg.className = 'branding-preview-logo-img';
+                    const logoDiv = document.getElementById('previewLogo');
+                    if (logoDiv) logoDiv.appendChild(previewImg);
+                }
+                previewImg.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+
+    const iconInput = document.getElementById('iconFileInput');
+    if (iconInput) {
+        iconInput.addEventListener('change', function () {
+            const file = this.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                const wrap = document.getElementById('iconCurrentWrap');
+                const img = document.getElementById('brandingIconImg');
+                if (wrap && img) {
+                    img.src = e.target.result;
+                    wrap.style.display = 'flex';
+                }
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+});
+
+function toggleLogoRemove(checkbox) {
+    const wrap = document.getElementById('logoCurrentWrap');
+    if (wrap) wrap.style.opacity = checkbox.checked ? '0.4' : '1';
+    const previewImg = document.getElementById('previewLogoImg');
+    if (previewImg) previewImg.style.opacity = checkbox.checked ? '0.2' : '1';
 }
 </script>
 

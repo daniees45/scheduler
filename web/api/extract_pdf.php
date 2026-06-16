@@ -2,7 +2,12 @@
 // as/api/extract_pdf.php
 header('Content-Type: application/json');
 require_once 'db.php';
+require_once __DIR__ . '/auth_guard.php';
 require_once __DIR__ . '/../../lib/B2Storage.php';
+
+require_http_methods('POST');
+require_authenticated_user();
+require_admin_user();
 
 $b2 = new B2Storage();
 

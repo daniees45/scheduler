@@ -18,6 +18,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_id'])) {
     $update_id = (int)$_POST['update_id'];
     $username = trim($_POST['username'] ?? '');
     $fullname = trim($_POST['full_name'] ?? '');
+    $email = trim($_POST['email'] ?? '');
     $role = trim($_POST['role'] ?? '');
     $department = trim($_POST['department'] ?? '');
     $level = isset($_POST['level']) && $_POST['level'] !== '' ? (int)$_POST['level'] : null;
@@ -27,6 +28,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_id'])) {
         $error = 'Invalid user selected.';
     } elseif ($username === '' || $role === '') {
         $error = 'Username and role are required.';
+    } elseif ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $error = 'Please provide a valid email address.';
     } else {
         // Fetch current user for constraints
         $current_stmt = $conn->prepare("SELECT id, role, department FROM users WHERE id = ?");
@@ -85,9 +88,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_id'])) {
                 }
             }
 
+            if (empty($error) && $email !== '') {
+                $email_check_stmt = $conn->prepare("SELECT id FROM users WHERE email = ? AND id <> ? LIMIT 1");
+                $email_check_stmt->bind_param("si", $email, $update_id);
+                $email_check_stmt->execute();
+                if ($email_check_stmt->get_result()->num_rows > 0) {
+                    $error = 'Email already exists.';
+                }
+            }
+
             if (empty($error)) {
-                $update_stmt = $conn->prepare("UPDATE users SET username = ?, full_name = ?, role = ?, department = ?, level = ?, lecturer_id = ? WHERE id = ?");
-                $update_stmt->bind_param("ssssiii", $username, $fullname, $role, $department, $level, $lecturer_id, $update_id);
+                $update_stmt = $conn->prepare("UPDATE users SET username = ?, full_name = ?, email = ?, role = ?, department = ?, level = ?, lecturer_id = ? WHERE id = ?");
+                $update_stmt->bind_param("sssssiii", $username, $fullname, $email, $role, $department, $level, $lecturer_id, $update_id);
 
                 if ($update_stmt->execute()) {
                     $message = 'User updated successfully.';
@@ -153,18 +165,19 @@ $users = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
             <tbody>
                 <?php foreach ($users as $u): ?>
                 <tr>
-                    <td><?php echo htmlspecialchars($u['username']); ?></td>
-                    <td><?php echo htmlspecialchars($u['full_name']); ?></td>
-                    <td>
+                    <td data-label="Username"><?php echo htmlspecialchars($u['username']); ?></td>
+                    <td data-label="Full Name"><?php echo htmlspecialchars($u['full_name']); ?></td>
+                    <td data-label="Role">
                         <span style="padding: 4px 8px; border-radius: 4px; background: rgba(255,255,255,0.1); font-size: 0.8rem;">
                             <?php echo htmlspecialchars(ucwords(str_replace('_', ' ', $u['role']))); ?>
                         </span>
                     </td>
-                    <td>
+                    <td data-label="Actions">
                         <button type="button" class="glass-btn secondary" style="padding: 6px 10px;" onclick="openEditUserModal(this)"
                             data-id="<?php echo (int)$u['id']; ?>"
                             data-username="<?php echo htmlspecialchars($u['username']); ?>"
                             data-fullname="<?php echo htmlspecialchars($u['full_name']); ?>"
+                            data-email="<?php echo htmlspecialchars($u['email'] ?? ''); ?>"
                             data-role="<?php echo htmlspecialchars($u['role']); ?>"
                             data-department="<?php echo htmlspecialchars($u['department'] ?? ''); ?>"
                             data-level="<?php echo htmlspecialchars($u['level'] ?? ''); ?>"
@@ -271,6 +284,11 @@ $users = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
                 <input type="text" name="username" id="editUsername" class="glass-input" required>
             </div>
 
+            <div class="form-group" style="margin-bottom: 1rem;">
+                <label style="display:block; margin-bottom: 0.5rem; color: var(--text-muted);">Email</label>
+                <input type="email" name="email" id="editEmail" class="glass-input" placeholder="user@example.com">
+            </div>
+
             <div class="form-group" id="editLevelField" style="margin-bottom: 1rem;">
                 <label style="display:block; margin-bottom: 0.5rem; color: var(--text-muted);">Level</label>
                 <input type="number" name="level" id="editLevel" class="glass-input" min="100" max="900" step="100" placeholder="e.g., 100">
@@ -291,6 +309,7 @@ function openEditUserModal(btn) {
     document.getElementById('editUserId').value = btn.dataset.id || '';
     document.getElementById('editUsername').value = btn.dataset.username || '';
     document.getElementById('editFullName').value = btn.dataset.fullname || '';
+    document.getElementById('editEmail').value = btn.dataset.email || '';
     document.getElementById('editRole').value = btn.dataset.role || 'student';
     const deptSelect = document.getElementById('editDepartment');
     if (deptSelect) {
@@ -324,7 +343,7 @@ function toggleEditFields() {
 
     if (role === 'lecturer') {
         lecturerField.style.display = 'block';
-        deptField.style.display = 'none';
+        deptField.style.display = 'block';
         nameField.style.display = 'none';
         levelField.style.display = 'none';
     } else if (role === 'faculty_admin') {
@@ -334,7 +353,7 @@ function toggleEditFields() {
         levelField.style.display = 'none';
     } else if (role === 'student') {
         lecturerField.style.display = 'none';
-        deptField.style.display = 'none';
+        deptField.style.display = 'block';
         nameField.style.display = 'block';
         levelField.style.display = 'block';
     } else {

@@ -2,6 +2,10 @@
 // as/api/import_before_gen.php
 header('Content-Type: application/json');
 require_once 'db.php';
+require_once __DIR__ . '/auth_guard.php';
+
+require_http_methods('POST');
+require_admin_user();
 
 $base_dir = realpath('../../') . '/';
 

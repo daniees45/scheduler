@@ -1370,3 +1370,304 @@ Backtracks: 0
 Constraint Violations: 0
 Solve Time: 16.02s
 ======================
+
+=== SOLVE METRICS ===
+Variables Assigned: 18
+Backtracks: 0
+Constraint Violations: 3232
+Solve Time: 0.21s
+======================
+
+=== SOLVE METRICS ===
+Variables Assigned: 18
+Backtracks: 0
+Constraint Violations: 2847
+Solve Time: 0.20s
+======================
+
+=== SOLVE METRICS ===
+Variables Assigned: 18
+Backtracks: 0
+Constraint Violations: 2756
+Solve Time: 0.21s
+======================
+
+=== SOLVE METRICS ===
+Variables Assigned: 18
+Backtracks: 0
+Constraint Violations: 3084
+Solve Time: 0.20s
+======================
+
+=== SOLVE METRICS ===
+Variables Assigned: 18
+Backtracks: 0
+Constraint Violations: 2855
+Solve Time: 0.21s
+======================
+
+=== SOLVE METRICS ===
+Variables Assigned: 18
+Backtracks: 0
+Constraint Violations: 3005
+Solve Time: 0.22s
+======================
+
+=== SOLVE METRICS ===
+Variables Assigned: 18
+Backtracks: 0
+Constraint Violations: 3043
+Solve Time: 103.92s
+======================
+
+=== SOLVE METRICS ===
+Variables Assigned: 1
+Backtracks: 0
+Constraint Violations: 0
+Solve Time: 14.29s
+======================
+
+=== SOLVE METRICS ===
+Variables Assigned: 1
+Backtracks: 0
+Constraint Violations: 0
+Solve Time: 14.22s
+======================
+
+=== SOLVE METRICS ===
+Variables Assigned: 2
+Backtracks: 0
+Constraint Violations: 0
+Solve Time: 14.56s
+======================
+
+=== SOLVE METRICS ===
+Variables Assigned: 40
+Backtracks: 2
+Constraint Violations: 351
+Solve Time: 16.93s
+======================
+
+=== SOLVE METRICS ===
+Variables Assigned: 0
+Backtracks: 0
+Constraint Violations: 0
+Solve Time: 16.27s
+======================
+
+=== SOLVE METRICS ===
+Variables Assigned: 0
+Backtracks: 0
+Constraint Violations: 0
+Solve Time: 14.55s
+======================
+
+=== SOLVE METRICS ===
+Variables Assigned: 0
+Backtracks: 0
+Constraint Violations: 0
+Solve Time: 13.76s
+======================
+
+=== SOLVE METRICS ===
+Variables Assigned: 0
+Backtracks: 0
+Constraint Violations: 0
+Solve Time: 18.68s
+======================
+
+=== SOLVE METRICS ===
+Variables Assigned: 0
+Backtracks: 0
+Constraint Violations: 0
+Solve Time: 18.13s
+======================
+
+=== SOLVE METRICS ===
+Variables Assigned: 0
+Backtracks: 0
+Constraint Violations: 0
+Solve Time: 14.80s
+======================
+
+=== SOLVE METRICS ===
+Variables Assigned: 0
+Backtracks: 0
+Constraint Violations: 0
+Solve Time: 14.56s
+======================
+
+=== SOLVE METRICS ===
+Variables Assigned: 0
+Backtracks: 0
+Constraint Violations: 0
+Solve Time: 17.50s
+======================
+
+=== SOLVE METRICS ===
+Variables Assigned: 0
+Backtracks: 0
+Constraint Violations: 0
+Solve Time: 14.02s
+======================
+
+=== SOLVE METRICS ===
+Variables Assigned: 0
+Backtracks: 0
+Constraint Violations: 0
+Solve Time: 14.94s
+======================
+
+=== SOLVE METRICS ===
+Variables Assigned: 0
+Backtracks: 0
+Constraint Violations: 0
+Solve Time: 19.66s
+======================
+
+=== SOLVE METRICS ===
+Variables Assigned: 0
+Backtracks: 0
+Constraint Violations: 0
+Solve Time: 19.18s
+======================
+
+=== SOLVE METRICS ===
+Variables Assigned: 0
+Backtracks: 0
+Constraint Violations: 0
+Solve Time: 14.57s
+======================
+
+=== SOLVE METRICS ===
+Variables Assigned: 19
+Backtracks: 0
+Constraint Violations: 76
+Solve Time: 15.30s
+======================
+
+=== SOLVE METRICS ===
+Variables Assigned: 0
+Backtracks: 0
+Constraint Violations: 0
+Solve Time: 16.87s
+======================
+
+=== SOLVE METRICS ===
+Variables Assigned: 0
+Backtracks: 0
+Constraint Violations: 0
+Solve Time: 31.01s
+======================
+
+=== SOLVE METRICS ===
+Variables Assigned: 0
+Backtracks: 0
+Constraint Violations: 0
+Solve Time: 31.02s
+======================
+
+=== SOLVE METRICS ===
+Variables Assigned: 0
+Backtracks: 0
+Constraint Violations: 0
+Solve Time: 30.01s
+======================
+
+=== SOLVE METRICS ===
+Variables Assigned: 0
+Backtracks: 0
+Constraint Violations: 0
+Solve Time: 14.49s
+======================
+
+=== SOLVE METRICS ===
+Variables Assigned: 21
+Backtracks: 0
+Constraint Violations: 24
+Solve Time: 0.03s
+======================
+
+=== SOLVE METRICS ===
+Variables Assigned: 39
+Backtracks: 0
+Constraint Violations: 1553
+Solve Time: 0.08s
+======================
+
+=== SOLVE METRICS ===
+Variables Assigned: 39
+Backtracks: 0
+Constraint Violations: 1566
+Solve Time: 0.07s
+======================
+
+=== SOLVE METRICS ===
+Variables Assigned: 39
+Backtracks: 0
+Constraint Violations: 1563
+Solve Time: 0.07s
+======================
+
+=== SOLVE METRICS ===
+Variables Assigned: 18
+Backtracks: 0
+Constraint Violations: 2206
+Solve Time: 0.23s
+======================
+
+=== SOLVE METRICS ===
+Variables Assigned: 39
+Backtracks: 0
+Constraint Violations: 2671
+Solve Time: 0.18s
+======================
+
+=== SOLVE METRICS ===
+Variables Assigned: 39
+Backtracks: 0
+Constraint Violations: 3619
+Solve Time: 0.46s
+======================
+
+=== SOLVE METRICS ===
+Variables Assigned: 1
+Backtracks: 0
+Constraint Violations: 0
+Solve Time: 0.00s
+======================
+
+=== SOLVE METRICS ===
+Variables Assigned: 1
+Backtracks: 0
+Constraint Violations: 0
+Solve Time: 0.00s
+======================
+
+=== SOLVE METRICS ===
+Variables Assigned: 1
+Backtracks: 0
+Constraint Violations: 0
+Solve Time: 0.00s
+======================
+
+=== SOLVE METRICS ===
+Variables Assigned: 4
+Backtracks: 0
+Constraint Violations: 60
+Solve Time: 0.01s
+======================
+
+=== SOLVE METRICS ===
+Variables Assigned: 4
+Backtracks: 0
+Constraint Violations: 62
+Solve Time: 0.01s
+======================
+
+=== SOLVE METRICS ===
+Variables Assigned: 4
+Backtracks: 0
+Constraint Violations: 60
+Solve Time: 0.02s
+======================

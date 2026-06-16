@@ -107,3 +107,21 @@
     width: 100%;
     margin-top: 2rem;
 }
+
+/* ============================================================
+   register.css — Mobile responsive breakpoints
+   ============================================================ */
+
+@media (max-width: 600px) {
+    .register-container {
+        padding: 1rem;
+        max-width: 100%;
+    }
+}
+
+@media (max-width: 480px) {
+    .register-lecturer-search,
+    .register-submit-btn {
+        font-size: 16px; /* prevent iOS zoom */
+    }
+}

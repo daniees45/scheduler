@@ -64,7 +64,7 @@ function room_rows_to_csv_content(array $rows): string
     });
 
     $handle = fopen('php://temp', 'r+');
-    fputcsv($handle, ['room_name', 'capacity']);
+    fputcsv($handle, ['room_name', 'capacity'], ',', '"', '\\');
     foreach ($rows as $row) {
         $room_name = trim((string) ($row['room_name'] ?? ''));
         if ($room_name === '') {
@@ -76,7 +76,7 @@ function room_rows_to_csv_content(array $rows): string
             $capacity = 50;
         }
 
-        fputcsv($handle, [$room_name, $capacity]);
+        fputcsv($handle, [$room_name, $capacity], ',', '"', '\\');
     }
     rewind($handle);
     $content = stream_get_contents($handle);
@@ -113,8 +113,8 @@ function save_room_rows_to_storage($b2, string $source_key, array $rows): void
 
     $result = $b2->uploadContent($content, $source_key);
     if (is_array($result) && empty($result['success'])) {
-        $error = $result['error'] ?? 'Unknown B2 upload error';
-        throw new Exception("B2 upload failed for {$source_key}: {$error}");
+        $error = $result['error'] ?? 'Unknown Cloud upload error';
+        throw new Exception("Cloud upload failed for {$source_key}: {$error}");
     }
 }
 

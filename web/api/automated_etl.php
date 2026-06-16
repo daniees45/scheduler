@@ -2,9 +2,11 @@
 // web/api/automated_etl.php
 header('Content-Type: application/json');
 require_once 'db.php';
+require_once __DIR__ . '/auth_guard.php';
 
-// Access Control - Admin Only (checked in parent page but added here for safety)
-// requireAdmin(); 
+require_http_methods('POST');
+require_authenticated_user();
+require_admin_user();
 
 $output_name = isset($_POST['filename']) ? $_POST['filename'] : 'vvu_final_cleaned.csv';
 $output_folder = isset($_POST['output_folder']) ? $_POST['output_folder'] : '';
@@ -117,7 +119,7 @@ except Exception as e:
         if ($result['success']) {
             $b2_status = "Uploaded to B2: $output_path";
         } else {
-            throw new Exception("B2 upload failed: " . $result['error']);
+            throw new Exception("Cloud upload failed: " . $result['error']);
         }
     } else {
          // If no folder selected, maybe user expects DB only? 
@@ -132,7 +134,7 @@ except Exception as e:
          require_once '../../lib/B2Storage.php';
          $b2 = new B2Storage();
          $result = $b2->uploadContent($final_content, $output_name);
-         $b2_status = "Uploaded to B2 (root): $output_name";
+         $b2_status = "Uploaded to Cloud: $output_name";
     }
 
     // Cleanup temp files
@@ -142,18 +144,18 @@ except Exception as e:
 
     echo json_encode([
         'status' => 'success',
-        'message' => 'Automated ETL complete. Final file: ' . $output_path,
-        'extract_log' => $extract_out,
-        'cleanup_log' => $cleanup_out
+        'message' => 'Automated ETL complete. Final file: ' . $output_path
     ]);
 
 } catch (Exception $e) {
+    error_log('automated_etl failed: ' . $e->getMessage());
     @unlink($target_pdf);
     @unlink($raw_csv);
     @unlink($clean_csv);
+    http_response_code(500);
     echo json_encode([
         'status' => 'error',
-        'message' => $e->getMessage()
+        'message' => 'Automated ETL failed. Check server logs.'
     ]);
 }
 ?>

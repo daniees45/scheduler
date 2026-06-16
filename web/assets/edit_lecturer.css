@@ -34,3 +34,25 @@
 .edit-lecturer-cancel-btn {
     text-align: center;
 }
+
+/* ============================================================
+   edit_lecturer.css — Mobile responsive breakpoints
+   ============================================================ */
+
+@media (max-width: 600px) {
+    .edit-lecturer-container {
+        padding: 1rem;
+        max-width: 100%;
+    }
+}
+
+@media (max-width: 480px) {
+    .edit-lecturer-actions {
+        flex-direction: column;
+    }
+    .edit-lecturer-submit-btn,
+    .edit-lecturer-cancel-btn {
+        width: 100%;
+        text-align: center;
+    }
+}

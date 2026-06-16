@@ -1,9 +1,49 @@
-
 import pandas as pd
 import os
 import shutil
+import re
 from typing import  Dict, List
 from data_model import Lecturer, Room, Course, ClassSection
+
+# Global alias map (will be populated if available)
+_alias_to_canonical = {}
+
+def normalize_course_code(code: str) -> str:
+    if not isinstance(code, str):
+        return ""
+    # 1. Basic cleaning
+    cleaned = " ".join(code.strip().upper().split())
+    # 2. Strip potential suffix like "[SEC A]" or ": Elements..."
+    base = cleaned.split("[SEC")[0].split(":")[0].strip()
+    
+    # 3. Aggressive normalization: Extract core code (e.g. "COSC 124" from "COSC 124 Procedural Programming")
+    match = re.match(r'^([A-Z]{2,4}\s*\d{2,4})', base)
+    if match:
+         extracted = match.group(1)
+         letters = "".join(re.findall(r'[A-Z]', extracted))
+         numbers = "".join(re.findall(r'\d', extracted))
+         base = f"{letters} {numbers}"
+    
+    # Apply alias mapping
+    return _alias_to_canonical.get(base, base)
+
+def normalize_level_token(raw_level) -> str:
+    text = str(raw_level or '').strip()
+    if not text or text.lower() == 'nan':
+        return ''
+    try:
+        value = int(float(text))
+        if 0 < value < 10:
+            value *= 100
+        return str(value)
+    except Exception:
+        return text
+
+def normalize_semester_token(raw_semester) -> str:
+    text = str(raw_semester or '').strip()
+    if not text or text.lower() == 'nan':
+        return ''
+    return text
 
 day_to_index = {"Mon":0, "Tue":1, "Wed":2, "Thu":3, "Fri":4,
                 "Monday":0, "Tuesday":1, "Wednesday":2, "Thursday":3, "Friday":4}
@@ -42,7 +82,7 @@ def get_department_group(course_code: str) -> str:
     if any(prefix in code for prefix in ["DEVS", "INTL", "AFRI", "AFRN"]):
         return "DevelopmentStudies"
     # Biomedical Engineering Group
-    if any(prefix in code for prefix in ["BIOM", "ENGR", "BENG", "HLTC"]):
+    if any(prefix in code for prefix in ["BIOM", "ENGR", "BENG", "HLTC", "BMET"]):
         return "BiomedicalEngineering"
     # Nursing Group
     if any(prefix in code for prefix in ["NURS", "RNSG", "MIDW"]):
@@ -68,6 +108,8 @@ def get_department_room_file(department: str) -> str:
         "cs/it/bbis": "CS/IT/BBIS",
         "csitbbis": "CS/IT/BBIS",
         "computingscience": "CS/IT/BBIS",
+        "Computer Science": "CS/IT/BBIS",
+        "Computing Science": "CS/IT/BBIS",
         "business": "Business",
         "education": "Education",
         "developmentstudies": "DevelopmentStudies",
@@ -133,7 +175,8 @@ def load_combined_data(paths: List[str],
                        shared_aliases_path: str = "csv/general/shared_course_aliases.csv",
                        override_course_type: str = None,
                        interactive: bool = True,
-                       blocked_blocks: List[dict] = None) :
+                       blocked_blocks: List[dict] = None,
+                       availability_mode: str = "1") :
     from analyzer import TIME_TO_SLOT
     
     # B2 Integration: Download files to temp directory with caching
@@ -298,7 +341,9 @@ def load_combined_data(paths: List[str],
         print(f"[WARNING] B2 Sync failed: {e}. Falling back to local files.")
 
     # Load shared-course aliases (canonical_code, alias_code)
-    alias_to_canonical = {}
+    global _alias_to_canonical
+    _alias_to_canonical = {}
+    alias_to_canonical = _alias_to_canonical
     if os.path.exists(shared_aliases_path):
         try:
             alias_df = pd.read_csv(shared_aliases_path)
@@ -312,54 +357,9 @@ def load_combined_data(paths: List[str],
         except Exception as e:
             print(f"[WARNING] Could not load aliases: {e}")
 
-    def normalize_course_code(code: str) -> str:
-        if not isinstance(code, str):
-            return ""
-        cleaned = " ".join(code.strip().upper().split())
-        # Strip potential suffix like "[SEC A]" or ": Elements..."
-        base = cleaned.split("[SEC")[0].split(":")[0].strip()
-        # Apply alias mapping
-        return alias_to_canonical.get(base, base)
+    # (Normalization functions moved to global scope)
 
-    def normalize_level_token(raw_level) -> str:
-        text = str(raw_level or '').strip()
-        if not text or text.lower() == 'nan':
-            return ''
-        try:
-            value = int(float(text))
-            if 0 < value < 10:
-                value *= 100
-            return str(value)
-        except Exception:
-            return text
-
-    def normalize_semester_token(raw_semester) -> str:
-        text = str(raw_semester or '').strip()
-        if not text or text.lower() == 'nan':
-            return ''
-        return text
-
-    # Create lookup for smart course-locking if blocks provided
-    # Keyed by (course_code, normalized_level, semester) with code-only fallback.
-    course_to_fixed_exact = {}
-    course_to_fixed_code_only = {}
-    if blocked_blocks:
-        for block in blocked_blocks:
-            code = normalize_course_code(block.get('course_code', ''))
-            if code:
-                # Store day, slot, and room_name (if any)
-                r_name = block.get('room_name')
-                block_level = normalize_level_token(block.get('level', ''))
-                block_semester = normalize_semester_token(block.get('semester', ''))
-                course_to_fixed_exact[(code, block_level, block_semester)] = (block['day'], block['slot'], r_name)
-                course_to_fixed_code_only[code] = (block['day'], block['slot'], r_name)
-                if r_name:
-                    print(f"[SMART LOCK] Found block for {code} on day {block['day']} slot {block['slot']} in room {r_name}")
-                else:
-                    print(f"[SMART LOCK] Found block for {code} on day {block['day']} slot {block['slot']}")
-
-
-    
+    # --- Step 1: Load Input Data ---
     dfs = []
     for path in paths:
         if os.path.exists(path):
@@ -374,71 +374,184 @@ def load_combined_data(paths: List[str],
     if issues:
         raise ValueError("; ".join(issues))
     combined_df = combined_df.dropna(subset=['course_code', 'lecturer_name'])
-    
-    level_map = load_level_data()
-    
-    # alias and normalize_course_code logic moved up to facilitate early lookups
 
-    #Load curriculum data and identify cohorts
+    # --- Step 1b: Load Configuration and Curriculum (Needed for subsequent steps) ---
+    config = {"days": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"], "slots_per_day": 4, "strict_capacity": False}
+    if os.path.exists("config.json"):
+        import json
+        try:
+            with open("config.json", "r") as f:
+                config.update(json.load(f))
+        except: pass
+    slots_per_day = int(config.get("slots_per_day", 4))
+    level_map = load_level_data()
+
     course_cohorts = {}
     all_programs = set()
     if os.path.exists(curriculum_path):
-        curriculum_df = pd.read_csv(curriculum_path)
-        for _, row in curriculum_df.iterrows():
-            course_code = normalize_course_code(str(row['course_code']))
-            program = str(row['program']).strip()
-            level = str(row['level']).strip()
-            sem = str(row.get('semester', '')).strip()
+        try:
+            curriculum_df = pd.read_csv(curriculum_path)
+            for _, row in curriculum_df.iterrows():
+                course_code = normalize_course_code(str(row['course_code']))
+                program, level, sem = str(row['program']).strip(), str(row['level']).strip(), str(row.get('semester', '')).strip()
+                cohort_id = f"{program}_{level}_Sem{sem}" if sem else f"{program}_{level}"
+                all_programs.add(program)
+                if course_code not in course_cohorts: course_cohorts[course_code] = set()
+                course_cohorts[course_code].add(cohort_id)
+        except: pass
+
+    # --- Step 2: Load Room Pool (Moved Up) ---
+    room_db = {}
+    room_dept_map = {}
+    room_type_map = {}
+    is_dept_specific = not rooms_csv_path.endswith("general/rooms.csv")
+    inferred_dept = "General"
+    if is_dept_specific:
+        fname = os.path.basename(rooms_csv_path).lower()
+        # Explicit mapping of filename patterns to department names
+        dept_file_map = {
+            "computing_science_rooms": "CS/IT/BBIS",
+            "business_rooms": "Business",
+            "education_rooms": "Education",
+            "development_studies_rooms": "DevelopmentStudies",
+            "biomedical_engineering_rooms": "BiomedicalEngineering",
+            "nursing_rooms": "Nursing",
+            "theology_rooms": "Theology"
+        }
+        for pattern, dept_name in dept_file_map.items():
+            if pattern in fname:
+                inferred_dept = dept_name
+                break
+    
+    if os.path.exists(rooms_csv_path):
+        rooms_df = pd.read_csv(rooms_csv_path)
+        for _, row in rooms_df.iterrows():
+            rname = str(row['room_name']).strip()
+            csv_dept = str(row.get('department', 'General')).strip()
+            dept = inferred_dept if (csv_dept == "General" and inferred_dept != "General") else csv_dept
+            room_db[rname] = int(row.get('capacity', 30))
+            room_dept_map[rname] = dept
+            room_type_map[rname] = str(row.get('room_type', 'lecture')).strip()
             
-            # Standardize cohort ID: Program_Level_SemX
-            if sem:
-                cohort_id = f"{program}_{level}_Sem{sem}"
-            else:
-                cohort_id = f"{program}_{level}"
+    rooms : Dict[str, Room] = {}
+    for room_name in list(room_db.keys()):
+        room_id = room_name.replace(" ", "_")
+        rooms[room_id] = Room(id=room_id, name=room_name, capacity=room_db[room_name], 
+                     room_type=room_type_map.get(room_name, "lecture"), 
+                     department=room_dept_map.get(room_name, "General"),
+                     available_time_slots=[(d, s) for d in range(5) for s in range(slots_per_day)])
+
+    # --- Step 3: Load Lecturers (Moved Up) ---
+    from manage_availability import check_and_prompt_availability
+    unique_lecturers = combined_df['lecturer_name'].unique()
+    lecturer_names_list = [str(name).strip() for name in unique_lecturers]
+    
+    lecturer_availability_map = {}
+    if interactive:
+        lecturer_availability_map = check_and_prompt_availability(lecturers_in_input=lecturer_names_list, availability_file=availability_path, min_days_threshold=3)
+    else:
+        if os.path.exists(availability_path):
+            try:
+                avail_df = pd.read_csv(availability_path)
+                day_cols = ["Mon", "Tue", "Wed", "Thu", "Fri"]
+                for _, row in avail_df.iterrows():
+                    name = str(row.get("lecturer_name", "")).strip()
+                    if not name: continue
+                    available_days = [i for i, day in enumerate(day_cols) if int(row.get(day, 1)) == 1]
+                    lecturer_availability_map[name] = available_days
+            except: pass
+    
+    lecturers: Dict[str, Lecturer] = {}
+    for name in lecturer_names_list:
+        available_days = lecturer_availability_map.get(name, list(range(5)))
+        if not interactive and availability_mode == "1" and len(available_days) < 3:
+            available_days = [0, 1, 2, 3, 4]
+        available_time_slots = [(d, s) for d in available_days for s in range(slots_per_day)]
+        lecturers[name.replace(" ", "_")] = Lecturer(id=name.replace(" ", "_"), name=name, available_time_slots=available_time_slots)
+
+    # --- Step 4: Load Special Rooms ---
+    active_course_codes = {
+        normalize_course_code(str(code).strip().upper())
+        for code in combined_df['course_code'].dropna().astype(str).tolist()
+    }
+    special_rooms = {}
+    if os.path.exists(special_rooms_path):
+        try:
+            sr_df = pd.read_csv(special_rooms_path)
+            for _, row in sr_df.iterrows():
+                c_code, r_name = str(row['course_code']).strip().upper(), str(row['room_name']).strip()
+                canonical_special_code = normalize_course_code(c_code)
+                if canonical_special_code not in active_course_codes:
+                    # Ignore special-room records for courses not being solved in this session.
+                    continue
+
+                r_id = r_name.replace(" ", "_")
+                if r_id not in rooms:
+                    # Never inject out-of-scope rooms into the active pool.
+                    print(f"[INFO] Skipping out-of-pool special room '{r_name}' for {c_code}")
+                    continue
+
+                special_rooms[c_code] = {
+                    "room": r_name,
+                    "day": day_to_index.get(str(row.get('fixed_day', '')).strip()),
+                    "slot": TIME_TO_SLOT.get(str(row.get('fixed_time', '')).strip().lower())
+                }
+        except Exception as e:
+            print(f"[WARNING] Failed to load special rooms: {e}")
+    else:
+        print(f"[DEBUG] Special rooms file not found at {special_rooms_path}")
+
+
+    # --- Step 5: Load Block-based Smart Locks (Inject Foreign Data) ---
+    course_to_fixed_exact = {}
+    course_to_fixed_code_only = {}
+    if blocked_blocks:
+        for block in blocked_blocks:
+            code = normalize_course_code(block.get('course_code', ''))
+            if code:
+                # 1. Inject Foreign Room if missing
+                r_name = block.get('room_name')
+                # Do not inject foreign rooms into the global pool.
+                pass
                 
-            all_programs.add(program)
-            if course_code not in course_cohorts:
-                course_cohorts[course_code] = set()
-            course_cohorts[course_code].add(cohort_id)
+                # 2. Inject Foreign Lecturer if missing
+                l_name = block.get('lecturer_name')
+                if l_name:
+                    l_id = l_name.replace(" ", "_")
+                    if l_id not in lecturers:
+                        print(f"[INFO] Injecting Foreign Block Lecturer {l_name} for {code}")
+                        lecturers[l_id] = Lecturer(id=l_id, name=l_name, available_time_slots=[(d, s) for d in range(5) for s in range(slots_per_day)])
+
+                block_level, block_semester = normalize_level_token(block.get('level', '')), normalize_semester_token(block.get('semester', ''))
+                requested_room_id = str(r_name or '').strip().replace(" ", "_")
+                allowed_locked_room = r_name if requested_room_id in rooms else None
+                if r_name and allowed_locked_room is None:
+                    print(f"[INFO] Ignoring locked room '{r_name}' for {code}: not in active room pool")
+
+                lock_info = {'day': block['day'], 'slot': block['slot'], 'room': allowed_locked_room, 'lecturer': l_name}
+                course_to_fixed_exact[(code, block_level, block_semester)] = lock_info
+                course_to_fixed_code_only[code] = lock_info
+                print(f"[SMART LOCK] Captured block for {code} on day {block['day']} slot {block['slot']} in room {r_name} with lecturer {l_name}")
 
     # Build normalized program lookup for shared-course mapping
-    program_by_norm = {}
-    for program in all_programs:
-        program_by_norm[normalize_program_label(program)] = program
-
-    alias_map = {
-        "cs": ["computer science", "comp sci", "cs"],
-        "it": ["information technology", "info tech", "it"],
-        "bis": ["business information system", "bis"],
-        "business": ["business", "business admin", "business administration"],
-    }
+    program_by_norm = {normalize_program_label(p): p for p in all_programs}
+    alias_map = {"cs": ["computer science", "comp sci", "cs"], "it": ["information technology", "info tech", "it"], "bis": ["business information system", "bis"], "business": ["business", "business admin", "business administration"]}
 
     def resolve_programs_from_labels(labels: List[str]) -> List[str]:
         resolved = set()
         norm_programs = list(program_by_norm.keys())
         for label in labels:
             norm_label = normalize_program_label(label)
-            if norm_label in program_by_norm:
-                resolved.add(program_by_norm[norm_label])
-                continue
-
+            if norm_label in program_by_norm: resolved.add(program_by_norm[norm_label]); continue
             matched = False
             for alias_key, alias_terms in alias_map.items():
                 if norm_label == alias_key or any(norm_label == term for term in alias_terms):
                     for prog_norm in norm_programs:
-                        if any(term in prog_norm for term in alias_terms):
-                            resolved.add(program_by_norm[prog_norm])
-                            matched = True
+                        if any(term in prog_norm for term in alias_terms): resolved.add(program_by_norm[prog_norm]); matched = True
                     break
-
-            if matched:
-                continue
-
-            # Fallback: substring match against program names
-            for prog_norm in norm_programs:
-                if norm_label and norm_label in prog_norm:
-                    resolved.add(program_by_norm[prog_norm])
-
+            if not matched:
+                for prog_norm in norm_programs:
+                    if norm_label and norm_label in prog_norm: resolved.add(program_by_norm[prog_norm])
         return list(resolved)
 
     # Load shared (cross-department) courses
@@ -449,205 +562,19 @@ def load_combined_data(paths: List[str],
             shared_df.columns = [c.strip().lower() for c in shared_df.columns]
             for _, row in shared_df.iterrows():
                 course_code = normalize_course_code(str(row.get('course_code', '')))
-                if not course_code:
-                    continue
-
-                raw_departments = str(row.get('department', row.get('departments', ''))).strip()
-                dept_labels = split_department_labels(raw_departments)
+                if not course_code: continue
+                dept_labels = split_department_labels(str(row.get('department', row.get('departments', ''))).strip())
                 programs = resolve_programs_from_labels(dept_labels)
+                shared_level, shared_semester = row.get('course_level'), row.get('semester')
+                try: shared_level = int(float(shared_level))
+                except: shared_level = None
+                shared_semester = str(shared_semester).strip() if shared_semester and str(shared_semester).lower() != 'nan' else None
+                shared_course_map[course_code] = {"programs": programs, "level": shared_level, "semester": shared_semester}
+        except: pass
 
-                # Optional: shared course-specific level/semester overrides
-                shared_level = row.get('course_level', None)
-                shared_semester = row.get('semester', None)
-
-                if isinstance(shared_level, str) and shared_level.strip():
-                    try:
-                        shared_level = int(float(shared_level))
-                    except Exception:
-                        shared_level = None
-                elif isinstance(shared_level, (int, float)):
-                    shared_level = int(shared_level)
-                else:
-                    shared_level = None
-
-                if isinstance(shared_semester, str):
-                    shared_semester = shared_semester.strip()
-                    if not shared_semester or shared_semester.lower() == 'nan':
-                        shared_semester = None
-                elif shared_semester is None:
-                    shared_semester = None
-                else:
-                    shared_semester = str(shared_semester).strip()
-
-                shared_course_map[course_code] = {
-                    "programs": programs,
-                    "level": shared_level,
-                    "semester": shared_semester,
-                    "raw_departments": raw_departments
-                }
-        except Exception as e:
-            print(f"[WARNING] Error reading shared_courses.csv: {e}")
-            shared_course_map = {}
-    # Load Configuration (needed for slot counts)
-    config = {
-        "days": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
-        "slots_per_day": 4,
-        "strict_capacity": False
-    }
-
-    if os.path.exists("config.json"):
-        import json
-        try:
-            with open("config.json", "r") as f:
-                loaded_conf = json.load(f)
-                config.update(loaded_conf)
-        except Exception as e:
-            print(f"[WARNING] Could not load config.json: {e}")
-
-    slots_per_day = int(config.get("slots_per_day", 4))
-
-    #Build lecturers with interactive availability management
-    from manage_availability import check_and_prompt_availability
-    
-    # Get unique lecturer names from input
-    unique_lecturers = combined_df['lecturer_name'].unique()
-    lecturer_names_list = [str(name).strip() for name in unique_lecturers]
-    
-    # Check availability and prompt if needed
-    lecturer_availability_map = {}
-    if interactive:
-        print("\n[INFO] Checking lecturer availability...")
-        lecturer_availability_map = check_and_prompt_availability(
-            lecturers_in_input=lecturer_names_list,
-            availability_file=availability_path,
-            min_days_threshold=3  # Prompt if lecturer has < 3 days available
-        )
-    else:
-        # In non-interactive mode, load existing availability without prompting
-        if os.path.exists(availability_path):
-            try:
-                avail_df = pd.read_csv(availability_path)
-                avail_df.columns = [c.strip() for c in avail_df.columns]
-                day_cols = ["Mon", "Tue", "Wed", "Thu", "Fri"]
-                for _, row in avail_df.iterrows():
-                    name = str(row.get("lecturer_name", "")).strip()
-                    if not name:
-                        continue
-                    available_days = []
-                    for i, day in enumerate(day_cols):
-                        raw_val = row.get(day, 1)
-                        try:
-                            val = int(raw_val) if pd.notna(raw_val) else 1
-                        except Exception:
-                            val = 1
-                        if val == 1:
-                            available_days.append(i)
-                    lecturer_availability_map[name] = available_days
-            except Exception as e:
-                print(f"[WARNING] Could not parse lecturer availability CSV: {e}")
-    
-    lecturers: Dict[str, Lecturer] = {}
-    for name in combined_df['lecturer_name'].unique():
-        name = str(name).strip()
-        norm_name = normalize_name(name)
-        
-        # Get availability from the map (already prompted if needed)
-        available_days = lecturer_availability_map.get(name, list(range(5)))
-        available_time_slots = [(d, s) for d in available_days for s in range(slots_per_day)]
-        lecturers[name.replace(" ", "_")] = Lecturer(id=name.replace(" ", "_"), name=name, available_time_slots=available_time_slots)
-
-        
-    #Build rooms with department affiliation
-    room_db = {}
-    room_dept_map = {}  # room_name -> department
-    room_type_map = {}  # room_name -> room_type
-    
-    # Determine if we're using a department-specific room pool
-    is_dept_specific = not rooms_csv_path.endswith("general/rooms.csv")
-    
-    # Infer department from filename if not general
-    inferred_dept = "General"
-    if is_dept_specific:
-        # Example: csv/department/computing_science_rooms.csv -> CS/IT/BBIS (via reverse map or heuristic)
-        # However, it's safer to just look at which department requested this pool if possible.
-        # For simplicity, if we are in this specific call, we'll mark all loaded rooms with the "parent" dept
-        # but only if their original DEPT in CSV is 'General' or missing.
-        
-        # We'll use a better approach: map the filename back to the dept group.
-        fname = os.path.basename(rooms_csv_path).lower()
-        if "computing_science" in fname: inferred_dept = "CS/IT/BBIS"
-        elif "business" in fname: inferred_dept = "Business"
-        elif "education" in fname: inferred_dept = "Education"
-        elif "development_studies" in fname: inferred_dept = "DevelopmentStudies"
-        elif "biomedical_engineering" in fname: inferred_dept = "BiomedicalEngineering"
-        elif "nursing" in fname: inferred_dept = "Nursing"
-        elif "theology" in fname: inferred_dept = "Theology"
-    
-    # Step 1: Load rooms from the specified rooms_csv_path
-    if os.path.exists(rooms_csv_path):
-        rooms_df = pd.read_csv(rooms_csv_path)
-        for _, row in rooms_df.iterrows():
-            rname = str(row['room_name']).strip()
-            cap = int(row.get('capacity', 30))
-            
-            # Use inferred department if CSV says 'General' but we are in a dept file
-            csv_dept = str(row.get('department', 'General')).strip()
-            if csv_dept.lower() in ('', 'nan', 'none', 'null'):
-                csv_dept = 'General'
-            if csv_dept == "General" and inferred_dept != "General":
-                dept = inferred_dept
-            else:
-                dept = csv_dept
-                
-            rtype = str(row.get('room_type', 'lecture')).strip()
-            
-            room_db[rname] = cap
-            room_dept_map[rname] = dept
-            room_type_map[rname] = rtype
-    
-    # Step 2: Detect input departments
-    input_departments = set()
-    for _, row in combined_df.iterrows():
-        course_code = str(row['course_code']).strip().upper()
-        dept = get_department_group(course_code)
-        if dept != "General":
-            input_departments.add(dept)
-    
-    # Step 3: Load department-specific room files (DISABLED)
-    # Refined: We no longer auto-load extra departmental rooms when the general pool is selected.
-    # This prevents room leakage in general sessions.
-    if False: # was: if not is_dept_specific:
-        pass
-    else:
-        print(f"[INFO] Using department-specific room pool. Skipping auto-load of additional department rooms.")
-        
-    rooms : Dict[str, Room] = {}
-    
-    # Logic: If using the general 'rooms.csv' or any specific pool, we should be strict
-    # unless we explicitly want to allow ad-hoc rooms from the input CSV.
-    # Refinement: General sessions now also use only the specified room pool.
-    is_custom_pool = True # Always enforce the provided room pool for consistency
-    
-    if is_custom_pool:
-        all_rooms = list(room_db.keys())
-    else:
-        # Legacy fallback (unused due to leakage)
-        input_rooms = set(combined_df['room_name'].dropna().unique()) if 'room_name' in combined_df.columns else set()
-        all_rooms = list(input_rooms | set(room_db.keys()))
-
-    for room_name in all_rooms:
-        room_id = room_name.replace(" ", "_")
-        capacity = int(room_db.get(room_name, 30))  # Default capacity
-        dept = room_dept_map.get(room_name, "General")
-        rtype = room_type_map.get(room_name, "lecture")
-        rooms[room_id] = Room(id=room_id, name=room_name, capacity=capacity, 
-                     room_type=rtype, department=dept,
-                     available_time_slots=[(d, s) for d in range(5) for s in range(slots_per_day)])
-        
-    #Build Sections
+    # Build Sections
     courses : Dict[str, Course] = {}
     sections : List[ClassSection] = []
-    seen = set()
     for idx, row in combined_df.iterrows():
         course_code = str(row['course_code']).strip().upper()
         canonical_course_code = normalize_course_code(course_code)
@@ -687,81 +614,45 @@ def load_combined_data(paths: List[str],
             semester = guess_semester(course_code, str(row.get("course_title", "")))
         normalized_semester = normalize_semester_token(semester)
 
-        #smart locking for general and shared courses
-        fixed_day, fixed_slot, fixed_room = None, None, None
+        # Smart locking (Override everything with original block data if available)
+        fixed_day, fixed_slot, fixed_room, fixed_lecturer = None, None, None, None
         
-        # 1. Direct CSV override (e.g. general schedule already has day/time)
+        # 1. Direct CSV override
         if section_type == "General" and "day" in combined_df.columns and "start_time" in combined_df.columns:
-            day = str(row.get("day", "")).strip()
-            start_time = str(row.get("start_time", str(row.get("time", "")))).split("-")[0].strip().lower()
+            day, start_time = str(row.get("day", "")).strip(), str(row.get("start_time", str(row.get("time", "")))).split("-")[0].strip().lower()
             if day in day_to_index and start_time in TIME_TO_SLOT:
-                fixed_day = day_to_index[day]
-                fixed_slot = TIME_TO_SLOT[start_time]
+                fixed_day, fixed_slot = day_to_index[day], TIME_TO_SLOT[start_time]
         
-        # 2. Block-based locking (e.g. shared course found in a provided block)
-        # This handles the user request: "when shared courses are found, it should use the time, day from the original course schedule"
+        # 2. Block-based locking (Keep original day, time, lecturer, room)
         if fixed_day is None:
             lock_key = (canonical_course_code, normalized_level, normalized_semester)
-            if lock_key in course_to_fixed_exact:
-                fixed_day, fixed_slot, fixed_room = course_to_fixed_exact[lock_key]
-                print(f"[INFO] Smart Locked shared course {course_code} (L{normalized_level or '?'} S{normalized_semester or '?'}) to Day {fixed_day}, Slot {fixed_slot}, Room {fixed_room}")
-            elif canonical_course_code in course_to_fixed_code_only:
-                fixed_day, fixed_slot, fixed_room = course_to_fixed_code_only[canonical_course_code]
-                print(f"[INFO] Smart Locked shared course {course_code} to Day {fixed_day}, Slot {fixed_slot}, Room {fixed_room}")
+            lock_info = course_to_fixed_exact.get(lock_key, course_to_fixed_code_only.get(canonical_course_code))
+            if lock_info:
+                fixed_day, fixed_slot, fixed_room, fixed_lecturer = lock_info['day'], lock_info['slot'], lock_info['room'], lock_info['lecturer']
+                print(f"[INFO] Strictly locking {course_code} to original schedule: Day {fixed_day}, Slot {fixed_slot}, Room {fixed_room}, Lecturer {fixed_lecturer}")
 
-        #Build cohorts: General courses belong to all programs of that level
         cohorts = course_cohorts.get(canonical_course_code, set())
-        
         if section_type == "General":
             cohort_level = int(normalized_level) if normalized_level.isdigit() else 100
-            base_cohort = f"General_{cohort_level}_Sem{semester}"
-            cohorts.add(base_cohort)
-            
-            # Also add for specific programs if needed
-            for program in all_programs:
-                prog_cohort = f"{program}_{cohort_level}_Sem{semester}"
-                cohorts.add(prog_cohort)
+            cohorts.add(f"General_{cohort_level}_Sem{semester}")
+            for program in all_programs: cohorts.add(f"{program}_{cohort_level}_Sem{semester}")
 
-        # Shared (cross-department) course cohorts
         if canonical_course_code in shared_course_map:
             shared_info = shared_course_map[canonical_course_code]
-            shared_level = shared_info.get("level")
-            shared_semester = shared_info.get("semester")
+            s_level = shared_info.get("level") if shared_info.get("level") is not None else level * 100
+            s_semester = shared_info.get("semester") if shared_info.get("semester") is not None else semester
+            for program in shared_info.get("programs", []): cohorts.add(f"{program}_{s_level}_Sem{s_semester}")
 
-            # Use shared overrides if provided; otherwise use course-level inference
-            if shared_level is None:
-                shared_level = level * 100
-            if shared_semester is None:
-                shared_semester = semester
-
-            for program in shared_info.get("programs", []):
-                shared_cohort = f"{program}_{shared_level}_Sem{shared_semester}"
-                cohorts.add(shared_cohort)
-
-                
-        # DEPT COURSE: Check if it conflicts with GENERAL schedule
-        # If 'blocked_slots' is passed (from General Schedule CSV), we add constraints
-        # Logic: If this is a Dept course for Level 100 Sem 1, it must not clash with General Level 100 Sem 1
-        
-        # (This logic is usually handled in the solver constraints, so we just pass cohorts here)
-        
-        # Determine owning department (for room allocation purposes)
         dept_group = get_department_group(course_code)
-        owning_dept = dept_group  # Directly use the department group
         
-        # Get credit hours from curriculum or default to "3"
-        credit_hours = courses.get(course_code, Course(course_code, "", "3", "", 0)).credit_hours if course_code in courses else "3"
+        # Determine effective lecturer ID (use fixed_lecturer if locked)
+        final_lecturer_name = fixed_lecturer if fixed_lecturer else lecturer_name
+        requested_room = str(fixed_room).strip().replace(" ", "_").replace("nan", "").replace("Nan", "") if fixed_room else None
         
-        # Identify requested room from fixed_room
-        requested_room = None
-        if fixed_room:
-             requested_room = str(fixed_room).strip().replace(" ", "_").replace("Nan", "")
-
-        sec_id = f"{course_code}_{idx}"
         sections.append(ClassSection(
-            id=sec_id,
+            id=f"{course_code}_{idx}",
             course_code=course_code,
-            lecturer_id=lecturer_name.replace(" ", "_"),
+            lecturer_id=final_lecturer_name.replace(" ", "_"),
             section_title=str(row.get("course_title", course_code)).strip(),
             course_type=section_type,
             course_level=normalized_level or "100",
@@ -772,89 +663,12 @@ def load_combined_data(paths: List[str],
             requested_room=requested_room,
             semester=semester,
             departmental_group=dept_group,
-            owning_department=owning_dept,
-            credit_hours=str(credit_hours).strip()
+            owning_department=dept_group,
+            credit_hours=str(row.get('credit_hours', '3')).strip()
         ))
     
-    # Load special rooms configuration for pre-assigned courses
-    special_rooms = {}
-    sr_df = None
-    if os.path.exists(special_rooms_path):
-        try:
-            sr_df = pd.read_csv(special_rooms_path)
-        except Exception as e:
-            print(f"[WARNING] Could not load special_rooms.csv: {e}")
-            sr_df = None
-            
-    if sr_df is not None and 'course_code' in sr_df.columns and 'room_name' in sr_df.columns:
-        for _, row in sr_df.iterrows():
-            c_code = str(row['course_code']).strip().upper()
-            r_name = str(row['room_name']).strip()
-            
-            # Parse fixed day if specified
-            fixed_day_idx = None
-            if 'fixed_day' in sr_df.columns:
-                day_str = str(row['fixed_day']).strip()
-                if day_str and day_str != 'nan':
-                    fixed_day_idx = day_to_index.get(day_str)
-            
-            # Parse fixed time if specified
-            slot_idx = None
-            if 'fixed_time' in sr_df.columns:
-                t_str = str(row['fixed_time']).strip().lower()
-                if t_str and t_str != 'nan':
-                    slot_idx = TIME_TO_SLOT.get(t_str)
-            
-            # Store as dict with metadata
-            special_rooms[c_code] = {
-                "room": r_name,
-                "day": fixed_day_idx,  # None if not specified
-                "slot": slot_idx        # None if not specified
-            }
+    # Ensure every special-room target exists in rooms pool (Validated earlier)
 
-    # Ensure every special-room target exists in rooms pool.
-    # This is critical when using department-specific room files that may omit a global/special room.
-    if special_rooms:
-        # Build auxiliary capacity map from global rooms if available
-        global_rooms_candidates = [
-            os.path.join("temp", "csv", "general", "rooms.csv"),
-            "csv/general/rooms.csv",
-            "rooms.csv"
-        ]
-        global_capacity_map = {}
-        for candidate in global_rooms_candidates:
-            if os.path.exists(candidate):
-                try:
-                    gdf = pd.read_csv(candidate)
-                    for _, grow in gdf.iterrows():
-                        gname = str(grow.get('room_name', '')).strip()
-                        if not gname:
-                            continue
-                        try:
-                            gcap = int(grow.get('capacity', 30))
-                        except Exception:
-                            gcap = 30
-                        global_capacity_map[gname] = gcap
-                except Exception:
-                    pass
-
-        for info in special_rooms.values():
-            target_name = info.get("room", "") if isinstance(info, dict) else str(info)
-            target_name = str(target_name).strip()
-            if not target_name:
-                continue
-
-            target_id = target_name.replace(" ", "_")
-            if target_id not in rooms:
-                cap = global_capacity_map.get(target_name, room_db.get(target_name, 30))
-                rooms[target_id] = Room(
-                    id=target_id,
-                    name=target_name,
-                    capacity=int(cap),
-                    room_type=room_type_map.get(target_name, "lecture"),
-                    department=room_dept_map.get(target_name, "General"),
-                    available_time_slots=[(d, s) for d in range(5) for s in range(slots_per_day)]
-                )
 
     # Build shared course groups (sections that should align across departments)
     from shared_courses import build_shared_course_groups, apply_shared_group_ids
@@ -873,23 +687,39 @@ def load_combined_data(paths: List[str],
 
 def load_general_schedule_blocks(general_csv_path: str, semester: str = None) -> List[dict]:
     """
-    Parses a General Schedule CSV to identify BUSY slots for cohorts.
-    Returns a list of blocked time slots:
-    [{'sem': '1', 'level': '100', 'day': 0, 'slot': (800, 1000)}, ...]
+    Parses one or more General Schedule CSVs to identify BUSY slots for cohorts.
+    Accepts a single path string, a comma-separated string, or a list of paths.
     """
-    blocks = []
-    if not os.path.exists(general_csv_path):
-        return blocks
+    if not general_csv_path:
+        return []
+
+    # Handle multiple paths (comma-separated or list)
+    paths = []
+    if isinstance(general_csv_path, list):
+        paths = general_csv_path
+    elif isinstance(general_csv_path, str):
+        paths = [p.strip() for p in general_csv_path.split(',') if p.strip()]
+    
+    all_blocks = []
+    for path in paths:
+        if not os.path.exists(path):
+            print(f"[WARNING] Block file not found: {path}")
+            continue
         
+        print(f"[INFO] Loading blocks from {path}...")
+        blocks = _load_single_block_file(path, semester)
+        all_blocks.extend(blocks)
+        
+    return all_blocks
+
+def _load_single_block_file(path: str, semester: str = None) -> List[dict]:
+    blocks = []
     from analyzer import TIME_TO_SLOT
     day_to_index = {"Monday": 0, "Tuesday": 1, "Wednesday": 2, "Thursday": 3, "Friday": 4, 
                     "Mon": 0, "Tue": 1, "Wed": 2, "Thu": 3, "Fri": 4}
-    import pandas as pd
-    
     try:
-        df = pd.read_csv(general_csv_path)
+        df = pd.read_csv(path)
         # Normalize column names for flexible matching
-        original_cols = df.columns.tolist()
         df.columns = [str(c).lower().strip().replace(" ", "_") for c in df.columns]
         
         # Mapping of required data to possible column synonyms
@@ -940,7 +770,7 @@ def load_general_schedule_blocks(general_csv_path: str, semester: str = None) ->
                     day_idx = day_to_index[day_str]
                     slot_obj = TIME_TO_SLOT[time_str]
                     
-                    course_code = get_val(row, 'course_code', '').upper()
+                    course_code = normalize_course_code(get_val(row, 'course_code', ''))
                     room_name = get_val(row, 'room_name')
                     lecturer_name = get_val(row, 'lecturer_name')
                     

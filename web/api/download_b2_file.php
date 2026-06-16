@@ -1,14 +1,13 @@
 <?php
 // web/api/download_b2_file.php
 // Download file content from B2 storage
-session_start();
+require_once __DIR__ . '/auth_guard.php';
 require_once '../../lib/B2Storage.php';
 
 header('Content-Type: application/json');
 
-if (!isset($_SESSION['user_id'])) {
-    die(json_encode(['status' => 'error', 'message' => 'Unauthorized']));
-}
+require_http_methods('GET');
+require_authenticated_user();
 
 if (!isset($_GET['file'])) {
     die(json_encode(['status' => 'error', 'message' => 'File parameter required']));

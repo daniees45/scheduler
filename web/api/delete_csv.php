@@ -1,18 +1,12 @@
 <?php
 // web/api/delete_csv.php
-session_start();
 require_once 'db.php';
+require_once __DIR__ . '/auth_guard.php';
 
 header('Content-Type: application/json');
 
-if (!isset($_SESSION['user_id'])) {
-    die(json_encode(["status" => "error", "message" => "Unauthorized"]));
-}
-
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    echo json_encode(['status' => 'error', 'message' => 'Invalid request method.']);
-    exit;
-}
+require_http_methods('POST');
+$user_id = require_authenticated_user();
 
 $input = json_decode(file_get_contents('php://input'), true);
 $file_path = $input['file_path'] ?? '';
@@ -36,7 +30,7 @@ if ($result->num_rows === 0) {
 $row = $result->fetch_assoc();
 
 // Check if user owns the file or is admin
-if ($row['uploaded_by'] != $_SESSION['user_id'] && $_SESSION['role'] !== 'super_admin') {
+if ((int)$row['uploaded_by'] !== $user_id && (string)($_SESSION['role'] ?? '') !== 'super_admin') {
     echo json_encode(['status' => 'error', 'message' => 'You do not have permission to delete this file.']);
     exit;
 }

@@ -202,12 +202,12 @@ function displayLogs(page) {
             
             html += `
             <tr onclick="showLogDetails('${encodeURIComponent(JSON.stringify(log))}')" class="audit-trail-log-row">
-                <td>${date.toLocaleString()}</td>
-                <td>${log.user_name}</td>
-                <td><span class="action-badge">${log.action}</span></td>
-                <td class="audit-trail-details-cell">${log.details || 'N/A'}</td>
-                <td class="audit-trail-ip-cell">${log.ip_address}</td>
-                <td class="audit-trail-severity-cell">
+                <td data-label="Time">${date.toLocaleString()}</td>
+                <td data-label="User">${log.user_name}</td>
+                <td data-label="Action"><span class="action-badge">${log.action}</span></td>
+                <td data-label="Details" class="audit-trail-details-cell">${log.details || 'N/A'}</td>
+                <td data-label="IP" class="audit-trail-ip-cell">${log.ip_address}</td>
+                <td data-label="Severity" class="audit-trail-severity-cell">
                     <span class="severity-${severity.level} audit-severity-badge">
                         ${severity.label}
                     </span>

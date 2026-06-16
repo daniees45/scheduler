@@ -7,10 +7,11 @@ import os
 import pandas as pd
 from b2_handler import B2Handler
 
-B2_HISTORICAL_KEY = "csv/general/historical_data.csv"
+B2_HISTORICAL_KEY = "csv/general/historical_schedule.csv"
 B2_EXAM_KEY = "csv/general/historical_exam_schedule.csv"
-LOCAL_DATA_PATH = "temp/historical_data.csv"
+LOCAL_DATA_PATH = "temp/historical_schedule.csv"
 LOCAL_EXAM_PATH = "temp/historical_exam_schedule.csv"
+
 
 def download_historical_data():
     b2 = B2Handler(enable_cache=True, cache_dir="temp/b2_cache")

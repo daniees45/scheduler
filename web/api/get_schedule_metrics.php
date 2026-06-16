@@ -29,7 +29,7 @@ function calculate_schedule_metrics($schedule_csv_content = null) {
         if (!$result['success']) {
             return [
                 'success' => false,
-                'error' => 'Schedule CSV not found in B2'
+                'error' => 'Schedule CSV not available'
             ];
         }
         $schedule_csv_content = $result['content'];

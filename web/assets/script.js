@@ -1,13 +1,36 @@
 // Modern UI Interactions
 
-document.addEventListener('DOMContentLoaded', () => {
-    // Add fade-in classes to main elements automatically
-    const fadeElements = document.querySelectorAll('.stat-card, .glass-panel, table tr');
-    fadeElements.forEach((el, index) => {
-        el.classList.add('animate-fade-in');
-        el.style.animationDelay = `${index * 0.05}s`;
-    });
+function runWhenIdle(fn, timeout = 250) {
+    if ('requestIdleCallback' in window) {
+        window.requestIdleCallback(fn, { timeout });
+        return;
+    }
+    window.setTimeout(fn, 16);
+}
 
+function applyFadeInInChunks(elements) {
+    let index = 0;
+    const total = elements.length;
+
+    function processChunk(deadline) {
+        let processed = 0;
+        while (index < total && processed < 24 && (!deadline || deadline.timeRemaining() > 4)) {
+            const el = elements[index];
+            el.classList.add('animate-fade-in');
+            el.style.animationDelay = `${index * 0.05}s`;
+            index += 1;
+            processed += 1;
+        }
+
+        if (index < total) {
+            runWhenIdle(processChunk, 150);
+        }
+    }
+
+    runWhenIdle(processChunk, 150);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
     // Sidebar active state
     const currentPath = window.location.pathname;
     const navLinks = document.querySelectorAll('.nav-item a');
@@ -16,6 +39,10 @@ document.addEventListener('DOMContentLoaded', () => {
             link.classList.add('active');
         }
     });
+
+    // Add fade-in classes lazily so first interactions stay responsive.
+    const fadeElements = document.querySelectorAll('.stat-card, .glass-panel, table tr');
+    applyFadeInInChunks(fadeElements);
 });
 
 
@@ -114,17 +141,20 @@ const MobileMenu = {
         
         if (!toggle || !nav) return;
         
-        // Prevent double touch on mobile
+        // Use delegated touch feedback to avoid attaching listeners on every button/link.
         if (isTouchDevice()) {
-            ['button', 'a'].forEach(selector => {
-                document.querySelectorAll(selector).forEach(el => {
-                    el.addEventListener('touchstart', function() {
-                        this.style.backgroundColor = 'rgba(255,255,255,0.1)';
-                    });
-                    el.addEventListener('touchend', function() {
-                        this.style.backgroundColor = '';
-                    });
-                });
+            document.addEventListener('touchstart', function(e) {
+                const target = e.target.closest('button, a');
+                if (target) {
+                    target.style.backgroundColor = 'rgba(255,255,255,0.1)';
+                }
+            }, { passive: true });
+
+            document.addEventListener('touchend', function(e) {
+                const target = e.target.closest('button, a');
+                if (target) {
+                    target.style.backgroundColor = '';
+                }
             });
         }
     }
@@ -205,13 +235,17 @@ const ViewportFix = {
  */
 document.addEventListener('DOMContentLoaded', function() {
     if (isMobileDevice() || isTouchDevice()) {
-        MobileMenu.init();
-        ResponsiveTable.init();
-        MobileInputs.init();
         ViewportFix.init();
+        MobileMenu.init();
         
         // Add mobile class to body
         document.body.classList.add('is-mobile');
+
+        // Defer non-critical DOM mutation work.
+        runWhenIdle(() => {
+            ResponsiveTable.init();
+            MobileInputs.init();
+        }, 250);
     }
 });
 

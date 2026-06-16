@@ -580,7 +580,7 @@
 
 .progress-bar-container {
     width: 100%;
-    max-width: 500px;
+    max-width: 800px;
     height: 12px;
     background: rgba(255, 255, 255, 0.03);
     border-radius: 20px;
@@ -645,7 +645,9 @@
     background: rgba(4, 7, 12, 0.85);
     text-align: left;
     padding: 1.25rem;
-    height: 180px;
+    height: 400px;
+    max-width: 900px;
+    margin: 0 auto;
     overflow-y: auto;
     font-family: 'JetBrains Mono', 'Fira Code', monospace;
     font-size: 0.85rem;
@@ -671,15 +673,32 @@
 }
 
 .progress-logs > div {
-    margin-bottom: 4px;
+    margin-bottom: 6px;
+    padding: 2px 0;
     transition: all 0.2s ease;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.02);
 }
 
-.progress-logs > div::before {
-    content: '> ';
+.progress-logs .log-timestamp {
+    color: rgba(255, 255, 255, 0.3);
+    margin-right: 8px;
+    font-size: 0.75rem;
+}
+
+.progress-logs .log-prefix {
     color: #6366f1;
     font-weight: bold;
+    margin-right: 4px;
 }
+
+.progress-logs .log-info { color: #e9d5ff; }
+.progress-logs .log-success { color: #10b981; }
+.progress-logs .log-warning { color: #fbbf24; }
+.progress-logs .log-error { color: #ef4444; font-weight: 600; }
+
+.progress-logs .log-success .log-prefix { color: #10b981; }
+.progress-logs .log-warning .log-prefix { color: #fbbf24; }
+.progress-logs .log-error .log-prefix { color: #ef4444; }
 
 /* ========== SUCCESS STEP STYLES ========== */
 .success-step {
@@ -938,4 +957,91 @@
     background: rgba(0, 0, 0, 0.4) !important;
     border: 1px solid rgba(255, 255, 255, 0.1);
     margin: 2rem auto !important;
+}
+
+/* ============================================================
+   generate.css - Mobile responsive breakpoints
+   ============================================================ */
+
+@media (max-width: 768px) {
+    .generate-container {
+        padding: 1.25rem;
+        margin: 0.75rem;
+        border-radius: 16px;
+    }
+    .config-form-grid {
+        grid-template-columns: 1fr;
+    }
+    .form-group-full {
+        grid-column: span 1;
+    }
+    .constraint-section-wrapper {
+        grid-column: span 1;
+    }
+    .action-buttons-flex {
+        flex-direction: column;
+    }
+    .data-ready-box {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.75rem;
+    }
+    .data-ready-buttons {
+        flex-direction: column;
+        width: 100%;
+    }
+    .data-ready-buttons .glass-btn {
+        width: 100%;
+    }
+    .review-data-buttons {
+        flex-direction: column;
+    }
+    .review-data-buttons .glass-btn {
+        width: 100%;
+    }
+}
+
+@media (max-width: 480px) {
+    .generate-container {
+        padding: 1rem;
+        margin: 0.5rem;
+    }
+    .radio-option-flex {
+        flex-direction: column;
+    }
+    .exam-radio-options {
+        flex-direction: column;
+    }
+    .input-flex-wrapper {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .input-flex-wrapper > select,
+    .input-flex-wrapper .glass-btn,
+    .input-flex-wrapper .upload-btn {
+        width: 100%;
+        height: 44px !important;
+    }
+    .upload-button-flex {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .upload-button-flex .glass-btn {
+        width: 100%;
+    }
+    .constraint-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+    .exam-saved-select-container {
+        flex-direction: column;
+    }
+    .exam-saved-select-container > select {
+        width: 100%;
+    }
+    .generate-hero-icon {
+        width: 70px;
+        height: 70px;
+    }
 }

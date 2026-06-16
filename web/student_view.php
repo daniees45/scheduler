@@ -1,4 +1,8 @@
 <?php
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 $page_title = 'Student Schedule View';
 // Custom header for students (simplified, no sidebar)
 ?>
@@ -30,7 +34,12 @@ $page_title = 'Student Schedule View';
                 </div>
             </div>
             <div>
+                <?php if (!empty($_SESSION['user_id'])): ?>
+                <a href="dashboard.php" class="glass-btn secondary small"><i class="fa-solid fa-gauge-high"></i> Dashboard</a>
+                <a href="api/auth.php?logout=true" class="glass-btn secondary small"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
+                <?php else: ?>
                 <a href="login.php" class="glass-btn secondary small"><i class="fa-solid fa-lock"></i> Staff Login</a>
+                <?php endif; ?>
             </div>
         </div>
 

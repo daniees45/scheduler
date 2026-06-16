@@ -104,16 +104,16 @@ $lecturers = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
                 <?php if ($lecturers): ?>
                 <?php foreach ($lecturers as $lecturer): ?>
                 <tr>
-                    <td class="lecturers-name-cell">
+                    <td data-label="Name" class="lecturers-name-cell">
                         <?php echo htmlspecialchars($lecturer['name']); ?>
                     </td>
-                    <td class="lecturers-muted-cell">
+                    <td data-label="Email" class="lecturers-muted-cell">
                         <?php echo htmlspecialchars($lecturer['email'] ?? 'N/A'); ?>
                     </td>
-                    <td class="lecturers-muted-cell">
+                    <td data-label="Department" class="lecturers-muted-cell">
                         <?php echo htmlspecialchars($lecturer['department'] ?? 'N/A'); ?>
                     </td>
-                    <td>
+                    <td data-label="Availability">
                         <?php
         $avail = json_decode($lecturer['availability_json'] ?? '[]', true);
         $count = is_array($avail) ? count($avail) : 5; // Default full if null
@@ -129,7 +129,7 @@ $lecturers = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
                             </span>
                         </div>
                     </td>
-                    <td>
+                    <td data-label="Actions">
                         <form method="POST" class="lecturers-inline-form"
                             onsubmit="confirmAction(event, 'Delete Lecturer', 'Are you sure you want to delete this lecturer?')">
                             <input type="hidden" name="delete_id" value="<?php echo $lecturer['id']; ?>">

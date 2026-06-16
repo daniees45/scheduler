@@ -1,5 +1,6 @@
 <?php
-echo "User: " . shell_exec('whoami') . "\n";
-echo "Root writable: " . (is_writable('../../') ? 'Yes' : 'No') . "\n";
-echo "CWD: " . getcwd() . "\n";
+http_response_code(404);
+header('Content-Type: application/json');
+echo json_encode(['status' => 'error', 'message' => 'Not found']);
+exit;
 ?>
